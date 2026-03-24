@@ -11,10 +11,9 @@ const { processOneConfig: processSFTP } = require('./ftp-worker-ssh');
 const arg = process.argv[2] || 'all';
 
 const TYPE_MAP = {
-    'ftp': ['filezilla'],
-    'filezilla': ['filezilla'],
+    'ftp': ['ftp'],
     'sftp': ['sftp'],
-    'all': ['filezilla', 'sftp']
+    'all': ['ftp', 'sftp']
 };
 
 const selectedTypes = TYPE_MAP[arg.toLowerCase()];
@@ -53,14 +52,14 @@ async function processAllFiles() {
     }
 
     // สรุปจำนวน config แต่ละประเภท
-    const ftpCount = allConfigs.filter(c => c.config_type === 'filezilla').length;
+    const ftpCount = allConfigs.filter(c => c.config_type === 'ftp').length;
     const sftpCount = allConfigs.filter(c => c.config_type === 'sftp').length;
     console.log(`>> พบทั้งหมด: ${allConfigs.length} แหล่ง (FTP: ${ftpCount}, SFTP: ${sftpCount})`);
 
     // วน config ทีละตัว → switch ไปเรียก worker ตามที่กำหนด
     for (const config of allConfigs) {
         switch (config.config_type) {
-            case 'filezilla':
+            case 'ftp':
                 console.log(`\n[${config.config_name}] → ใช้ Basic FTP`);
                 await processFTP(config);
                 break;

@@ -284,8 +284,9 @@ async function processOneConfig(ftpConfig) {
         // ===== 1. OMI =====
         {
             const subFolder = 'OMI/OMI';
+            const subTarget = 'OMI';
             const sourceFolder = `${baseSourceFolder}/${subFolder}`;
-            const targetArchiveFolder = `${baseArchiveFolder}/${dateFolderName}/${subFolder}`;
+            const targetArchiveFolder = `${baseArchiveFolder}/${dateFolderName}/${subTarget}`;
 
             console.log(`\n=================================================`);
             console.log(`📂 [OMI] กำลังเข้าตรวจสอบโฟลเดอร์: ${sourceFolder}`);
@@ -362,7 +363,7 @@ if (require.main === module) {
         try {
             const result = await pool.query(`
                 SELECT * FROM tbl_connection_configs
-                WHERE config_flag = '1' AND config_type = 'filezilla'
+                WHERE config_flag = '1' AND config_type = 'ftp'
             `);
             ftpConfigs = result.rows;
         } catch (err) {
