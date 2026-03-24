@@ -43,8 +43,9 @@ async function processOneConfig(ftpConfig) {
         // ===== 1. OMI =====
         {
             const subFolder = 'OMI/OMI';
-            const sourceFolder = `${baseSourceFolder}/${subFolder}`;
-            const targetArchiveFolder = `${baseArchiveFolder}/${dateFolderName}/${subFolder}`;
+            const subTarget = 'OMI';
+            let sourceFolder = `${baseSourceFolder}/${subFolder}`;
+            const targetArchiveFolder = `${baseArchiveFolder}/${dateFolderName}/${subTarget}`;
 
             console.log(`\n=================================================`);
             console.log(`📂 [OMI] กำลังเข้าตรวจสอบโฟลเดอร์: ${sourceFolder}`);
@@ -52,6 +53,12 @@ async function processOneConfig(ftpConfig) {
             if (!exists) {
                 await client.mkdir(targetArchiveFolder, true);
             }
+
+            const existsSub = await client.exists(sourceFolder);
+            if (!existsSub) {
+                sourceFolder = `${baseSourceFolder}/${subTarget}`;
+            }
+
             //Function สำหรับย้ายไฟล์, อ่านไฟล์ และ insert ลง DB
             await processFilesInFolder(client, sourceFolder, targetArchiveFolder, parseAndInsertOMI);
         }
