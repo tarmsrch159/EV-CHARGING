@@ -2727,7 +2727,6 @@ exports.editOrderItem = async (req, res, next) => {
 
         let scriptCheckStatus = `SELECT status_deli FROM tbl_order WHERE id = ${order_id}`;
         let status_deli = await pgConn.get(dbPrefix + lic_code, scriptCheckStatus, config.connectionString());
-        // console.log(status_deli);
 
         if (status_deli.code || status_deli.data.length === 0 || status_deli.data[0].status_deli != 'A') {
             let response = [{
@@ -2760,7 +2759,6 @@ exports.editOrderItem = async (req, res, next) => {
                 return;
             }
 
-            // console.log(order_item);
             order_item.map(async item => {
                 let item_quantity = item.item_quantity;
                 let item_no = item.item_no;
