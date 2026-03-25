@@ -259,7 +259,7 @@ exports.xAuthorization = async (req, res) => {
     catch (ex) {
         let response = [{
             status: 'error',
-            invalid_code: "-1",
+            invalid_code: "-2",
             message: "Authorization failed.",
             response_time: moment().format('YYYY-MM-DD HH:mm:ss')
         }]

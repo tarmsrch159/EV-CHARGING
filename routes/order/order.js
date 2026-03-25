@@ -332,7 +332,6 @@ exports.getOrderInformationByID = async (req, res, next) => {
 exports.getOrderReportInformation = async (req, res, next) => {
 
     var xresult = [];
-
     return (async () => {
 
         let lic_code = req.header('lic_code');
@@ -343,10 +342,11 @@ exports.getOrderReportInformation = async (req, res, next) => {
         page_limit = page_limit === undefined ? 10 : page_limit;
         auto_order = auto_order === undefined ? 'ALL' : auto_order;
         status_deli = status_deli === undefined ? 'ALL' : status_deli;
-
+        order_status = order_status === undefined || order_status === 'ALL' || order_status === '' ? 0 : order_status;
+        console.log(order_status);
         // ========== เช็คเฉพาะส่วนที่สำคัญ ==========
         if (start_date === undefined || end_date === undefined || order_type === undefined ||
-            order_status === undefined || search === undefined || action === undefined) {
+            order_status === undefined || action === undefined) {
 
             let response = [{
                 status: 'error',
@@ -369,22 +369,22 @@ exports.getOrderReportInformation = async (req, res, next) => {
         // =========================================================
         let conditions = ["tbl_order.rm_dt IS NULL"]; // เงื่อนไขตั้งต้น (บังคับมี)
 
-        if (order_no.toString().toUpperCase() !== 'ALL') {
+        if (order_no.toString().toUpperCase() !== 'ALL' && order_no.toString().toUpperCase() !== '') {
             conditions.push(`tbl_order.order_no = '${order_no}'`);
         }
-        if (status_deli.toString().toUpperCase() !== 'ALL') {
+        if (status_deli.toString().toUpperCase() !== 'ALL' && status_deli.toString().toUpperCase() !== '') {
             conditions.push(`tbl_order.status_deli = '${status_deli}'`);
         }
-        if (order_type.toString().toUpperCase() !== 'ALL') {
+        if (order_type.toString().toUpperCase() !== 'ALL' && order_type.toString().toUpperCase() !== '') {
             conditions.push(`tbl_order.order_type = '${order_type}'`);
         }
-        if (auto_order.toString().toUpperCase() !== 'ALL') {
+        if (auto_order.toString().toUpperCase() !== 'ALL' && auto_order.toString().toUpperCase() !== '') {
             conditions.push(`tbl_order.auto_order = '${auto_order}'`);
         }
-        if (order_status.toString().toUpperCase() !== 'ALL') {
+        if (order_status.toString().toUpperCase() !== 'ALL' && order_status.toString().toUpperCase() !== '') {
             conditions.push(`tbl_order.order_status = '${order_status}'`);
         }
-        if (search !== '') {
+        if (search !== '' && search !== undefined && search !== null) {
             conditions.push(`(
                 tbl_order.order_no LIKE '%${search}%' 
                 OR tbl_order.sold_to LIKE '%${search}%' 
@@ -948,9 +948,9 @@ exports.getOrderRunout = async (req, res, next) => {
                 EXTRACT(EPOCH FROM(NOW() - ist_dt)) / 60 AS minutes_since_created
             FROM public.tbl_order 
             WHERE auto_order = '1'
-            AND(order_no IS NULL OR order_no = '') 
-            AND rm_dt IS NULL 
-            AND ist_dt <= NOW() - INTERVAL '${RUNOUT_TIMEOUT_MINUTES} minutes'
+                AND(order_no IS NULL OR order_no = '') 
+                AND rm_dt IS NULL 
+                AND ist_dt <= NOW() - INTERVAL '${RUNOUT_TIMEOUT_MINUTES} minutes'
             ORDER BY ist_dt ASC`;
 
         let tbl_temporary = await pgConn.get(dbPrefix + lic_code, script, config.connectionString());

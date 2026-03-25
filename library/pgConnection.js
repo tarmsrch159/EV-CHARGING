@@ -143,6 +143,42 @@ exports.get = async (dbname, script, connectionstring) => {
     }
 }
 
+// เพิ่มตัวแปร params เข้ามาในฟังก์ชัน
+exports.getWithParams = async (dbname, script, params = [], connectionstring) => {
+    // get data
+    let temporary = JSON.parse(JSON.stringify(connectionstring))
+    if (dbname != null) {
+        temporary.database = dbname
+    }
+
+    let pool;
+    try {
+        pool = new Pool(temporary)
+        const client = await pool.connect()
+        try {
+            // ส่ง script คู่กับ params เข้าไปใน client.query
+            const res = await client.query(script, params)
+            return { code: false, data: res.rows }
+
+        } catch (e) {
+            if (e.code != '3D000') {
+                console.log(`${script} : error code : ${e.code} err.message : ${e.message}`)
+            }
+            return { code: true, message: e.message }
+        } finally {
+            client.release()
+            // แนะนำให้จบการทำงานของ pool ถ้าสร้างใหม่ทุกครั้ง (หรือใช้ Global Pool แทนจะดีกว่า)
+            await pool.end()
+        }
+    } catch (error) {
+        if (error.code != '3D000') {
+            // แก้ไขตัวแปรจาก e เป็น error เพื่อให้ตรงกับ catch
+            console.log(`${script} : error code : ${error.code} err.message : ${error.message}`)
+        }
+        return { code: true, message: error.message }
+    }
+}
+
 exports.upsert = async (dbname, insert, update, connectionString) => {
     // 1 by 1 upsert
     var arr = [];
