@@ -13,7 +13,7 @@ const formatIfValid = (date) => {
 
 exports.getReportPosTanks = async (req, res, next) => {
     var xresult = [];
-    let { start_date, end_date, page_index, page_limit, action } = req.body[0];
+    let { start_date, end_date, keyword, page_index, page_limit, action } = req.body[0];
     let lic_code = req.header('lic_code');
     let roleId = action[0].id;
     let roleValue = action[0].value !== 'ALL' ? action[0].value : 'ALL';
@@ -56,6 +56,13 @@ exports.getReportPosTanks = async (req, res, next) => {
 
             param.push(end_date);
             scriptSql += ` AND date_at < $${param.length} `;
+        }
+
+        // --- เงื่อนไขที่ 3: Keyword ---
+        if (keyword) {
+            keyword = '%' + keyword + '%';
+            param.push(keyword);
+            scriptSql += ` AND product_name LIKE $${param.length} `;
         }
 
         // --- ดึงข้อมูล Count ---
@@ -103,7 +110,7 @@ exports.getReportPosTanks = async (req, res, next) => {
 
 exports.getReportPosMeters = async (req, res, next) => {
     var xresult = [];
-    let { start_date, end_date, page_index, page_limit, action } = req.body[0];
+    let { start_date, end_date, keyword, page_index, page_limit, action } = req.body[0];
     let lic_code = req.header('lic_code');
     let roleId = action[0].id;
     let roleValue = action[0].value !== 'ALL' ? action[0].value : 'ALL';
@@ -146,6 +153,13 @@ exports.getReportPosMeters = async (req, res, next) => {
 
             param.push(end_date);
             scriptSql += ` AND buy_date < $${param.length} `;
+        }
+
+        // --- เงื่อนไขที่ 3: Keyword ---
+        if (keyword) {
+            keyword = '%' + keyword + '%';
+            param.push(keyword);
+            scriptSql += ` AND product_name LIKE $${param.length} `;
         }
 
         // --- ดึงข้อมูล Count ---
@@ -193,7 +207,7 @@ exports.getReportPosMeters = async (req, res, next) => {
 
 exports.getReportPosOmi = async (req, res, next) => {
     var xresult = [];
-    let { start_date, end_date, page_index, page_limit, action } = req.body[0];
+    let { start_date, end_date, keyword, page_index, page_limit, action } = req.body[0];
     let lic_code = req.header('lic_code');
     let roleId = action[0].id;
     let roleValue = action[0].value !== 'ALL' ? action[0].value : 'ALL';
@@ -236,6 +250,13 @@ exports.getReportPosOmi = async (req, res, next) => {
 
             param.push(end_date);
             scriptSql += ` AND buy_at < $${param.length} `;
+        }
+
+        // --- เงื่อนไขที่ 3: Keyword ---
+        if (keyword) {
+            keyword = '%' + keyword + '%';
+            param.push(keyword);
+            scriptSql += ` AND product_name LIKE $${param.length} `;
         }
 
         // --- ดึงข้อมูล Count ---
