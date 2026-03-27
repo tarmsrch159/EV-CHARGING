@@ -41,7 +41,7 @@ exports.getPetrolInformation = async (req, res, next) => {
             if (ptrl_code.toString().toUpperCase() != 'ALL') {
                 script = `select ptrl_code, ptrl_number, ptrl_sitecode, ptrl_desc, ptrl_short_desc, ptrl_address, ptrl_zip_code, ptrl_country_code,
                 ptrl_unloading_minute, ptrl_expenses_per_km, ptrl_area, ptrl_option_pump, ptrl_option_mrge_orders, ptrl_lat, ptrl_lon,
-                tbl_petrol.off_code, off_desc, tbl_petrol.ptrl_group_code, ptrl_group_desc, tbl_petrol.ist_dt, tbl_petrol.mdf_dt, tbl_petrol.rm_dt, 
+                tbl_petrol.off_code, off_desc, tbl_petrol.ptrl_group_code, ptrl_group_desc,
                 ptrl_flag, ptrl_remark, ptrl_sales_group, ptrl_sales_type, auto_order, tbl_petrol.prov_code, tbl_petrol.amph_code, tbl_petrol.tamb_code, tbl_province.prov_desc, tbl_amphure.amph_desc, tbl_tambon.tamb_desc
                 from tbl_petrol 
                 left join tbl_office on tbl_petrol.off_code = tbl_office.off_code 
@@ -54,7 +54,7 @@ exports.getPetrolInformation = async (req, res, next) => {
             else {
                 script = `select ptrl_code, ptrl_number, ptrl_sitecode, ptrl_desc, ptrl_short_desc, ptrl_address, ptrl_zip_code, ptrl_country_code,
                 ptrl_unloading_minute, ptrl_expenses_per_km, ptrl_area, ptrl_option_pump, ptrl_option_mrge_orders, ptrl_lat, ptrl_lon,
-                tbl_petrol.off_code, off_desc, tbl_petrol.ptrl_group_code, ptrl_group_desc, tbl_petrol.ist_dt, tbl_petrol.mdf_dt, tbl_petrol.rm_dt, 
+                tbl_petrol.off_code, off_desc, tbl_petrol.ptrl_group_code, ptrl_group_desc,
                 ptrl_flag, ptrl_remark, ptrl_sales_group, ptrl_sales_type, auto_order, tbl_petrol.prov_code, tbl_petrol.amph_code, tbl_petrol.tamb_code, tbl_province.prov_desc, tbl_amphure.amph_desc, tbl_tambon.tamb_desc  
                 from tbl_petrol 
                 left join tbl_office on tbl_petrol.off_code = tbl_office.off_code 
