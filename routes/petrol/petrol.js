@@ -12,13 +12,22 @@ exports.getPetrolInformation = async (req, res, next) => {
 
     return (async () => {
         let lic_code = req.header('lic_code');
-        let { ptrl_code, off_code, ptrl_group_code, search, page_index, page_limit, action, auto_order, emp_code } = req.body[0];
-        page_index == undefined ? page_index = 1 : page_index;
-        page_limit == undefined ? page_limit = 10 : page_limit;
-        emp_code = emp_code == undefined ? 'ALL' : emp_code;
-        //เช็คเฉพาะส่วนที่สำคัญ
-        if (ptrl_code == undefined || off_code == undefined || ptrl_group_code == undefined || lic_code == undefined
-            || search == undefined || action == undefined) {
+        let payload = req.body?.[0] || {};
+
+        let {
+            ptrl_code, off_code, ptrl_group_code, search,
+            page_index, page_limit, action, auto_order, emp_code
+        } = payload;
+
+        // ======== กำหนดค่าเริ่มต้น ========
+        page_index = page_index === undefined ? 1 : page_index;
+        page_limit = page_limit === undefined ? 10 : page_limit;
+        emp_code = emp_code === undefined ? 'ALL' : emp_code;
+
+        // ======== ตรวจสอบพารามิเตอร์ที่จำเป็น ========
+        if (ptrl_code === undefined || off_code === undefined || ptrl_group_code === undefined ||
+            lic_code === undefined || search === undefined || action === undefined) {
+
             let response = [{
                 status: 'error',
                 invalid_code: '-1',
@@ -27,188 +36,208 @@ exports.getPetrolInformation = async (req, res, next) => {
                 response_time: moment().format('YYYY-MM-DD HH:mm:ss'),
                 page_total: 0,
                 rows_total: 0
-            }]
+            }];
 
             res.status(200).send(response);
-        } else {
-            let script = ``;
-            if (page_index > 0) {
-                page_index -= 1;
+            return;
+        }
+
+        if (page_index > 0) {
+            page_index -= 1;
+        }
+
+        // ======== สร้างเงื่อนไข WHERE (Dynamic Conditions) ========
+        let conditions = ["tbl_petrol.ptrl_flag = '1'"];
+
+        if (ptrl_code.toString().toUpperCase() !== 'ALL') {
+            conditions.push(`tbl_petrol.ptrl_code = '${ptrl_code}'`);
+        }
+
+        if (auto_order !== undefined && auto_order !== '') {
+            conditions.push(`tbl_petrol.auto_order = ${auto_order}`);
+        }
+
+        if (ptrl_group_code.toString().toUpperCase() !== 'ALL' && ptrl_group_code !== '') {
+            conditions.push(`tbl_petrol.ptrl_group_code = '${ptrl_group_code}'`);
+        }
+
+        if (off_code.toString().toUpperCase() !== 'ALL' && off_code !== '') {
+            conditions.push(`tbl_petrol.off_code = '${off_code}'`);
+        }
+
+        // ดัก undefined ให้ Action
+        let act_val = action?.[0]?.value?.toString().toUpperCase() || 'ALL';
+        let act_id = action?.[0]?.id || '';
+
+        // จัดการเงื่อนไขตามสิทธิ์การเข้าถึง
+        if (act_val !== 'ALL') {
+            if (act_val === 'GROUP') {
+                conditions.push(`tbl_petrol.ptrl_group_code IN (SELECT ptrl_group_code FROM tbl_employee_petrol_group WHERE emp_code = '${act_id}' AND emp_pgrp_flag = 1)`);
+            } else {
+                conditions.push(`tbl_petrol.ptrl_code IN (SELECT ptrl_code FROM tbl_employee WHERE emp_code = '${act_id}' AND emp_flag = '1')`);
             }
+        }
 
-            page_limit = page_limit || 100;
+        if (search !== '') {
+            conditions.push(`(
+                tbl_petrol.ptrl_number LIKE '%${search}%' 
+                OR tbl_petrol.ptrl_sitecode LIKE '%${search}%' 
+                OR tbl_petrol_group.ptrl_group_desc LIKE '%${search}%' 
+                OR tbl_petrol.ptrl_desc LIKE '%${search}%' 
+                OR tbl_petrol.ptrl_short_desc LIKE '%${search}%' 
+                OR tbl_petrol.ptrl_address LIKE '%${search}%' 
+                OR tbl_petrol.ptrl_zip_code LIKE '%${search}%'
+            )`);
+        }
 
-            if (ptrl_code.toString().toUpperCase() != 'ALL') {
-                script = `select ptrl_code, ptrl_number, ptrl_sitecode, ptrl_desc, ptrl_short_desc, ptrl_address, ptrl_zip_code, ptrl_country_code,
-                ptrl_unloading_minute, ptrl_expenses_per_km, ptrl_area, ptrl_option_pump, ptrl_option_mrge_orders, ptrl_lat, ptrl_lon,
-                tbl_petrol.off_code, off_desc, tbl_petrol.ptrl_group_code, ptrl_group_desc,
-                ptrl_flag, ptrl_remark, ptrl_sales_group, ptrl_sales_type, auto_order, tbl_petrol.prov_code, tbl_petrol.amph_code, tbl_petrol.tamb_code, tbl_province.prov_desc, tbl_amphure.amph_desc, tbl_tambon.tamb_desc
-                from tbl_petrol 
-                left join tbl_office on tbl_petrol.off_code = tbl_office.off_code 
-                left join tbl_petrol_group on tbl_petrol.ptrl_group_code = tbl_petrol_group.ptrl_group_code 
-                left join tbl_province on tbl_petrol.prov_code = tbl_province.prov_code 
-                left join tbl_amphure on tbl_petrol.amph_code = tbl_amphure.amph_code 
-                left join tbl_tambon on tbl_petrol.tamb_code = tbl_tambon.tamb_code 
-                where ptrl_flag = '1' and tbl_petrol.ptrl_code = '${ptrl_code}'`;
-            }
-            else {
-                script = `select ptrl_code, ptrl_number, ptrl_sitecode, ptrl_desc, ptrl_short_desc, ptrl_address, ptrl_zip_code, ptrl_country_code,
-                ptrl_unloading_minute, ptrl_expenses_per_km, ptrl_area, ptrl_option_pump, ptrl_option_mrge_orders, ptrl_lat, ptrl_lon,
-                tbl_petrol.off_code, off_desc, tbl_petrol.ptrl_group_code, ptrl_group_desc,
-                ptrl_flag, ptrl_remark, ptrl_sales_group, ptrl_sales_type, auto_order, tbl_petrol.prov_code, tbl_petrol.amph_code, tbl_petrol.tamb_code, tbl_province.prov_desc, tbl_amphure.amph_desc, tbl_tambon.tamb_desc  
-                from tbl_petrol 
-                left join tbl_office on tbl_petrol.off_code = tbl_office.off_code 
-                left join tbl_petrol_group on tbl_petrol.ptrl_group_code = tbl_petrol_group.ptrl_group_code 
-                left join tbl_province on tbl_petrol.prov_code = tbl_province.prov_code 
-                left join tbl_amphure on tbl_petrol.amph_code = tbl_amphure.amph_code 
-                left join tbl_tambon on tbl_petrol.tamb_code = tbl_tambon.tamb_code 
-                where ptrl_flag = '1'`;
-            }
+        let whereClause = "WHERE " + conditions.join(" AND ");
 
-            if (auto_order != undefined && auto_order != '') {
-                script += ` and tbl_petrol.auto_order = ${auto_order}`
-            }
+        // ======== SQL สำหรับดึงข้อมูล ========
+        let baseSelectQuery = `
+            SELECT ptrl_code, ptrl_number, ptrl_sitecode, ptrl_desc, ptrl_short_desc, ptrl_address, ptrl_zip_code, ptrl_country_code,
+            ptrl_unloading_minute, ptrl_expenses_per_km, ptrl_area, ptrl_option_pump, ptrl_option_mrge_orders, ptrl_lat, ptrl_lon,
+            tbl_petrol.off_code, off_desc, tbl_petrol.ptrl_group_code, ptrl_group_desc,
+            ptrl_flag, ptrl_remark, ptrl_sales_group, ptrl_sales_type, auto_order, 
+            tbl_petrol.prov_code, tbl_petrol.amph_code, tbl_petrol.tamb_code, 
+            tbl_province.prov_desc, tbl_amphure.amph_desc, tbl_tambon.tamb_desc
+            FROM tbl_petrol 
+            LEFT JOIN tbl_office ON tbl_petrol.off_code = tbl_office.off_code 
+            LEFT JOIN tbl_petrol_group ON tbl_petrol.ptrl_group_code = tbl_petrol_group.ptrl_group_code 
+            LEFT JOIN tbl_province ON tbl_petrol.prov_code = tbl_province.prov_code 
+            LEFT JOIN tbl_amphure ON tbl_petrol.amph_code = tbl_amphure.amph_code 
+            LEFT JOIN tbl_tambon ON tbl_petrol.tamb_code = tbl_tambon.tamb_code 
+        `;
 
-            if (ptrl_group_code.toString().toUpperCase() != 'ALL' && ptrl_group_code.toString().toUpperCase() != '') {
-                script += ` and tbl_petrol.ptrl_group_code = '${ptrl_group_code}'`
-            }
+        let dataScript = `
+            ${baseSelectQuery}
+            ${whereClause}
+            ORDER BY tbl_petrol.ist_dt DESC 
+            LIMIT ${page_limit} OFFSET (${page_index} * ${page_limit});
+        `;
 
-            if (off_code.toString().toUpperCase() != 'ALL' && off_code.toString().toUpperCase() != '') {
-                script += ` and tbl_petrol.off_code = '${off_code}'`
-            }
+        let tbl_temporary = await pgConn.get(dbPrefix + lic_code, dataScript, config.connectionString());
 
-            if (action[0].value.toString().toUpperCase() != 'ALL') {
-                script += ` and tbl_petrol.ptrl_code IN (SELECT ptrl_code FROM tbl_employee WHERE emp_code = '${action[0].id}' AND emp_flag = '1') `
-            }
+        if (!tbl_temporary.code) {
+            if (tbl_temporary.data.length > 0) {
+                // แปลง null เป็น ""
+                tbl_temporary.data = JSON.parse(JSON.stringify(tbl_temporary.data).replace(/\:null/gi, "\:\"\""));
+                let responseData = tbl_temporary.data;
 
-            if (search != '') {
-                script += ` and (ptrl_number like '%${search}%' 
-                or ptrl_sitecode like '%${search}%' 
-                or ptrl_group_desc like '%${search}%' 
-                or ptrl_desc like '%${search}%' 
-                or ptrl_short_desc like '%${search}%' 
-                or ptrl_address like '%${search}%' 
-                or ptrl_zip_code like '%${search}%')`
-            }
+                // =================================================================
+                //  กรองข้อมูลและจัดกลุ่มถ้า action value เป็น 'GROUP'
+                // =================================================================
+                if (action[0].value.toString().toUpperCase() === 'GROUP') {
+                    // ใช้ reduce เพื่อสร้าง Object จัดกลุ่ม
+                    let groupedObj = responseData.reduce((acc, curr) => {
+                        let groupKey = curr.ptrl_group_code || 'UNASSIGNED';
 
-            script += ` order by tbl_petrol.ist_dt desc `
-            script += ` limit ${page_limit} offset (${page_index}*${page_limit});`
-
-            let tbl_temporary = await pgConn.get(dbPrefix + lic_code, script, config.connectionString());
-            if (!tbl_temporary.code) {
-                //debugger
-                if (tbl_temporary.data.length > 0) {
-                    tbl_temporary.data = JSON.parse(JSON.stringify(tbl_temporary.data).replace(/\:null/gi, "\:\"\""));
-
-                    let page_total = 0;
-                    let rows_total = 0;
-                    script = ``
-                    if (ptrl_code.toString().toUpperCase() != 'ALL') {
-                        script = `select ceil((ceil(count(ptrl_code)) / ${page_limit})) as page_total, (count(ptrl_code)) as rows_total 
-                        from tbl_petrol 
-                        left join tbl_office on tbl_petrol.off_code = tbl_office.off_code 
-                        left join tbl_petrol_group on tbl_petrol.ptrl_group_code = tbl_petrol_group.ptrl_group_code 
-                        where ptrl_flag = '1' and tbl_petrol.ptrl_code = '${ptrl_code}'`;
-                    }
-                    else {
-                        script = `select ceil((ceil(count(ptrl_code)) / ${page_limit})) as page_total, (count(ptrl_code)) as rows_total 
-                        from tbl_petrol 
-                        left join tbl_office on tbl_petrol.off_code = tbl_office.off_code 
-                        left join tbl_petrol_group on tbl_petrol.ptrl_group_code = tbl_petrol_group.ptrl_group_code 
-                        where ptrl_flag = '1' `;
-                    }
-
-                    if (ptrl_group_code.toString().toUpperCase() != 'ALL' && ptrl_group_code.toString().toUpperCase() != '') {
-                        script += ` and tbl_petrol.ptrl_group_code = '${ptrl_group_code}'`
-                    }
-
-                    if (off_code.toString().toUpperCase() != 'ALL' && off_code.toString().toUpperCase() != '') {
-                        script += ` and tbl_petrol.off_code = '${off_code}'`
-                    }
-
-                    if (action[0].value.toString().toUpperCase() != 'ALL') {
-                        script += ` and tbl_petrol.ptrl_code IN (SELECT ptrl_code FROM tbl_employee WHERE emp_code = '${action[0].id}' AND emp_flag = '1') `
-                    }
-
-                    if (search != '') {
-                        script += ` and (ptrl_number like '%${search}%' 
-                        or ptrl_sitecode like '%${search}%' 
-                        or ptrl_group_desc like '%${search}%' 
-                        or ptrl_desc like '%${search}%' 
-                        or ptrl_short_desc like '%${search}%' 
-                        or ptrl_address like '%${search}%' 
-                        or ptrl_zip_code like '%${search}%')`
-                    }
-
-
-
-                    let tbl_temporary0 = await pgConn.get(dbPrefix + lic_code, script, config.connectionString());
-
-                    if (!tbl_temporary0.code) {
-                        if (tbl_temporary0.data.length > 0) {
-                            page_total = parseInt(tbl_temporary0.data[0].page_total);
-                            rows_total = parseInt(tbl_temporary0.data[0].rows_total);
+                        // ถ้ายังไม่มี Key กลุ่มนี้ ให้สร้างขึ้นมา
+                        if (!acc[groupKey]) {
+                            acc[groupKey] = {
+                                ptrl_group_code: groupKey,
+                                ptrl_group_desc: curr.ptrl_group_desc || '',
+                                stations: [] // เก็บปั๊มไว้ใน Array นี้
+                            };
                         }
-                    }
 
-                    let response = [{
-                        status: 'success',
-                        invalid_code: '0',
-                        message: '',
-                        data: tbl_temporary.data,
-                        response_time: moment().format('YYYY-MM-DD HH:mm:ss'),
-                        page_total: (page_total <= 0 ? 1 : page_total),
-                        rows_total: rows_total
-                    }]
+                        // เอาข้อมูลปั๊มใส่เข้าไปในกลุ่ม
+                        acc[groupKey].stations.push(curr);
 
-                    res.status(200).send(response);
-                    return;
-                } else {
-                    let response = [{
-                        status: 'success',
-                        invalid_code: '0',
-                        message: '',
-                        data: xresult,
-                        response_time: moment().format('YYYY-MM-DD HH:mm:ss'),
-                        page_total: 0,
-                        rows_total: 0
-                    }]
+                        return acc;
+                    }, {});
 
-                    res.status(200).send(response);
-                    return;
+                    // แปลงกลับจาก Object ให้เป็น Array 
+                    responseData = Object.values(groupedObj);
                 }
+                let page_total = 0;
+                let rows_total = 0;
+
+                // ======== นับจำนวนแถวทั้งหมด ========
+                let countScript = `
+                    SELECT 
+                        CEIL(COUNT(tbl_petrol.ptrl_code)::float / ${page_limit}) as page_total, 
+                        COUNT(tbl_petrol.ptrl_code) as rows_total 
+                    FROM tbl_petrol 
+                    LEFT JOIN tbl_office ON tbl_petrol.off_code = tbl_office.off_code 
+                    LEFT JOIN tbl_petrol_group ON tbl_petrol.ptrl_group_code = tbl_petrol_group.ptrl_group_code 
+                    ${whereClause};
+                `;
+
+                let tbl_temporary0 = await pgConn.get(dbPrefix + lic_code, countScript, config.connectionString());
+
+                if (!tbl_temporary0.code && tbl_temporary0.data.length > 0) {
+                    page_total = parseInt(tbl_temporary0.data[0].page_total);
+                    rows_total = parseInt(tbl_temporary0.data[0].rows_total);
+                }
+
+                let response = [{
+                    status: 'success',
+                    invalid_code: '0',
+                    message: '',
+                    data: responseData,
+                    response_time: moment().format('YYYY-MM-DD HH:mm:ss'),
+                    page_total: (page_total <= 0 ? 1 : page_total),
+                    rows_total: rows_total
+                }];
+
+                res.status(200).send(response);
+                return;
             } else {
                 let response = [{
-                    status: 'error',
-                    invalid_code: '-3',
-                    message: `ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ`,
+                    status: 'success',
+                    invalid_code: '0',
+                    message: '',
                     data: xresult,
                     response_time: moment().format('YYYY-MM-DD HH:mm:ss'),
                     page_total: 0,
                     rows_total: 0
-                }]
+                }];
+
                 res.status(200).send(response);
-                await xglobal.action_logs(lic_code, action[0].id, 'ดึงข้อมูลปั้ม', JSON.stringify(req.body[0]), 'ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ', action[0].value);
                 return;
             }
+        } else {
+            let act_id = action?.[0]?.id || '';
+            let act_val = action?.[0]?.value || '';
+            let response = [{
+                status: 'error',
+                invalid_code: '-3',
+                message: `ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ`,
+                data: xresult,
+                response_time: moment().format('YYYY-MM-DD HH:mm:ss'),
+                page_total: 0,
+                rows_total: 0
+            }];
+
+            res.status(200).send(response);
+            await xglobal.action_logs(lic_code, act_id, 'ดึงข้อมูลปั้ม', JSON.stringify(payload), 'ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ', act_val);
+            return;
         }
+
     })().catch(async (err) => {
-        console.log(err);
+        console.error(err);
+        let payload = req.body?.[0] || {};
+        let act_id = payload.action?.[0]?.id || '';
+        let act_val = payload.action?.[0]?.value || '';
+
         let response = [{
             status: 'error',
             invalid_code: '-4',
             message: `ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ`,
             data: xresult,
-            response_time: moment().format('YYYY-MM-DD HH:mm:ss').toString(),
+            response_time: moment().format('YYYY-MM-DD HH:mm:ss'),
             page_total: 0,
             rows_total: 0
-        }]
+        }];
+
         res.status(200).send(response);
-        await xglobal.action_logs(lic_code, action[0].id, 'ดึงข้อมูลปั้ม', JSON.stringify(req.body[0]), 'ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ', action[0].value);
+
+        if (act_id) {
+            await xglobal.action_logs(lic_code, act_id, 'ดึงข้อมูลปั้ม', JSON.stringify(payload), 'ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ', act_val);
+        }
         return;
     });
 }
-
 exports.removePetrol = async (req, res, next) => {
 
     return (async () => {
