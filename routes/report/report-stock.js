@@ -13,12 +13,12 @@ const formatIfValid = (date) => {
 
 exports.getReportStock = async (req, res, next) => {
     var xresult = [];
-    let { date_at, ptrl_sitecode, action } = req.body[0];
+    let { date_at, ptrl_number, action } = req.body[0];
     let lic_code = req.header('lic_code');
     let roleId = action[0].id;
     let roleValue = action[0].value !== 'ALL' ? action[0].value : 'ALL';
 
-    if (!lic_code || !ptrl_sitecode || !date_at) {
+    if (!lic_code || !ptrl_number || !date_at) {
         let response = [{
             status: 'error',
             invalid_code: '-1',
@@ -50,12 +50,12 @@ exports.getReportStock = async (req, res, next) => {
         param.push(date_at);
 
         let wh = '';
-        param.push(ptrl_sitecode);
-        wh += ` AND tpr.ptrl_sitecode = $${param.length} `;
+        param.push(ptrl_number);
+        wh += ` AND tpr.ptrl_number = $${param.length} `;
 
         let scriptSql = `
             SELECT
-                tpr.ptrl_sitecode AS shipto,
+                tpr.ptrl_number AS shipto,
                 tank.date_at,
                 JSONB_AGG(
                     JSONB_BUILD_OBJECT(
@@ -92,8 +92,8 @@ exports.getReportStock = async (req, res, next) => {
                 AND tpr.ptrl_sitecode = meter_summary.shipto_no
             )
             WHERE 1=1 ${wh}
-            GROUP BY tpr.ptrl_sitecode, tank.date_at
-            ORDER BY tpr.ptrl_sitecode ASC;
+            GROUP BY tpr.ptrl_number, tank.date_at
+            ORDER BY tpr.ptrl_number ASC;
         `;
 
         let result = await pgConn.getWithParams(dbPrefix + lic_code, scriptSql, param, config.connectionString());
