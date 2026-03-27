@@ -61,10 +61,12 @@ exports.getReportStock = async (req, res, next) => {
                     JSONB_BUILD_OBJECT(
                         'tank_no', tpt.tnk_number,
                         'product_name', tit.itm_short_desc,
+                        'un_pump', tpt.tnk_deadstock,
                         'max_stock', tpt.tnk_capacity,
                         'tank_start', tank.tank_start,
                         'tank_end', tank.tank_end,
-                        'total_sales', COALESCE(CAST(meter_summary.total_sales AS NUMERIC(18,2)), 0)
+                        'total_sales', COALESCE(CAST(meter_summary.total_sales AS NUMERIC(18,2)), 0),
+                        'min_stock', CAST(meter_summary.total_sales AS NUMERIC(18,2)) + tpt.tnk_deadstock
                     )
                     ORDER BY tpt.tnk_number ASC
                 ) AS data
