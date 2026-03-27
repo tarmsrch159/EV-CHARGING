@@ -18,7 +18,7 @@ exports.getReportStock = async (req, res, next) => {
     let roleId = action[0].id;
     let roleValue = action[0].value !== 'ALL' ? action[0].value : 'ALL';
 
-    if (!lic_code || !ptrl_number || !date_at) {
+    if (!lic_code || !ptrl_number) {
         let response = [{
             status: 'error',
             invalid_code: '-1',
@@ -32,19 +32,7 @@ exports.getReportStock = async (req, res, next) => {
     }
 
     try {
-        date_at = formatIfValid(date_at);
-        if (!date_at) {
-            let response = [{
-                status: 'error',
-                invalid_code: '-2',
-                message: 'ไม่สามารถดึงข้อมูลได้, เนื่องจากข้อมูลวันที่ไม่ถูกต้อง',
-                data: xresult,
-                response_time: moment().format('YYYY-MM-DD HH:mm:ss')
-            }]
-
-            res.status(200).send(response);
-            return
-        }
+        date_at = moment().format('YYYY-MM-DD');
 
         let param = [];
         param.push(date_at);
