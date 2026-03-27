@@ -63,10 +63,12 @@ exports.getReportStock = async (req, res, next) => {
                         'product_name', tit.itm_short_desc,
                         'un_pump', tpt.tnk_deadstock,
                         'max_stock', tpt.tnk_capacity,
+                        'target_stock', tpt.tnk_target,
                         'tank_start', tank.tank_start,
                         'tank_end', tank.tank_end,
                         'total_sales', COALESCE(CAST(meter_summary.total_sales AS NUMERIC(18,2)), 0),
-                        'min_stock', CAST(meter_summary.total_sales AS NUMERIC(18,2)) + tpt.tnk_deadstock
+                        'min_stock', CAST(meter_summary.total_sales AS NUMERIC(18,2)) + tpt.tnk_deadstock,
+                        'recive_val', tank.recive_val::INT
                     )
                     ORDER BY tpt.tnk_number ASC
                 ) AS data
@@ -81,12 +83,22 @@ exports.getReportStock = async (req, res, next) => {
             LEFT JOIN (
                 SELECT 
                     tank_no,
+                    product_name,
                     shipto_no,
                     buy_date,
-                    SUM(meter_end - meter_start) AS total_sales
-                FROM tbl_order_eodmeter
-                WHERE buy_date = $1
-                GROUP BY tank_no, shipto_no, buy_date
+                    SUM(meter_diff) AS total_sales
+                FROM (
+                    SELECT DISTINCT ON (product_name, shipto_no, tank_no, buy_date, meter_start, meter_start)
+                        product_name,
+                        shipto_no,
+                        tank_no,
+                        buy_date,
+                        (meter_end - meter_start) AS meter_diff
+                    FROM tbl_order_eodmeter
+                    WHERE buy_date = $1
+                    ORDER BY product_name, shipto_no, tank_no, buy_date, meter_start, meter_start, id DESC
+                ) AS latest_meters
+                GROUP BY product_name, tank_no, shipto_no, buy_date
             ) meter_summary ON (
                 tpt.tnk_number = meter_summary.tank_no 
                 AND tpr.ptrl_sitecode = meter_summary.shipto_no
