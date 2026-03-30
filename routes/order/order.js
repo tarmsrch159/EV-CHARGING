@@ -60,14 +60,13 @@ exports.getOrderInformation = async (req, res, next) => {
         // =========================================================================
         let conditions = ["tbl_order.rm_dt IS NULL"];
 
-        // กรองตามฟิลด์พื้นฐาน (อิงจาก Dropdown หน้าบ้าน)
         if (order_no.toString().toUpperCase() !== 'ALL') conditions.push(`tbl_order.order_no = '${order_no}'`);
         if (status_deli.toString().toUpperCase() !== 'ALL') conditions.push(`tbl_order.status_deli = '${status_deli}'`);
         if (order_type.toString().toUpperCase() !== 'ALL') conditions.push(`tbl_order.order_type = '${order_type}'`);
         if (auto_order.toString().toUpperCase() !== 'ALL') conditions.push(`tbl_order.auto_order = '${auto_order}'`);
         if (order_status.toString().toUpperCase() !== 'ALL') conditions.push(`tbl_order.order_status = '${order_status}'`);
 
-        // กรองตามรหัสสถานีปั๊ม
+
         if (ptrl_number !== undefined && ptrl_number.toString().toUpperCase() !== 'ALL') {
             conditions.push(`tbl_order.ship_to IN (${ptrl_number})`);
         }
@@ -86,9 +85,6 @@ exports.getOrderInformation = async (req, res, next) => {
             conditions.push(`tbl_order.created_by_tms = '${act_id}'`);
         }
 
-        // =========================================================================
-        // กรองข้อมูลจากช่อง Search (ค้นหาครอบคลุมหลายฟิลด์)
-        // =========================================================================
         if (search !== '') {
             conditions.push(`(
                 tbl_order.order_no LIKE '%${search}%' 
@@ -165,6 +161,7 @@ exports.getOrderInformation = async (req, res, next) => {
             AND item.item_qty IS NOT NULL 
         `;
 
+
         let tbl_top_sum_qty = await pgConn.get(dbPrefix + lic_code, topSumQtyScript, config.connectionString());
 
         if (!tbl_top_sum_qty.code && tbl_top_sum_qty.data && tbl_top_sum_qty.data.length > 0) {
@@ -187,9 +184,9 @@ exports.getOrderInformation = async (req, res, next) => {
             ORDER BY latest_order_date DESC 
             LIMIT 1;
         `;
+
         console.log(topOrdererScript)
         let tbl_top_orderer = await pgConn.get(dbPrefix + lic_code, topOrdererScript, config.connectionString());
-        console.log(tbl_top_orderer)
         if (!tbl_top_orderer.code && tbl_top_orderer.data && tbl_top_orderer.data.length > 0) {
             let Orderer_name = tbl_top_orderer.data[0].emp_name;
             let code = tbl_top_orderer.data[0].created_by_tms;
@@ -245,7 +242,6 @@ exports.getOrderInformation = async (req, res, next) => {
         if (!tbl_temporary.code) {
             if (tbl_temporary.data.length > 0) {
 
-                // แปลงค่า null ให้เป็น string ว่าง ("") ป้องกันปัญหาตอน Frontend นำไปใช้
                 tbl_temporary.data = JSON.parse(JSON.stringify(tbl_temporary.data).replace(/\:null/gi, "\:\"\""));
 
                 // =========================================================================
