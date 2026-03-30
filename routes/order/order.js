@@ -231,7 +231,7 @@ exports.getOrderInformation = async (req, res, next) => {
 exports.getOrderInformationByID = async (req, res, next) => {
 
     var xresult = [];
-
+    let date_at = moment().format('YYYY-MM-DD');
     return (async () => {
 
         let lic_code = req.header('lic_code');
@@ -252,20 +252,20 @@ exports.getOrderInformationByID = async (req, res, next) => {
 
         // ======== คำสั่ง SQL สำหรับดึงข้อมูลของออเดอร์ พร้อม Join ข้อมูลพื้นฐานที่เกี่ยวข้อง ========
         let orderScript = `SELECT 
-            tbl_order.id, tbl_order.order_no, tbl_order.sh_cus_ref as aos_order_no, tbl_order.order_type, tbl_order.order_group, 
-            tbl_order_type.ord_type_desc,
-            tbl_petrol_group.ptrl_group_desc,
-            tbl_order.order_status,
-            tbl_order.chanel, tbl_order.division, tbl_order.sold_to, tbl_order.ship_to, 
-            tbl_petrol.ptrl_desc as station, tbl_petrol.ptrl_code,
-            tbl_order.cus_ref, tbl_order.cus_date_ref, tbl_order.po_name, tbl_order.order_by, 
-            tbl_order.ship_cond, tbl_order.pay_term, tbl_order.deli_date_req as request_date, tbl_master_time.time_value as RequestTime, 
-            tbl_order.description, tbl_order.sh_cus_date_ref, 
-            tbl_order.status_deli, tbl_order.status_block, tbl_order.status_sd_process, 
-            tbl_order.status_check, tbl_order.sd_doc_reject, tbl_order.cus_group, 
-            tbl_order.hana_created, tbl_order.hana_time, tbl_order.created_by, 
-            tbl_order.ist_dt, tbl_order.mdf_dt, tbl_order.rm_dt,
-            tbl_order.auto_order
+                tbl_order.id, tbl_order.order_no, tbl_order.sh_cus_ref as aos_order_no, tbl_order.order_type, tbl_order.order_group, 
+                tbl_order_type.ord_type_desc,
+                tbl_petrol_group.ptrl_group_desc,
+                tbl_order.order_status,
+                tbl_order.chanel, tbl_order.division, tbl_order.sold_to, tbl_order.ship_to, 
+                tbl_petrol.ptrl_desc as station, tbl_petrol.ptrl_code, tbl_petrol.ptrl_number,
+                tbl_order.cus_ref, tbl_order.cus_date_ref, tbl_order.po_name, tbl_order.order_by, 
+                tbl_order.ship_cond, tbl_order.pay_term, tbl_order.deli_date_req as request_date, tbl_master_time.time_value as RequestTime, 
+                tbl_order.description, tbl_order.sh_cus_date_ref, 
+                tbl_order.status_deli, tbl_order.status_block, tbl_order.status_sd_process, 
+                tbl_order.status_check, tbl_order.sd_doc_reject, tbl_order.cus_group, 
+                tbl_order.hana_created, tbl_order.hana_time, tbl_order.created_by, 
+                tbl_order.ist_dt, tbl_order.mdf_dt, tbl_order.rm_dt,
+                tbl_order.auto_order
             FROM tbl_order  
             LEFT JOIN tbl_order_type ON tbl_order.order_type = tbl_order_type.ord_type_code
             LEFT JOIN tbl_petrol_group ON tbl_petrol_group.ptrl_group_code = tbl_order.order_group
@@ -306,21 +306,58 @@ exports.getOrderInformationByID = async (req, res, next) => {
 
         // ======== คำสั่ง SQL สำหรับดึงรายการสินค้า (Items) ที่อยู่ในออเดอร์นี้ ========
         let itemScript = `SELECT 
-            tbl_order_item.id, tbl_order_item.order_no, tbl_order_item.item_no,
-            tbl_petrol_tank.tnk_number as tank_number,
-            tbl_petrol_tank.tnk_capacity as tank_capacity,
-            tbl_order_item.item_qty, tbl_order_item.deli_plant, 
-            tbl_order_item.long_text_id, tbl_order_item.long_text,
-            tbl_order_item.sales_order_item, tbl_order_item.auto_order,
-            tbl_order_item.sd_reject_reason, tbl_order_item.sd_process_status, 
-            tbl_order_item.deli_status, tbl_order_item.misc_deli_no,
-            tbl_order_item.ist_dt, tbl_order_item.mdf_dt,
-            tbl_item.itm_desc as product, tbl_item.itm_material_number, tbl_item.itm_code
+                tbl_order_item.id, tbl_order_item.order_no, tbl_order_item.item_no,
+                tbl_petrol_tank.tnk_number as tank_number,
+                tbl_petrol_tank.tnk_capacity as tank_capacity,
+                tbl_order_item.item_qty, tbl_order_item.deli_plant, 
+                tbl_order_item.long_text_id, tbl_order_item.long_text,
+                tbl_order_item.sales_order_item, tbl_order_item.auto_order,
+                tbl_order_item.sd_reject_reason, tbl_order_item.sd_process_status, 
+                tbl_order_item.deli_status, tbl_order_item.misc_deli_no,
+                tbl_order_item.ist_dt, tbl_order_item.mdf_dt,
+                tbl_item.itm_desc as product, tbl_item.itm_material_number, tbl_item.itm_code,
+                tbl_petrol_tank.tnk_deadstock AS un_pump,
+                tbl_petrol_tank.tnk_capacity AS max_stock,
+                tbl_petrol_tank.tnk_target AS target_stock,
+                tank.tank_start,
+                tank.tank_end,
+                meter_summary.total_sales,
+                meter_summary.total_sales + tbl_petrol_tank.tnk_deadstock AS min_stock,
+                tank.recive_val::INT
             FROM tbl_order_item
             LEFT JOIN tbl_item ON tbl_order_item.item_no = tbl_item.itm_code
             LEFT JOIN tbl_petrol_tank ON tbl_order_item.item_no = tbl_petrol_tank.itm_code 
-                                      AND tbl_petrol_tank.ptrl_code = '${orderData.ptrl_code}'
-            WHERE tbl_order_item.order_no = '${id}' 
+                AND tbl_petrol_tank.ptrl_code = '${orderData.ptrl_code}'
+            LEFT JOIN tbl_order_eodtank tank ON (
+                tbl_petrol_tank.tnk_number = tank.tank_no 
+                AND tank.shipto_no = '${orderData.ptrl_number}'
+                AND tank.date_at = '${date_at}'
+            )
+            LEFT JOIN (
+                SELECT 
+                    tank_no,
+                    product_name,
+                    shipto_no,
+                    buy_date,
+                    SUM(meter_diff) AS total_sales
+                FROM (
+                    SELECT DISTINCT ON (product_name, shipto_no, tank_no, buy_date, meter_start, meter_start)
+                        product_name,
+                        shipto_no,
+                        tank_no,
+                        buy_date,
+                        (meter_end - meter_start) AS meter_diff
+                    FROM tbl_order_eodmeter
+                    WHERE buy_date = '${date_at}'
+                    ORDER BY product_name, shipto_no, tank_no, buy_date, meter_start, meter_start, id DESC
+                ) AS latest_meters
+                GROUP BY product_name, tank_no, shipto_no, buy_date
+            ) meter_summary ON (
+                tbl_petrol_tank.tnk_number = meter_summary.tank_no 
+                AND meter_summary.shipto_no = '${orderData.ptrl_number}'
+            )
+
+            WHERE tbl_order_item.order_no = ${id}
             AND tbl_order_item.order_item_flag = '1'
             ORDER BY tbl_order_item.id ASC`;
 
