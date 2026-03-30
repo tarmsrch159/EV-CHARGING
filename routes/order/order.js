@@ -535,6 +535,7 @@ exports.getOrderReportInformation = async (req, res, next) => {
             tbl_order.status_check, tbl_order.sd_doc_reject, tbl_order.cus_group, 
             tbl_order.hana_created, tbl_order.hana_time, tbl_order.created_by, 
             tbl_order.ist_dt, tbl_order.mdf_dt, tbl_order.rm_dt,
+            
             json_build_object(
                 'id', tbl_order_item.id,
                 'sales_order_item', tbl_order_item.sales_order_item,
@@ -546,7 +547,8 @@ exports.getOrderReportInformation = async (req, res, next) => {
                 'item_qty', tbl_order_item.item_qty,
                 'long_text_id', tbl_order_item.long_text_id,
                 'long_text', tbl_order_item.long_text,
-                'auto_order', tbl_order_item.auto_order 
+                'auto_order', tbl_order_item.auto_order ,
+                'remark', tbl_order_item.remark
             ) as item_information,
             tbl_order.auto_order
             FROM tbl_order  
