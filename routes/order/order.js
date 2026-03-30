@@ -177,23 +177,23 @@ exports.getOrderInformation = async (req, res, next) => {
         let top_orderer = "-";
 
         let topOrdererScript = `
-            SELECT tbl_order.ship_to, tbl_employee.emp_name, COUNT(tbl_order.id) AS ship_to_count 
+            SELECT tbl_order.created_by_tms, tbl_employee.emp_name , MAX(tbl_order.ist_dt) AS latest_order_date
             FROM tbl_order 
             LEFT JOIN tbl_employee ON tbl_order.created_by_tms = tbl_employee.emp_code
             ${whereClause}
-            AND tbl_order.ship_to IS NOT NULL 
-            AND TRIM(tbl_order.ship_to) <> '' 
-            GROUP BY tbl_order.ship_to, tbl_employee.emp_name
-            ORDER BY ship_to_count DESC 
+            AND tbl_order.created_by_tms IS NOT NULL 
+            AND TRIM(tbl_order.created_by_tms) <> '' 
+            GROUP BY tbl_order.created_by_tms, tbl_employee.emp_name
+            ORDER BY latest_order_date DESC 
             LIMIT 1;
         `;
-
+        console.log(topOrdererScript)
         let tbl_top_orderer = await pgConn.get(dbPrefix + lic_code, topOrdererScript, config.connectionString());
-
+        console.log(tbl_top_orderer)
         if (!tbl_top_orderer.code && tbl_top_orderer.data && tbl_top_orderer.data.length > 0) {
-            let desc = tbl_top_orderer.data[0].ptrl_desc;
-            let code = tbl_top_orderer.data[0].ship_to;
-            top_orderer = desc ? desc : code;
+            let Orderer_name = tbl_top_orderer.data[0].emp_name;
+            let code = tbl_top_orderer.data[0].created_by_tms;
+            top_orderer = Orderer_name ? Orderer_name : code;
         }
 
 
