@@ -2387,6 +2387,7 @@ exports.addOrderInformation = async (req, res, next) => {
                 var item_quantity = parseFloat(order_item[i].item_quantity) || 0;
                 var itm_material_number = (order_item[i].itm_material_number || "").trim();
                 var deli_plant = order_item[i].deli_plant;
+                var remark = order_item[i].remark;
 
                 console.log(`ตรวจสอบ Item [${i}]: Material=${itm_material_number}, Code=${itm_code}`);
 
@@ -2407,9 +2408,9 @@ exports.addOrderInformation = async (req, res, next) => {
                         for (var k = 0; k < order_item[i].item_text.length; k++) {
                             var item_text = order_item[i].item_text[k];
                             let script_item = `INSERT INTO public.tbl_order_item
-                        (order_no, item_no, item_qty, long_text_id, long_text, ist_dt, order_item_flag, auto_order, deli_plant, sales_order_item)
+                        (order_no, item_no, item_qty, long_text_id, long_text, ist_dt, order_item_flag, auto_order, deli_plant, sales_order_item, remark)
                         VALUES(${order_id}, '${itm_code}', ${item_quantity}, '${(item_text.long_text_id || '').replace(/'/g, "''")}', '${(item_text.long_text || '').replace(/'/g, "''")}',
-                        '${moment().format('YYYY-MM-DD HH:mm:ss')}', '1', 0, '${deli_plant || ''}', '${sales_order_item}')`;
+                        '${moment().format('YYYY-MM-DD HH:mm:ss')}', '1', 0, '${deli_plant || ''}', '${sales_order_item}', '${remark || ''}')`;
 
                             console.log(`กำลัง Insert Item [${itm_code}] (with text) สำหรับ Order ${order_id}`);
                             let res_item = await pgConn.execute(dbPrefix + lic_code, script_item, config.connectionString());
@@ -2420,9 +2421,9 @@ exports.addOrderInformation = async (req, res, next) => {
                     } else {
                         // กรณีที่ไม่มี item_text
                         let script_item = `INSERT INTO public.tbl_order_item
-                            (order_no, item_no, item_qty, long_text_id, long_text, ist_dt, order_item_flag, auto_order, deli_plant, sales_order_item)
+                            (order_no, item_no, item_qty, long_text_id, long_text, ist_dt, order_item_flag, auto_order, deli_plant, sales_order_item, remark)
                         VALUES(${order_id}, '${itm_code}', ${item_quantity}, '', '',
-                            '${moment().format('YYYY-MM-DD HH:mm:ss')}', '1', 0, '${deli_plant || ''}', '${sales_order_item}')`;
+                            '${moment().format('YYYY-MM-DD HH:mm:ss')}', '1', 0, '${deli_plant || ''}', '${sales_order_item}', '${remark || ''}')`;
 
                         console.log(`กำลัง Insert Item [${itm_code}] (no text) สำหรับ Order ${order_id}`);
                         let res_item = await pgConn.execute(dbPrefix + lic_code, script_item, config.connectionString());
