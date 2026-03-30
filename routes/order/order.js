@@ -49,8 +49,6 @@ exports.getOrderInformation = async (req, res, next) => {
         // =========================================================================
         if (page_index > 0) page_index -= 1;
 
-        let original_start_date = start_date;
-        let original_end_date = end_date;
 
         if (start_date.length === 10) start_date += ' 00:00:00';
         if (end_date.length === 10) end_date += ' 23:59:59';
@@ -95,103 +93,8 @@ exports.getOrderInformation = async (req, res, next) => {
             )`);
         }
 
-        // กรองวันที่สำหรับ Query หลัก
-        if (original_start_date.toString().toUpperCase() !== 'ALL' && original_end_date.toString().toUpperCase() !== 'ALL') {
-            conditions.push(`tbl_order.ist_dt >= '${start_date}' AND tbl_order.ist_dt <= '${end_date}'`);
-        }
-
-        // รวมเงื่อนไขเป็น String เดียวสำหรับใช้ต่อใน SQL
         let whereClause = "WHERE " + conditions.join(" AND ");
 
-        // =========================================================================
-        // [SUMMARY 1] คำนวณยอดรวมของ Manual Order (auto_order = '0')
-        // =========================================================================
-        let total_manual_order = 0;
-
-        let countManualOrderScript = `
-            SELECT COUNT(tbl_order.id) AS total_manual_order 
-            FROM tbl_order 
-            LEFT JOIN tbl_petrol ON tbl_order.ship_to = tbl_petrol.ptrl_number
-            ${whereClause} AND tbl_order.auto_order = '0';
-        `;
-
-        let tbl_count_manual = await pgConn.get(dbPrefix + lic_code, countManualOrderScript, config.connectionString());
-
-        if (!tbl_count_manual.code && tbl_count_manual.data && tbl_count_manual.data.length > 0) {
-            total_manual_order = parseInt(tbl_count_manual.data[0].total_manual_order) || 0;
-        }
-
-        // =========================================================================
-        // [SUMMARY 2] ค้นหา Top Remark (หมายเหตุที่พบบ่อยที่สุดในช่วงเวลานี้)
-        // =========================================================================
-        let top_remark = "-";
-
-        let topRemarkScript = `
-            SELECT item.remark, COUNT(*) AS remark_count 
-            FROM tbl_order 
-            LEFT JOIN tbl_petrol ON tbl_order.ship_to = tbl_petrol.ptrl_number
-            INNER JOIN tbl_order_item item ON TRIM(CAST(tbl_order.id AS TEXT)) = TRIM(CAST(item.order_no AS TEXT))
-            ${whereClause} 
-            AND item.rm_dt IS NULL 
-            AND item.remark IS NOT NULL 
-            AND TRIM(item.remark) <> '' 
-            GROUP BY item.remark 
-            ORDER BY remark_count DESC 
-            LIMIT 1;
-        `;
-
-        let tbl_top_remark = await pgConn.get(dbPrefix + lic_code, topRemarkScript, config.connectionString());
-
-        if (!tbl_top_remark.code && tbl_top_remark.data && tbl_top_remark.data.length > 0) {
-            top_remark = tbl_top_remark.data[0].remark;
-        }
-
-        // =========================================================================
-        // [SUMMARY 3] ค้นหาผลรวมจำนวนสินค้า (Top Sum Qty ในช่วงเวลานี้)
-        // =========================================================================
-        let top_sum_qty = 0;
-
-        let topSumQtyScript = `
-            SELECT SUM(CAST(item.item_qty AS numeric)) AS sum_qty 
-            FROM tbl_order 
-            LEFT JOIN tbl_petrol ON tbl_order.ship_to = tbl_petrol.ptrl_number
-            INNER JOIN tbl_order_item item ON TRIM(CAST(tbl_order.id AS TEXT)) = TRIM(CAST(item.order_no AS TEXT))
-            ${whereClause} 
-            AND item.rm_dt IS NULL 
-            AND item.item_qty IS NOT NULL 
-        `;
-
-
-        let tbl_top_sum_qty = await pgConn.get(dbPrefix + lic_code, topSumQtyScript, config.connectionString());
-
-        if (!tbl_top_sum_qty.code && tbl_top_sum_qty.data && tbl_top_sum_qty.data.length > 0) {
-            top_sum_qty = parseFloat(tbl_top_sum_qty.data[0].sum_qty) || 0;
-        }
-
-        // =========================================================================
-        // [SUMMARY 4] ค้นหา Top Orderer (ผู้สั่งที่พบบ่อยที่สุดในช่วงเวลานี้)
-        // =========================================================================
-        let top_orderer = "-";
-
-        let topOrdererScript = `
-            SELECT tbl_order.created_by_tms, tbl_employee.emp_name , MAX(tbl_order.ist_dt) AS latest_order_date
-            FROM tbl_order 
-            LEFT JOIN tbl_employee ON tbl_order.created_by_tms = tbl_employee.emp_code
-            ${whereClause}
-            AND tbl_order.created_by_tms IS NOT NULL 
-            AND TRIM(tbl_order.created_by_tms) <> '' 
-            GROUP BY tbl_order.created_by_tms, tbl_employee.emp_name
-            ORDER BY latest_order_date DESC 
-            LIMIT 1;
-        `;
-
-        console.log(topOrdererScript)
-        let tbl_top_orderer = await pgConn.get(dbPrefix + lic_code, topOrdererScript, config.connectionString());
-        if (!tbl_top_orderer.code && tbl_top_orderer.data && tbl_top_orderer.data.length > 0) {
-            let Orderer_name = tbl_top_orderer.data[0].emp_name;
-            let code = tbl_top_orderer.data[0].created_by_tms;
-            top_orderer = Orderer_name ? Orderer_name : code;
-        }
 
 
         // =========================================================================
@@ -278,12 +181,7 @@ exports.getOrderInformation = async (req, res, next) => {
                     response_time: moment().format('YYYY-MM-DD HH:mm:ss'),
                     page_total: (page_total <= 0 ? 1 : page_total),
                     rows_total: rows_total,
-                    summary: {
-                        total_manual_order: total_manual_order,
-                        top_remark: top_remark,
-                        top_orderer: top_orderer,
-                        top_sum_qty: top_sum_qty
-                    }
+
                 }];
                 res.status(200).send(response);
                 return;
@@ -295,12 +193,7 @@ exports.getOrderInformation = async (req, res, next) => {
                     message: '',
                     data: xresult,
                     response_time: moment().format('YYYY-MM-DD HH:mm:ss'),
-                    summary: {
-                        total_manual_order: total_manual_order,
-                        top_remark: top_remark,
-                        top_orderer: top_orderer,
-                        top_sum_qty: top_sum_qty
-                    }
+
                 }];
                 res.status(200).send(response);
                 return;
@@ -497,6 +390,10 @@ exports.getOrderReportInformation = async (req, res, next) => {
 
         // ========== เตรียมข้อมูลสำหรับ Query และ Format Dates ==========
         if (page_index > 0) page_index -= 1;
+
+        let original_start_date = start_date;
+        let original_end_date = end_date;
+
         if (start_date.length === 10) start_date += ' 00:00:00';
         if (end_date.length === 10) end_date += ' 23:59:59';
 
@@ -529,12 +426,101 @@ exports.getOrderReportInformation = async (req, res, next) => {
                 OR tbl_order.description LIKE '%${search}%'
             )`);
         }
-        if (start_date.toString().toUpperCase() !== 'ALL' && end_date.toString().toUpperCase() !== 'ALL') {
-            conditions.push(`tbl_order.ist_dt >= '${start_date}' AND tbl_order.ist_dt <= '${end_date}'`);
+        if (original_start_date.toString().toUpperCase() !== 'ALL' && original_end_date.toString().toUpperCase() !== 'ALL') {
+            conditions.push(`tbl_order.ist_dt >= '${original_start_date}' AND tbl_order.ist_dt <= '${original_end_date}'`);
         }
 
         // รวมเงื่อนไขทั้งหมดเข้าด้วยกัน
         let whereClause = "WHERE " + conditions.join(" AND ");
+
+        // =========================================================================
+        // [SUMMARY 1] คำนวณยอดรวมของ Manual Order (auto_order = '0')
+        // =========================================================================
+        let total_manual_order = 0;
+
+        let countManualOrderScript = `
+            SELECT COUNT(tbl_order.id) AS total_manual_order 
+            FROM tbl_order 
+            LEFT JOIN tbl_petrol ON tbl_order.ship_to = tbl_petrol.ptrl_number
+            ${whereClause} AND tbl_order.auto_order = '0';
+        `;
+
+        let tbl_count_manual = await pgConn.get(dbPrefix + lic_code, countManualOrderScript, config.connectionString());
+
+        if (!tbl_count_manual.code && tbl_count_manual.data && tbl_count_manual.data.length > 0) {
+            total_manual_order = parseInt(tbl_count_manual.data[0].total_manual_order) || 0;
+        }
+
+        // =========================================================================
+        // [SUMMARY 2] ค้นหา Top Remark (หมายเหตุที่พบบ่อยที่สุดในช่วงเวลานี้)
+        // =========================================================================
+        let top_remark = "-";
+
+        let topRemarkScript = `
+            SELECT item.remark, COUNT(*) AS remark_count 
+            FROM tbl_order 
+            LEFT JOIN tbl_petrol ON tbl_order.ship_to = tbl_petrol.ptrl_number
+            INNER JOIN tbl_order_item item ON TRIM(CAST(tbl_order.id AS TEXT)) = TRIM(CAST(item.order_no AS TEXT))
+            ${whereClause} 
+            AND item.rm_dt IS NULL 
+            AND item.remark IS NOT NULL 
+            AND TRIM(item.remark) <> '' 
+            GROUP BY item.remark 
+            ORDER BY remark_count DESC 
+            LIMIT 1;
+        `;
+
+        let tbl_top_remark = await pgConn.get(dbPrefix + lic_code, topRemarkScript, config.connectionString());
+
+        if (!tbl_top_remark.code && tbl_top_remark.data && tbl_top_remark.data.length > 0) {
+            top_remark = tbl_top_remark.data[0].remark;
+        }
+
+        // =========================================================================
+        // [SUMMARY 3] ค้นหาผลรวมจำนวนสินค้า (Top Sum Qty ในช่วงเวลานี้)
+        // =========================================================================
+        let top_sum_qty = 0;
+
+        let topSumQtyScript = `
+            SELECT SUM(CAST(item.item_qty AS numeric)) AS sum_qty 
+            FROM tbl_order 
+            LEFT JOIN tbl_petrol ON tbl_order.ship_to = tbl_petrol.ptrl_number
+            INNER JOIN tbl_order_item item ON TRIM(CAST(tbl_order.id AS TEXT)) = TRIM(CAST(item.order_no AS TEXT))
+            ${whereClause} 
+            AND item.rm_dt IS NULL 
+            AND item.item_qty IS NOT NULL 
+        `;
+
+
+        let tbl_top_sum_qty = await pgConn.get(dbPrefix + lic_code, topSumQtyScript, config.connectionString());
+
+        if (!tbl_top_sum_qty.code && tbl_top_sum_qty.data && tbl_top_sum_qty.data.length > 0) {
+            top_sum_qty = parseFloat(tbl_top_sum_qty.data[0].sum_qty) || 0;
+        }
+
+        // =========================================================================
+        // [SUMMARY 4] ค้นหา Top Orderer (ผู้สั่งที่พบบ่อยที่สุดในช่วงเวลานี้)
+        // =========================================================================
+        let top_orderer = "-";
+
+        let topOrdererScript = `
+            SELECT tbl_order.created_by_tms, tbl_employee.emp_name , MAX(tbl_order.ist_dt) AS latest_order_date
+            FROM tbl_order 
+            LEFT JOIN tbl_employee ON tbl_order.created_by_tms = tbl_employee.emp_code
+            ${whereClause}
+            AND tbl_order.created_by_tms IS NOT NULL 
+            AND TRIM(tbl_order.created_by_tms) <> '' 
+            GROUP BY tbl_order.created_by_tms, tbl_employee.emp_name
+            ORDER BY latest_order_date DESC 
+            LIMIT 1;
+        `;
+
+        let tbl_top_orderer = await pgConn.get(dbPrefix + lic_code, topOrdererScript, config.connectionString());
+        if (!tbl_top_orderer.code && tbl_top_orderer.data && tbl_top_orderer.data.length > 0) {
+            let Orderer_name = tbl_top_orderer.data[0].emp_name;
+            let code = tbl_top_orderer.data[0].created_by_tms;
+            top_orderer = Orderer_name ? Orderer_name : code;
+        }
 
         // =========================================================
         // 2. Query ดึงข้อมูลหลัก (Main Script)
@@ -600,6 +586,7 @@ exports.getOrderReportInformation = async (req, res, next) => {
                     SELECT CEIL((CEIL(SUM(rows_total)) / ${page_limit})) as page_total, SUM(rows_total) as rows_total  
                     FROM (
                         SELECT 1 as rows_total FROM tbl_order 
+                        LEFT JOIN tbl_petrol ON tbl_order.ship_to = tbl_petrol.ptrl_number
                         ${whereClause}
                     ) xtbl_master;
                 `;
@@ -621,7 +608,13 @@ exports.getOrderReportInformation = async (req, res, next) => {
                     data: tbl_temporary.data,
                     response_time: moment().format('YYYY-MM-DD HH:mm:ss'),
                     page_total: (page_total <= 0 ? 1 : page_total),
-                    rows_total: rows_total
+                    rows_total: rows_total,
+                    summary: {
+                        total_manual_order: total_manual_order,
+                        top_remark: top_remark,
+                        top_orderer: top_orderer,
+                        top_sum_qty: top_sum_qty
+                    }
                 }];
                 res.status(200).send(response);
                 return;
@@ -632,7 +625,13 @@ exports.getOrderReportInformation = async (req, res, next) => {
                     invalid_code: '0',
                     message: '',
                     data: xresult,
-                    response_time: moment().format('YYYY-MM-DD HH:mm:ss')
+                    response_time: moment().format('YYYY-MM-DD HH:mm:ss'),
+                    summary: {
+                        total_manual_order: total_manual_order,
+                        top_remark: top_remark,
+                        top_orderer: top_orderer,
+                        top_sum_qty: top_sum_qty
+                    }
                 }];
                 res.status(200).send(response);
                 return;
