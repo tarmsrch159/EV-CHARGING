@@ -384,20 +384,20 @@ exports.setEmployeeInformation = async (req, res, next) => {
             ptrl_code = ptrl_code == undefined ? '' : ptrl_code;
             ptrl_group_code = ptrl_group_code == undefined ? [] : ptrl_group_code;
 
-            if (off_code.toString().toUpperCase() == 'ALL') {
+            // if (off_code.toString().toUpperCase() == 'ALL') {
 
-                let response = [{
-                    status: 'error',
-                    invalid_code: '-1',
-                    message: 'ไม่สามารถบันทึกข้อมูลได้, เนื่องจากข้อมูลพารามิเตอร์ไม่ถูกต้อง off_code ไม่รองรับ ALL',
-                    data: [],
-                    response_time: moment().format('YYYY-MM-DD HH:mm:ss')
-                }]
+            //     let response = [{
+            //         status: 'error',
+            //         invalid_code: '-1',
+            //         message: 'ไม่สามารถบันทึกข้อมูลได้, เนื่องจากข้อมูลพารามิเตอร์ไม่ถูกต้อง off_code ไม่รองรับ ALL',
+            //         data: [],
+            //         response_time: moment().format('YYYY-MM-DD HH:mm:ss')
+            //     }]
 
-                res.status(200).send(response);
-                await xglobal.action_logs(lic_code, action[0].id, 'แก้ไขข้อมูลพนักงาน', JSON.stringify(req.body[0]), 'ไม่สามารถบันทึกข้อมูลได้, เนื่องจากข้อมูลพารามิเตอร์ไม่ถูกต้อง off_code ไม่รองรับ ALL', action[0].value);
-                return;
-            }
+            //     res.status(200).send(response);
+            //     await xglobal.action_logs(lic_code, action[0].id, 'แก้ไขข้อมูลพนักงาน', JSON.stringify(req.body[0]), 'ไม่สามารถบันทึกข้อมูลได้, เนื่องจากข้อมูลพารามิเตอร์ไม่ถูกต้อง off_code ไม่รองรับ ALL', action[0].value);
+            //     return;
+            // }
 
             let now_dt = moment().format('YYYY-MM-DD HH:mm:ss');
             script = `BEGIN;\n`;
