@@ -19,7 +19,7 @@ exports.execute2params = async (script, params = []) => {
             return {
                 code: false,
                 rowaction: res.rowCount,
-                rows: res.rows
+                rows: res.rows || []
             }
 
         } catch (e) {

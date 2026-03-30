@@ -1530,14 +1530,7 @@ exports.getOrderInformationHana = async (req, res, next) => {
 
         try {
             let apiResponse = await axios.request(axiosConfig);
-            let response = [{
-                status: 'success',
-                invalid_code: '0',
-                message: 'ดึงข้อมูล Order จาก SAP',
-                data: apiResponse.data,
-                response_time: moment().format('YYYY-MM-DD HH:mm:ss')
-            }];
-            res.status(200).send(response);
+
             for (let i = 0; i < apiResponse.data.Response.SalesOrders.length; i++) {
                 let salesOrder = apiResponse.data.Response.SalesOrders[i];
 
@@ -1718,6 +1711,14 @@ exports.getOrderInformationHana = async (req, res, next) => {
                 }
             }
 
+            let response = [{
+                status: 'success',
+                invalid_code: '0',
+                message: 'ดึงข้อมูล Order จาก SAP',
+                data: apiResponse.data,
+                response_time: moment().format('YYYY-MM-DD HH:mm:ss')
+            }];
+            res.status(200).send(response);
 
         } catch (error) {
             console.log(error);
@@ -2717,134 +2718,65 @@ exports.setOrderInformation = async (req, res, next) => {
             return;
         } else {
 
+            let addOrderScript = `
+                UPDATE tbl_order SET 
+                    description = $1, 
+                    deli_date_req = $2, 
+                    deli_time_req = $3,
+                    mdf_dt = $4
+                WHERE id = $5`;
 
-            // =========== ตรวจสอบ Order No. ถ้ามีใช้ ข้อมูลเดิม ===========
-            let scriptCheckOrderNo = `SELECT * FROM tbl_order WHERE id = ${order_no}`;
-            let checkOrderNo = await pgConn.get(dbPrefix + lic_code, scriptCheckOrderNo, config.connectionString());
-            if (checkOrderNo.code || checkOrderNo.data.length == 0) {
-                let response = [{
-                    status: 'error',
-                    invalid_code: '-1',
-                    message: 'ไม่สามารถบันทึกข้อมูล, เนื่องจากข้อมูลพารามิเตอร์ไม่ถูกต้อง',
-                    data: [],
-                    response_time: moment().format('YYYY-MM-DD HH:mm:ss')
-                }];
-
-                res.status(200).send(response);
-                let logPayloadObj = { order_no: order_no, ...req.body[0] };
-                await xglobal.action_logs(lic_code, action[0].id, 'แก้ไขข้อมูล Order', JSON.stringify(logPayloadObj), 'ไม่สามารถบันทึกข้อมูล, เนื่องจากข้อมูลพารามิเตอร์ไม่ถูกต้อง', action[0].value);
-                return;
-            }
-
-            let req_date_str = moment(deli_date_req).format('YYYYMMDD');
-            let sh_cus_ref = await genCusRef(lic_code, req_date_str);
-
-            let oldOrder = checkOrderNo.data[0];
-            let new_order_no = 'ord-' + moment().format('x');
-            let addOrderScript = `INSERT INTO tbl_order(
-                order_type, order_group, chanel, division, sold_to, ship_to,
-                cus_ref, cus_date_ref, po_name, order_by, ship_cond, pay_term,
-                deli_date_req, deli_time_req, description, sh_cus_ref, sh_cus_date_ref,
-                auto_order, order_ref, ist_dt, status_deli, order_flag)
-                VALUES(
-                    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-                    $11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
-                    $21, $22 ) RETURNING id`;
-
-            let tbl_temporary_add_order = await pgConn.execute2params(addOrderScript, [
-                oldOrder.order_type, oldOrder.order_group, oldOrder.chanel,
-                oldOrder.division, oldOrder.sold_to, oldOrder.ship_to, oldOrder.cus_ref,
-                oldOrder.cus_date_ref ? moment(oldOrder.cus_date_ref).format('YYYY-MM-DD HH:mm:ss') : null,
-                oldOrder.po_name, oldOrder.order_by, oldOrder.ship_cond, oldOrder.pay_term,
-                deli_date_req, deli_time_req, description, sh_cus_ref,
-                oldOrder.sh_cus_date_ref ? moment(oldOrder.sh_cus_date_ref).format('YYYY-MM-DD HH:mm:ss') : null,
-                `0`, order_no, moment().format('YYYY-MM-DD HH:mm:ss'), `A`, `1`
-            ]);
+            let params = [description, deli_date_req, deli_time_req, moment().format('YYYY-MM-DD HH:mm:ss'), order_no];
+            let tbl_temporary_add_order = await pgConn.getWithParams(dbPrefix + lic_code, addOrderScript, params, config.connectionString());
 
             if (tbl_temporary_add_order.code) {
                 let response = [{
                     status: 'error',
                     invalid_code: '-1',
-                    message: 'ไม่สามารถสร้าง Order ได้',
+                    message: 'ไม่สามารถแก้ไข Order ได้',
                     data: [],
                     response_time: moment().format('YYYY-MM-DD HH:mm:ss')
                 }];
 
                 res.status(200).send(response);
                 let logPayloadObj = { order_no: order_no, ...req.body[0] };
-                await xglobal.action_logs(lic_code, action[0].id, 'แก้ไขข้อมูล Order', JSON.stringify(logPayloadObj), 'ไม่สามารถสร้าง Order ได้', action[0].value);
-                return;
-            }
-
-            let updateOrderScript = `UPDATE tbl_order SET order_flag = '0' WHERE id = $1`;
-            let tbl_temporary_update_order = await pgConn.execute2params(updateOrderScript, [order_no]);
-
-            if (tbl_temporary_update_order.code) {
-                let response = [{
-                    status: 'error',
-                    invalid_code: '-1',
-                    message: 'ไม่สามารถอัปเดต Order ได้',
-                    data: [],
-                    response_time: moment().format('YYYY-MM-DD HH:mm:ss')
-                }];
-
-                res.status(200).send(response);
-                let logPayloadObj = { order_no: order_no, ...req.body[0] };
-                await xglobal.action_logs(lic_code, action[0].id, 'แก้ไขข้อมูล Order', JSON.stringify(logPayloadObj), 'ไม่สามารถอัปเดต Order ได้', action[0].value);
+                await xglobal.action_logs(lic_code, action[0].id, 'แก้ไขข้อมูล Order', JSON.stringify(logPayloadObj), 'ไม่สามารถแก้ไข Order ได้', action[0].value);
                 return;
             }
 
             // ============= UPDATE tbl_order_item (item_quantity) =================
             if (order_item && Array.isArray(order_item) && order_item.length > 0) {
-                // Collect all items to update
-                let itemsToUpdate = [];
                 for (let i = 0; i < order_item.length; i++) {
                     let currentItem = order_item[i];
                     if (currentItem.item_no) {
-                        itemsToUpdate.push({
-                            item_no: currentItem.item_no,
-                            item_quantity: parseFloat(currentItem.item_quantity) || 0
-                        });
-                    }
-                }
+                        let item_no = currentItem.item_no;
+                        let item_quantity = parseFloat(currentItem.item_quantity) || 0;
+                        let remark = currentItem.remark || '';
 
-                for (let i = 0; i < itemsToUpdate.length; i++) {
-                    let order_item_no = itemsToUpdate[i].item_no;
-                    let item_quantity = itemsToUpdate[i].item_quantity;
-                    let new_order_id = tbl_temporary_add_order.rows[0].id;
-
-                    if (order_item_no) {
-                        // ============= ดึงข้อมูลเดิมมาอ้างอิง =============
-                        // Use both order_no (string) and oldOrder.id to find precisely if exists.
-                        let getItemScript = `SELECT * FROM public.tbl_order_item WHERE (order_no = ${order_no} OR order_no = ${oldOrder.id}) and item_no = '${order_item_no}' order by id desc limit 1`;
+                        let getItemScript = `SELECT id FROM public.tbl_order_item WHERE order_no = ${order_no} and item_no = '${item_no}' order by id desc limit 1`;
                         let oldItemResult = await pgConn.get(dbPrefix + lic_code, getItemScript, config.connectionString());
 
                         if (!oldItemResult.code && oldItemResult.data.length > 0) {
-                            let oldItem = oldItemResult.data[0];
                             //============ ดึงข้อมูลเก่ามาสร้าง Row ใหม่ =============
-                            let script_item = `INSERT INTO public.tbl_order_item
-                                (order_no, item_no, item_qty, long_text_id, long_text, ist_dt, order_item_flag, auto_order)
-                            VALUES(
-                                '${new_order_id}', '${oldItem.item_no}', ${item_quantity}, '${oldItem.long_text_id || ''}',
-                                '${oldItem.long_text || ''}', '${moment().format('YYYY-MM-DD HH:mm:ss')}', '1', '0'
-                            )`;
-                            await pgConn.execute(dbPrefix + lic_code, script_item, config.connectionString());
 
-
-
-                            //============ ปิด Row เก่า =============
-                            let disableOldScript = `UPDATE public.tbl_order_item SET order_item_flag = '0', rm_dt = '${moment().format('YYYY-MM-DD HH:mm:ss')}' WHERE id = ${oldItem.id} `;
-                            await pgConn.execute(dbPrefix + lic_code, disableOldScript, config.connectionString());
+                            let script_item = `
+                                UPDATE public.tbl_order_item
+                                SET item_qty = $1, remark = $2, mdf_dt = $3
+                                WHERE order_no = $4 and item_no = $5
+                            `;
+                            let params = [item_quantity, remark, moment().format('YYYY-MM-DD HH:mm:ss'), order_no, item_no];
+                            let tbl_temporary_update_order_item = await pgConn.getWithParams(dbPrefix + lic_code, script_item, params, config.connectionString());
 
                         } else {
                             // ============= กรณีหาของเดิมไม่เจอ ให้ทำการ Insert ของใหม่เข้าไปเลยครับ โดยผูกกับ new_order_id =============
-                            let script_item = `INSERT INTO public.tbl_order_item
+                            let script_item = `
+                                INSERT INTO public.tbl_order_item
                                 (order_no, item_no, item_qty, long_text_id, long_text, ist_dt, order_item_flag, auto_order)
-                            VALUES(
-                                '${new_order_id}', '${order_item_no}', ${item_quantity}, '', '', '${moment().format('YYYY-MM-DD HH:mm:ss')}', '1', '0'
-                            )`;
+                                VALUES(
+                                    ${order_no}, '${item_no}', ${item_quantity}, '', '', '${moment().format('YYYY-MM-DD HH:mm:ss')}', '1', '0'
+                                )
+                            `;
                             await pgConn.execute(dbPrefix + lic_code, script_item, config.connectionString());
-
                         }
                     }
                 }
@@ -2859,12 +2791,10 @@ exports.setOrderInformation = async (req, res, next) => {
                 response_time: moment().format('YYYY-MM-DD HH:mm:ss')
             }];
 
-            res.status(200).send(response);
             let event_type = req.body[0].event_type || 'override';
-            let logPayloadObj = { order_no: order_no, new_order_no: new_order_no, ...req.body[0] };
+            let logPayloadObj = { order_no: order_no, ...req.body[0] };
             await xglobal.action_logs(lic_code, action[0].id, event_type, JSON.stringify(logPayloadObj), 'success', action[0].value);
-            return;
-
+            res.status(200).send(response);
         }
 
     })().catch(async (err) => {

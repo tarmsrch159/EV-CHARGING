@@ -8,6 +8,9 @@ const fs = require('fs')
 const multer = require('multer');
 const crypto = require("crypto");
 const moment = require('moment');
+const cron = require('node-cron');
+const axios = require('axios');
+
 var employeeRouter = require('./routes/employee/index');
 var divisionRouter = require('./routes/division/index');
 var departmentRouter = require('./routes/department/index');
@@ -28,6 +31,7 @@ var jobRouter = require('./routes/job/index');
 var trackingRouter = require('./routes/tracking/index');
 var reportRouter = require('./routes/report/index');
 var masterTimeRouter = require('./routes/master-time/index');
+const orderController = require('./routes/order/order');
 var app = express();
 var cors = require('cors');
 var config = require('./configuration/connection');
@@ -309,6 +313,48 @@ app.use('/api-tms-v2/tracking', trackingRouter);
 app.use('/api-tms-v2/report', reportRouter);
 //MasterTime
 app.use('/api-tms-v2/master-time', masterTimeRouter);
+
+// ตั้งเวลาทำงานทุก 1 ชั่วโมง
+// cron.schedule('0 * * * *', async () => {
+//     console.log('--- Start Hourly Cron Job: SAP Order Sync ---');
+//     let toDay = moment().format('YYYYMMDD');
+//     let toDayPlusOne = moment().add(1, 'days').format('YYYYMMDD');
+
+//     const options = {
+//         method: 'POST',
+//         url: 'http://localhost:9100/api-tms-v2/order/order-hana/information',
+//         headers: {
+//             'Content-Type': 'application/json',
+//             lic_code: 'aos01',
+//             Authorization: 'Basic dG1zdjIud2Vic2l0ZTpyZVBAc3N3MHJkNzc4OTAw'
+//         },
+//         data: [
+//             {
+//                 SOInputParameter: {
+//                     SalesOrderList: [],
+//                     SalesOrderTypeList: [],
+//                     ShipToPartyList: [],
+//                     CreationDate: toDay,
+//                     CreationTime: '',
+//                     CreationDateTo: toDayPlusOne,
+//                     CreationTimeTo: '',
+//                     CustomerPurchaseOrderType: '',
+//                     CustomerGroup1List: [],
+//                     NameofOrdererList: [],
+//                     action: [{ id: 'empl-1747190398748', value: '00001' }]
+//                 }
+//             }
+//         ]
+//     };
+
+//     axios.request(options).then(function (response) {
+//         console.log(response.data);
+//     }).catch(function (error) {
+//         console.error(error);
+//     });
+// }, {
+//     timezone: "Asia/Bangkok"
+// });
 
 // catch 404 and forward to error handler
 app.use(function (req, res, next) {
