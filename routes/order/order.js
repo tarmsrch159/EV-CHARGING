@@ -14,6 +14,7 @@ exports.getOrderInformation = async (req, res, next) => {
 
         let lic_code = req.header('lic_code');
         let { order_no, start_date, end_date, order_type, order_status, auto_order, status_deli,
+            ptrl_number,
             search, page_index, page_limit, action } = req.body[0];
 
         // ======== กำหนดค่าเริ่มต้นให้กับพารามิเตอร์ที่ไม่ได้ส่งมา ========
@@ -21,6 +22,7 @@ exports.getOrderInformation = async (req, res, next) => {
         page_limit = page_limit === undefined ? 10 : page_limit;
         auto_order = auto_order === undefined ? 'ALL' : auto_order;
         status_deli = status_deli === undefined ? 'ALL' : status_deli;
+        ptrl_number = ptrl_number === undefined ? 'ALL' : ptrl_number;
 
         // ======== ตรวจสอบความถูกต้องของพารามิเตอร์ที่จำเป็น ========
         if (start_date === undefined || end_date === undefined ||
@@ -61,9 +63,26 @@ exports.getOrderInformation = async (req, res, next) => {
         if (order_status.toString().toUpperCase() !== 'ALL') {
             conditions.push(`tbl_order.order_status = '${order_status}'`);
         }
-        if (action[0].value.toString().toUpperCase() !== 'ALL') {
-            conditions.push(`tbl_order.created_by_tms = '${action[0].id}'`);
+
+        // ======== กรองตาม ptrl_code (เมื่อเลือกปั๊มเจาะจง) ========
+        if (ptrl_number.toString().toUpperCase() !== 'ALL') {
+            conditions.push(`tbl_order.ship_to = '${ptrl_number}'`);
         }
+
+        // ======== กรองตามสิทธิ์การเข้าถึง (Role) ========
+        let act_val = action[0].value.toString().toUpperCase();
+        let act_id = action[0].id;
+
+        if (act_val !== 'ALL' && act_val !== 'GROUP') {
+            conditions.push(`tbl_order.created_by_tms = '${act_id}'`);
+        }
+
+        // if (act_val === 'GROUP') {
+        //     // Role planner/cs: ดึง order เฉพาะปั๊มที่อยู่ในกลุ่มปั๊มของพนักงานคนนั้น
+        //     conditions.push(`tbl_petrol.ptrl_group_code IN (SELECT ptrl_group_code FROM tbl_employee_petrol_group WHERE emp_code = '${act_id}' AND emp_pgrp_flag = 1)`);
+        // } else if (act_val !== 'ALL') {
+        //     conditions.push(`tbl_order.created_by_tms = '${act_id}'`);
+        // }
         // ======== เพิ่มเงื่อนไขการค้นหาข้อความ (Search) แบบครอบคลุมหลายฟิลด์ ========
         if (search !== '') {
             conditions.push(`(
@@ -117,6 +136,7 @@ exports.getOrderInformation = async (req, res, next) => {
             OFFSET (${page_index} * ${page_limit}) LIMIT ${page_limit};
         `;
 
+
         // ======== Query เพื่อดึงข้อมูลหลัก ========
         let tbl_temporary = await pgConn.get(dbPrefix + lic_code, dataScript, config.connectionString());
 
@@ -132,6 +152,7 @@ exports.getOrderInformation = async (req, res, next) => {
                         SUM(rows_total) as rows_total  
                     FROM (
                         SELECT 1 as rows_total FROM tbl_order 
+                        LEFT JOIN tbl_petrol ON tbl_order.ship_to = tbl_petrol.ptrl_number
                         ${whereClause}
                     ) xtbl_master;
                 `;
