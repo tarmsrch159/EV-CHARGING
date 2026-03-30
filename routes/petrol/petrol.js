@@ -115,39 +115,34 @@ exports.getPetrolInformation = async (req, res, next) => {
         `;
 
         let tbl_temporary = await pgConn.get(dbPrefix + lic_code, dataScript, config.connectionString());
-
         if (!tbl_temporary.code) {
             if (tbl_temporary.data.length > 0) {
-                // แปลง null เป็น ""
+
                 tbl_temporary.data = JSON.parse(JSON.stringify(tbl_temporary.data).replace(/\:null/gi, "\:\"\""));
-                let responseData = tbl_temporary.data;
+                let rawData = tbl_temporary.data;
+                let responseData = rawData;
 
-                // =================================================================
-                //  กรองข้อมูลและจัดกลุ่มถ้า action value เป็น 'GROUP'
-                // =================================================================
-                if (action[0].value.toString().toUpperCase() === 'GROUP') {
-                    // ใช้ reduce เพื่อสร้าง Object จัดกลุ่ม
-                    let groupedObj = responseData.reduce((acc, curr) => {
-                        let groupKey = curr.ptrl_group_code || 'UNASSIGNED';
+                // =========== กรองข้อมูลปั๊มและกลุ่มปั๊ม ==========
+                if (act_val === 'GROUP') {
+                    let groupMap = new Map();
 
-                        // ถ้ายังไม่มี Key กลุ่มนี้ ให้สร้างขึ้นมา
-                        if (!acc[groupKey]) {
-                            acc[groupKey] = {
-                                ptrl_group_code: groupKey,
-                                ptrl_group_desc: curr.ptrl_group_desc || '',
-                                stations: []
-                            };
+                    // ดึงรายชื่อกลุ่ม (แบบไม่ซ้ำ)
+                    rawData.forEach(item => {
+                        let groupCode = item.ptrl_group_code || 'UNASSIGNED';
+                        if (!groupMap.has(groupCode)) {
+                            groupMap.set(groupCode, {
+                                ptrl_group_code: groupCode,
+                                ptrl_group_desc: item.ptrl_group_desc || 'ไม่ระบุกลุ่ม'
+                            });
                         }
+                    });
 
-                        // เอาข้อมูลปั๊มใส่เข้าไปในกลุ่ม
-                        acc[groupKey].stations.push(curr);
-
-                        return acc;
-                    }, {});
-
-                    // แปลงกลับจาก Object ให้เป็น Array 
-                    responseData = Object.values(groupedObj);
+                    responseData = {
+                        ptrl_group_code: Array.from(groupMap.values()),
+                        station: rawData // ปั๊มทั้งหมดรวมกันใน Array เดียว
+                    };
                 }
+
                 let page_total = 0;
                 let rows_total = 0;
 
