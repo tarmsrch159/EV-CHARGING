@@ -355,8 +355,10 @@ exports.setEmployeeInformation = async (req, res, next) => {
             emp_image_profile,
             off_code,
             ptrl_code,
+            ptrl_group_code,
             action
         } = req.body[0];
+
 
         //เช็คเฉพาะส่วนที่สำคัญ
         if (emp_code == undefined || off_code == undefined
@@ -379,6 +381,8 @@ exports.setEmployeeInformation = async (req, res, next) => {
             emp_dep_code = emp_dep_code == undefined ? '' : emp_dep_code;
             emp_pos_code = emp_pos_code == undefined ? '' : emp_pos_code;
             emp_group_code = emp_group_code == undefined ? '' : emp_group_code;
+            ptrl_code = ptrl_code == undefined ? '' : ptrl_code;
+            ptrl_group_code = ptrl_group_code == undefined ? [] : ptrl_group_code;
 
             if (off_code.toString().toUpperCase() == 'ALL') {
 
@@ -395,7 +399,9 @@ exports.setEmployeeInformation = async (req, res, next) => {
                 return;
             }
 
-            script = `update tbl_employee set 
+            let now_dt = moment().format('YYYY-MM-DD HH:mm:ss');
+            script = `BEGIN;\n`;
+            script += `update tbl_employee set 
             emp_ref_code = '${emp_ref_code}',
             emp_name = '${emp_name}',
             emp_surname = '${emp_surname}',
@@ -410,8 +416,19 @@ exports.setEmployeeInformation = async (req, res, next) => {
             emp_image_profile = '${emp_image_profile}',
             off_code = '${off_code}',
             ptrl_code = '${ptrl_code}',
-            mdf_dt = '${moment().format('YYYY-MM-DD HH:mm:ss')}' 
-            where emp_code = '${emp_code}';`
+            mdf_dt = '${now_dt}' 
+            where emp_code = '${emp_code}';\n`;
+
+            // อัปเดตข้อมูล petrol group (ถ้ามีการส่งมา)
+            // ========= ลบอันเก่าแล้ว Insert ใหม่ทั้งหมดตามที่ส่งมาล่าสุด =========
+            script += `DELETE FROM tbl_employee_petrol_group WHERE emp_code = '${emp_code}';\n`;
+            if (Array.isArray(ptrl_group_code) && ptrl_group_code.length > 0) {
+                for (const code of ptrl_group_code) {
+                    script += `INSERT INTO tbl_employee_petrol_group (emp_code, ptrl_group_code, emp_pgrp_flag, ist_dt) VALUES ('${emp_code}', '${code}', 1, '${now_dt}');\n`;
+                }
+            }
+
+            script += `COMMIT;`;
 
             let tbl_temporary = await pgConn.execute(dbPrefix + lic_code, script, config.connectionString());
             if (!tbl_temporary.code) {
@@ -428,6 +445,7 @@ exports.setEmployeeInformation = async (req, res, next) => {
                 await xglobal.action_logs(lic_code, action[0].id, 'แก้ไขข้อมูลพนักงาน', JSON.stringify(req.body[0]), 'success', action[0].value);
                 return;
             } else {
+                await pgConn.execute(dbPrefix + lic_code, `ROLLBACK;`, config.connectionString());
                 let response = [{
                     status: 'error',
                     invalid_code: '-3',
