@@ -17,7 +17,7 @@ exports.getOrderInformation = async (req, res, next) => {
         // =========================================================================
         let lic_code = req.header('lic_code');
         let { order_no, start_date, end_date, order_type, order_status, auto_order, status_deli,
-            ptrl_number, search, page_index, page_limit, action } = req.body[0] || {};
+            ptrl_number, ptrl_group_code, search, page_index, page_limit, action } = req.body[0] || {};
 
         // กำหนด Default Values ให้กับตัวแปรสำคัญที่ไม่ได้ส่งมา
         page_index = page_index === undefined ? 1 : page_index;
@@ -25,6 +25,7 @@ exports.getOrderInformation = async (req, res, next) => {
         auto_order = auto_order === undefined ? 'ALL' : auto_order;
         status_deli = status_deli === undefined ? 'ALL' : status_deli;
         ptrl_number = ptrl_number === undefined ? 'ALL' : ptrl_number;
+        ptrl_group_code = ptrl_group_code === undefined ? 'ALL' : ptrl_group_code;
 
         // =========================================================================
         // Data Validation (ตรวจสอบความครบถ้วนของข้อมูลสำคัญ)
@@ -66,7 +67,12 @@ exports.getOrderInformation = async (req, res, next) => {
 
 
         if (ptrl_number !== undefined && ptrl_number.toString().toUpperCase() !== 'ALL') {
-            conditions.push(`tbl_order.ship_to IN (${ptrl_number})`);
+            conditions.push(`tbl_order.ship_to = '${ptrl_number}'`);
+        }
+
+        if (ptrl_group_code !== undefined && ptrl_group_code.toString().toUpperCase() !== 'ALL') {
+
+            conditions.push(`tbl_petrol.ptrl_group_code = '${ptrl_group_code}'`);
         }
 
         // =========================================================================
@@ -78,6 +84,7 @@ exports.getOrderInformation = async (req, res, next) => {
         if (act_val === 'GROUP') {
             // สิทธิ์ GROUP (เช่น Planner/CS): มองเห็นเฉพาะ Order ของปั๊มที่อยู่ในความดูแลของตัวเอง
             conditions.push(`tbl_petrol.ptrl_group_code IN (SELECT ptrl_group_code FROM tbl_employee_petrol_group WHERE emp_code = '${act_id}' AND emp_pgrp_flag = 1)`);
+            conditions.push(`tbl_petrol.ptrl_flag = '1'`);
         } else if (act_val !== 'ALL') {
             // สิทธิ์พนักงานทั่วไป: มองเห็นเฉพาะ Order ที่ตัวเองเป็นคนสร้าง
             conditions.push(`tbl_order.created_by_tms = '${act_id}'`);
@@ -112,12 +119,14 @@ exports.getOrderInformation = async (req, res, next) => {
                 tbl_order.status_check, tbl_order.sd_doc_reject, tbl_order.cus_group, 
                 tbl_order.hana_created, tbl_order.hana_time, tbl_order.created_by, 
                 tbl_order.ist_dt, tbl_order.mdf_dt, tbl_order.rm_dt, tbl_order.auto_order,
-                COALESCE(tbl_sum_item.total_qty, 0) as total_item_qty
+                COALESCE(tbl_sum_item.total_qty, 0) as total_item_qty,
+                tbl_employee.emp_name
             FROM tbl_order  
             LEFT JOIN tbl_order_type ON tbl_order.order_type = tbl_order_type.ord_type_code
             LEFT JOIN tbl_petrol_group ON tbl_petrol_group.ptrl_group_code = tbl_order.order_group
             LEFT JOIN tbl_petrol ON tbl_order.ship_to = tbl_petrol.ptrl_number
             LEFT JOIN tbl_master_time ON tbl_order.deli_time_req = tbl_master_time.time_code
+            LEFT JOIN tbl_employee ON tbl_order.created_by_tms = tbl_employee.emp_code
             LEFT JOIN (
                 SELECT 
                     TRIM(CAST(order_no AS TEXT)) as order_no_text, 
@@ -158,6 +167,7 @@ exports.getOrderInformation = async (req, res, next) => {
                         SELECT 1 as rows_total FROM tbl_order 
                         LEFT JOIN tbl_petrol ON tbl_order.ship_to = tbl_petrol.ptrl_number
                         ${whereClause}
+                        ORDER BY tbl_order.ist_dt DESC 
                     ) xtbl_master;
                 `;
 

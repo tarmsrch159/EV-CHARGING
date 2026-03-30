@@ -99,12 +99,10 @@ exports.getEmployeeInformation = async (req, res, next) => {
                 tbl_employee.rm_dt, 
                 tbl_employee.off_code, 
                 tbl_office.off_desc, 
-                
                 tbl_employee.ptrl_code, 
-                tbl_petrol.ptrl_desc,
+                tbl_petrol.ptrl_desc
 
-                -- แทรกข้อมูลกลุ่มปั๊มที่จัดรูปแบบแล้ว
-                ${subquery_petrol_groups}
+               
 
                 from tbl_employee 
                 left join tbl_division on tbl_employee.emp_div_code = tbl_division.div_code

@@ -14,9 +14,10 @@ exports.getPetrolGroupInformation = async (req, res, next) => {
     return (async () => {
 
         let lic_code = req.header('lic_code');
-        let { ptrl_group_code, off_code, action } = req.body[0];
-        //เช็คเฉพาะส่วนที่สำคัญ
-        if (ptrl_group_code == undefined || lic_code == undefined || off_code == undefined || action == undefined) {
+        let { ptrl_group_code, off_code, action } = req.body[0] || {};
+
+        // เช็คเฉพาะส่วนที่สำคัญ
+        if (ptrl_group_code === undefined || lic_code === undefined || off_code === undefined || action === undefined) {
             let response = [{
                 status: 'error',
                 invalid_code: '-1',
@@ -27,109 +28,123 @@ exports.getPetrolGroupInformation = async (req, res, next) => {
 
             res.status(200).send(response);
             return;
-        } else {
+        }
 
-            let script = ``;
-            if (ptrl_group_code.toString().toUpperCase() != 'ALL') {
-                script = `select ptrl_group_code, ptrl_group_desc, ptrl_group_short_desc, ptrl_group_flag, 
-                tbl_petrol_group.ist_dt, tbl_petrol_group.mdf_dt, tbl_petrol_group.rm_dt, 
-                tbl_petrol_group.off_code, tbl_office.off_desc
-                from tbl_petrol_group 
-                left join tbl_office on tbl_petrol_group.off_code = tbl_office.off_code
-                where ptrl_group_flag = '1' and ptrl_group_code = '${ptrl_group_code}'`;
-            }
-            else {
-                script = `select ptrl_group_code, ptrl_group_desc, ptrl_group_short_desc, ptrl_group_flag, 
-                tbl_petrol_group.ist_dt, tbl_petrol_group.mdf_dt, tbl_petrol_group.rm_dt, 
-                tbl_petrol_group.off_code, tbl_office.off_desc
-                from tbl_petrol_group 
-                left join tbl_office on tbl_petrol_group.off_code = tbl_office.off_code
-                where ptrl_group_flag = '1'`;
-            }
+        // =========================================================================
+        // สร้าง Dynamic WHERE Clause
+        // =========================================================================
+        let conditions = ["tbl_petrol_group.ptrl_group_flag = '1'"];
 
-            if (off_code.toString().toUpperCase() != 'ALL') {
-                script += ` and tbl_petrol_group.off_code = '${off_code}' `
-            }
+        if (ptrl_group_code.toString().toUpperCase() !== 'ALL') {
+            conditions.push(`tbl_petrol_group.ptrl_group_code = '${ptrl_group_code}'`);
+        }
 
-            script += `  order by tbl_petrol_group.ist_dt desc;`
+        if (off_code.toString().toUpperCase() !== 'ALL') {
+            conditions.push(`tbl_petrol_group.off_code = '${off_code}'`);
+        }
 
-            let tbl_temporary = await pgConn.get(dbPrefix + lic_code, script, config.connectionString());
-            if (!tbl_temporary.code) {
-                //debugger
-                if (tbl_temporary.data.length > 0) {
-                    tbl_temporary.data = JSON.parse(JSON.stringify(tbl_temporary.data).replace(/\:null/gi, "\:\"\""));
+        // =========================================================================
+        // กรองข้อมูลตามสิทธิ์การเข้าถึง (Role Authorization)
+        // =========================================================================
+        let act_val = action[0]?.value?.toString().toUpperCase() || 'ALL';
+        let act_id = action[0]?.id || '';
 
-                    // ดึงข้อมูลที่อยู่และประเภทรถของแต่ละกลุ่มปั้ม
-                    for (let i = 0; i < tbl_temporary.data.length; i++) {
-                        let groupCode = tbl_temporary.data[i].ptrl_group_code;
+        if (act_val === 'GROUP') {
+            // ดึงเฉพาะกลุ่มปั๊มที่พนักงานคนนี้มีสิทธิ์ดูแลเท่านั้น
+            conditions.push(`tbl_petrol_group.ptrl_group_code IN (SELECT ptrl_group_code FROM tbl_employee_petrol_group WHERE emp_code = '${act_id}' AND emp_pgrp_flag = 1)`);
+        }
 
-                        // ดึงที่อยู่ พร้อมชื่อ จังหวัด อำเภอ ตำบล
-                        let addrScript = `select 
-                            tbl_petrol_group_address.ptrl_group_addr_code,
-                            tbl_petrol_group_address.prov_code, tbl_province.prov_desc,
-                            tbl_petrol_group_address.amph_code, tbl_amphure.amph_desc,
-                            tbl_petrol_group_address.tamb_code, tbl_tambon.tamb_desc
-                            from tbl_petrol_group_address
-                            left join tbl_province on tbl_petrol_group_address.prov_code = tbl_province.prov_code
-                            left join tbl_amphure on tbl_petrol_group_address.amph_code = tbl_amphure.amph_code
-                            left join tbl_tambon on tbl_petrol_group_address.tamb_code = tbl_tambon.tamb_code
-                            where tbl_petrol_group_address.ptrl_group_code = '${groupCode}' and tbl_petrol_group_address.flag = '1';`;
-                        let addrResult = await pgConn.get(dbPrefix + lic_code, addrScript, config.connectionString());
-                        if (!addrResult.code && addrResult.data.length > 0) {
-                            tbl_temporary.data[i].address = JSON.parse(JSON.stringify(addrResult.data).replace(/\:null/gi, "\:\"\""));
-                        } else {
-                            tbl_temporary.data[i].address = [];
-                        }
+        let whereClause = "WHERE " + conditions.join(" AND ");
 
-                        // ดึงประเภทรถ พร้อมชื่อประเภทรถ
-                        let vehScript = `select 
-                            tbl_petrol_group_veh.ptrl_group_veh_code,
-                            tbl_petrol_group_veh.veh_type_code, tbl_vehicle_type.veh_type_desc
-                            from tbl_petrol_group_veh
-                            left join tbl_vehicle_type on tbl_petrol_group_veh.veh_type_code = tbl_vehicle_type.veh_type_code
-                            where tbl_petrol_group_veh.ptrl_group_code = '${groupCode}' and tbl_petrol_group_veh.flag = '1';`;
-                        let vehResult = await pgConn.get(dbPrefix + lic_code, vehScript, config.connectionString());
-                        if (!vehResult.code && vehResult.data.length > 0) {
-                            tbl_temporary.data[i].veh_type = JSON.parse(JSON.stringify(vehResult.data).replace(/\:null/gi, "\:\"\""));
-                        } else {
-                            tbl_temporary.data[i].veh_type = [];
-                        }
+        // =========================================================================
+        // SQL Query หลัก
+        // =========================================================================
+        let script = `
+            SELECT ptrl_group_code, ptrl_group_desc, ptrl_group_short_desc, ptrl_group_flag, 
+            tbl_petrol_group.ist_dt, tbl_petrol_group.mdf_dt, tbl_petrol_group.rm_dt, 
+            tbl_petrol_group.off_code, tbl_office.off_desc
+            FROM tbl_petrol_group 
+            LEFT JOIN tbl_office ON tbl_petrol_group.off_code = tbl_office.off_code
+            ${whereClause}
+            ORDER BY tbl_petrol_group.ist_dt DESC;
+        `;
+
+        let tbl_temporary = await pgConn.get(dbPrefix + lic_code, script, config.connectionString());
+
+        if (!tbl_temporary.code) {
+            if (tbl_temporary.data.length > 0) {
+                tbl_temporary.data = JSON.parse(JSON.stringify(tbl_temporary.data).replace(/\:null/gi, "\:\"\""));
+
+                // ดึงข้อมูลที่อยู่และประเภทรถของแต่ละกลุ่มปั้ม
+                for (let i = 0; i < tbl_temporary.data.length; i++) {
+                    let groupCode = tbl_temporary.data[i].ptrl_group_code;
+
+                    // ดึงที่อยู่ พร้อมชื่อ จังหวัด อำเภอ ตำบล
+                    let addrScript = `select 
+                        tbl_petrol_group_address.ptrl_group_addr_code,
+                        tbl_petrol_group_address.prov_code, tbl_province.prov_desc,
+                        tbl_petrol_group_address.amph_code, tbl_amphure.amph_desc,
+                        tbl_petrol_group_address.tamb_code, tbl_tambon.tamb_desc
+                        from tbl_petrol_group_address
+                        left join tbl_province on tbl_petrol_group_address.prov_code = tbl_province.prov_code
+                        left join tbl_amphure on tbl_petrol_group_address.amph_code = tbl_amphure.amph_code
+                        left join tbl_tambon on tbl_petrol_group_address.tamb_code = tbl_tambon.tamb_code
+                        where tbl_petrol_group_address.ptrl_group_code = '${groupCode}' and tbl_petrol_group_address.flag = '1';`;
+                    let addrResult = await pgConn.get(dbPrefix + lic_code, addrScript, config.connectionString());
+                    if (!addrResult.code && addrResult.data.length > 0) {
+                        tbl_temporary.data[i].address = JSON.parse(JSON.stringify(addrResult.data).replace(/\:null/gi, "\:\"\""));
+                    } else {
+                        tbl_temporary.data[i].address = [];
                     }
 
-                    let response = [{
-                        status: 'success',
-                        invalid_code: '0',
-                        message: '',
-                        data: tbl_temporary.data,
-                        response_time: moment().format('YYYY-MM-DD HH:mm:ss')
-                    }]
-
-                    res.status(200).send(response);
-                    return;
-                } else {
-                    let response = [{
-                        status: 'success',
-                        invalid_code: '0',
-                        message: '',
-                        data: xresult,
-                        response_time: moment().format('YYYY-MM-DD HH:mm:ss')
-                    }]
-
-                    res.status(200).send(response);
-                    return;
+                    // ดึงประเภทรถ พร้อมชื่อประเภทรถ
+                    let vehScript = `select 
+                        tbl_petrol_group_veh.ptrl_group_veh_code,
+                        tbl_petrol_group_veh.veh_type_code, tbl_vehicle_type.veh_type_desc
+                        from tbl_petrol_group_veh
+                        left join tbl_vehicle_type on tbl_petrol_group_veh.veh_type_code = tbl_vehicle_type.veh_type_code
+                        where tbl_petrol_group_veh.ptrl_group_code = '${groupCode}' and tbl_petrol_group_veh.flag = '1';`;
+                    let vehResult = await pgConn.get(dbPrefix + lic_code, vehScript, config.connectionString());
+                    if (!vehResult.code && vehResult.data.length > 0) {
+                        tbl_temporary.data[i].veh_type = JSON.parse(JSON.stringify(vehResult.data).replace(/\:null/gi, "\:\"\""));
+                    } else {
+                        tbl_temporary.data[i].veh_type = [];
+                    }
                 }
+
+                let response = [{
+                    status: 'success',
+                    invalid_code: '0',
+                    message: '',
+                    data: tbl_temporary.data,
+                    response_time: moment().format('YYYY-MM-DD HH:mm:ss')
+                }]
+
+                res.status(200).send(response);
+                return;
             } else {
                 let response = [{
-                    status: 'error',
-                    invalid_code: '-3',
-                    message: `ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ`,
+                    status: 'success',
+                    invalid_code: '0',
+                    message: '',
                     data: xresult,
                     response_time: moment().format('YYYY-MM-DD HH:mm:ss')
                 }]
+
                 res.status(200).send(response);
-                await xglobal.action_logs(lic_code, action[0].id, 'ดึงข้อมูลกลุ่มปั้ม', JSON.stringify(req.body[0]), 'ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ', action[0].value);
                 return;
             }
+        } else {
+            let response = [{
+                status: 'error',
+                invalid_code: '-3',
+                message: `ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ`,
+                data: xresult,
+                response_time: moment().format('YYYY-MM-DD HH:mm:ss')
+            }]
+            res.status(200).send(response);
+            await xglobal.action_logs(lic_code, action[0].id, 'ดึงข้อมูลกลุ่มปั้ม', JSON.stringify(req.body[0]), 'ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ', action[0].value);
+            return;
         }
 
     })().catch(async (err) => {
@@ -142,7 +157,133 @@ exports.getPetrolGroupInformation = async (req, res, next) => {
             response_time: moment().format('YYYY-MM-DD HH:mm:ss').toString()
         }]
         res.status(200).send(response);
-        await xglobal.action_logs(lic_code, action[0].id, 'ดึงข้อมูลกลุ่มปั้ม', JSON.stringify(req.body[0]), 'ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ', action[0].value);
+
+        let act_id = req.body[0]?.action?.[0]?.id || '';
+        let act_val = req.body[0]?.action?.[0]?.value || '';
+        if (act_id) {
+            await xglobal.action_logs(lic_code, act_id, 'ดึงข้อมูลกลุ่มปั้ม', JSON.stringify(req.body[0]), 'ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ', act_val);
+        }
+        return;
+    });
+
+}
+
+exports.getPetrolGroupInformationFilter = async (req, res, next) => {
+
+    var xresult = [];
+
+    return (async () => {
+
+        let lic_code = req.header('lic_code');
+        let { ptrl_group_code, action } = req.body[0] || {};
+
+        // เช็คเฉพาะส่วนที่สำคัญ
+        if (ptrl_group_code === undefined || lic_code === undefined || action === undefined) {
+            let response = [{
+                status: 'error',
+                invalid_code: '-1',
+                message: 'ไม่สามารถดึงข้อมูลได้, เนื่องจากข้อมูลพารามิเตอร์ไม่ถูกต้อง',
+                data: xresult,
+                response_time: moment().format('YYYY-MM-DD HH:mm:ss')
+            }]
+
+            res.status(200).send(response);
+            return;
+        }
+
+        // =========================================================================
+        // สร้าง Dynamic WHERE Clause
+        // =========================================================================
+        let conditions = ["tbl_petrol_group.ptrl_group_flag = '1'"];
+
+        if (ptrl_group_code.toString().toUpperCase() !== 'ALL') {
+            conditions.push(`tbl_petrol_group.ptrl_group_code = '${ptrl_group_code}'`);
+        }
+
+
+
+        // =========================================================================
+        // กรองข้อมูลตามสิทธิ์การเข้าถึง (Role Authorization)
+        // =========================================================================
+        let act_val = action[0]?.value?.toString().toUpperCase() || 'ALL';
+        let act_id = action[0]?.id || '';
+
+        if (act_val === 'GROUP') {
+            // ดึงเฉพาะกลุ่มปั๊มที่พนักงานคนนี้มีสิทธิ์ดูแลเท่านั้น
+            conditions.push(`tbl_petrol_group.ptrl_group_code IN (SELECT ptrl_group_code FROM tbl_employee_petrol_group WHERE emp_code = '${act_id}' AND emp_pgrp_flag = 1)`);
+        }
+
+        let whereClause = "WHERE " + conditions.join(" AND ");
+
+        // =========================================================================
+        // SQL Query หลัก
+        // =========================================================================
+        let script = `
+            SELECT ptrl_group_code, ptrl_group_desc, ptrl_group_short_desc
+            FROM tbl_petrol_group 
+            ${whereClause}
+            ORDER BY tbl_petrol_group.ist_dt DESC;
+        `;
+
+        let tbl_temporary = await pgConn.get(dbPrefix + lic_code, script, config.connectionString());
+
+        if (!tbl_temporary.code) {
+            if (tbl_temporary.data.length > 0) {
+                tbl_temporary.data = JSON.parse(JSON.stringify(tbl_temporary.data).replace(/\:null/gi, "\:\"\""));
+
+
+
+                let response = [{
+                    status: 'success',
+                    invalid_code: '0',
+                    message: '',
+                    data: tbl_temporary.data,
+                    response_time: moment().format('YYYY-MM-DD HH:mm:ss')
+                }]
+
+                res.status(200).send(response);
+                return;
+            } else {
+                let response = [{
+                    status: 'success',
+                    invalid_code: '0',
+                    message: '',
+                    data: xresult,
+                    response_time: moment().format('YYYY-MM-DD HH:mm:ss')
+                }]
+
+                res.status(200).send(response);
+                return;
+            }
+        } else {
+            let response = [{
+                status: 'error',
+                invalid_code: '-3',
+                message: `ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ`,
+                data: xresult,
+                response_time: moment().format('YYYY-MM-DD HH:mm:ss')
+            }]
+            res.status(200).send(response);
+            await xglobal.action_logs(lic_code, action[0].id, 'ดึงข้อมูลกลุ่มปั้ม', JSON.stringify(req.body[0]), 'ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ', action[0].value);
+            return;
+        }
+
+    })().catch(async (err) => {
+        console.log(err);
+        let response = [{
+            status: 'error',
+            invalid_code: '-4',
+            message: `ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ`,
+            data: xresult,
+            response_time: moment().format('YYYY-MM-DD HH:mm:ss').toString()
+        }]
+        res.status(200).send(response);
+
+        let act_id = req.body[0]?.action?.[0]?.id || '';
+        let act_val = req.body[0]?.action?.[0]?.value || '';
+        if (act_id) {
+            await xglobal.action_logs(lic_code, act_id, 'ดึงข้อมูลกลุ่มปั้ม', JSON.stringify(req.body[0]), 'ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ', act_val);
+        }
         return;
     });
 

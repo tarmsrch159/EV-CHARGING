@@ -16,12 +16,14 @@ const reportStock = require('../report/report-stock');
 
 //Petrol
 router.put('/information', petrol.addPetrolInformation);
+router.post('/information/filter', petrol.getPetrolInformationFilter);
 router.patch('/information', petrol.setPetrolInformation);
 router.delete('/information', petrol.removePetrol);
 router.post('/information', petrol.getPetrolInformation);
 
 //Petrol group
 router.post('/group/information', petrol_group.getPetrolGroupInformation);
+router.post('/group/information/filter', petrol_group.getPetrolGroupInformationFilter);
 router.delete('/group/information', petrol_group.removePetrolGroup);
 router.patch('/group/information', petrol_group.setPetrolGroupInformation);
 router.put('/group/information', petrol_group.addPetrolGroupInformation);
