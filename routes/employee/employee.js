@@ -55,7 +55,8 @@ exports.getEmployeeInformation = async (req, res, next) => {
                             pg.ptrl_group_desc,
                             json_agg(
                                 json_build_object(
-                                    'ptrl_code', p.ptrl_code, 
+                                    'ptrl_code', p.ptrl_code,
+                                    'ptrl_number', p.ptrl_number, 
                                     'ptrl_desc', p.ptrl_desc
                                 )
                             ) as stations

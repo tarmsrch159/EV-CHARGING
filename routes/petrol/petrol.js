@@ -16,13 +16,12 @@ exports.getPetrolInformation = async (req, res, next) => {
 
         let {
             ptrl_code, off_code, ptrl_group_code, search,
-            page_index, page_limit, action, auto_order, emp_code
+            page_index, page_limit, action, auto_order
         } = payload;
 
         // ======== กำหนดค่าเริ่มต้น ========
         page_index = page_index === undefined ? 1 : page_index;
         page_limit = page_limit === undefined ? 10 : page_limit;
-        emp_code = emp_code === undefined ? 'ALL' : emp_code;
 
         // ======== ตรวจสอบพารามิเตอร์ที่จำเป็น ========
         if (ptrl_code === undefined || off_code === undefined || ptrl_group_code === undefined ||
@@ -136,7 +135,7 @@ exports.getPetrolInformation = async (req, res, next) => {
                             acc[groupKey] = {
                                 ptrl_group_code: groupKey,
                                 ptrl_group_desc: curr.ptrl_group_desc || '',
-                                stations: [] // เก็บปั๊มไว้ใน Array นี้
+                                stations: []
                             };
                         }
 
