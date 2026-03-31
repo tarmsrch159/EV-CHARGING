@@ -2825,7 +2825,7 @@ exports.editOrderItem = async (req, res, next) => {
         } = req.body[0];
 
         // เช็คเฉพาะส่วนที่สำคัญ
-        if (description == undefined || description == '' || action == undefined || order_item == undefined) {
+        if (action == undefined || order_item == undefined) {
             let response = [{
                 status: 'error',
                 invalid_code: '-1',
