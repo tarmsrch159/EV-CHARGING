@@ -3,6 +3,9 @@ const router = express.Router();
 const report = require('./report');
 const reportPos = require('./report-pos');
 const reportStock = require('./report-stock');
+const cron = require('node-cron');
+const axios = require('axios');
+const moment = require('moment');
 
 router.post('/als/information', report.getReportALSInformation);
 router.post('/als-v2/information', report.getReportALSInformationV2);
@@ -20,5 +23,23 @@ router.post('/pos/omi', reportPos.getReportPosOmi); //ยอดขายรา�
 
 //สต็อก
 router.post('/stock', reportStock.getReportStock);
+
+
+// คำนวณยอดขาย
+const runSyncSalesTask = () => {
+    console.log('Running sync sales task:', moment().format('YYYY-MM-DD HH:mm:ss'));
+    let lic_code = 'aos01';
+    let ptrl_number = 'ALL';
+    let date_at = moment().format('YYYY-MM-DD');
+    reportStock.syncSalesInfo(date_at, ptrl_number, lic_code);
+};
+
+// สั่งให้ทำงานทันที 1 ครั้งเมื่อ Start Service
+runSyncSalesTask();
+
+// ตั้งเวลาให้ทำงานรอบต่อไปตาม Cron (นาทีที่ 15 ของทุกชั่วโมง)
+cron.schedule('15 * * * *', () => {
+    runSyncSalesTask();
+});
 
 module.exports = router;
