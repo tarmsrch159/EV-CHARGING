@@ -340,7 +340,7 @@ exports.getOrderInformationByID = async (req, res, next) => {
                 AND tbl_petrol_tank.ptrl_code = '${orderData.ptrl_code}'
             LEFT JOIN tbl_order_eodtank tank ON (
                 tbl_petrol_tank.tnk_number = tank.tank_no 
-                AND tank.shipto_no = '${orderData.ptrl_number}
+                AND tank.shipto_no = '${orderData.ptrl_number}'
                 AND tank.date_at = '${date_at}'
             )
             LEFT JOIN (
@@ -363,12 +363,11 @@ exports.getOrderInformationByID = async (req, res, next) => {
                 ) AS latest_meters
                 GROUP BY product_name, tank_no, shipto_no, buy_date
             ) meter_summary ON (
-                tpt.tnk_number = meter_summary.tank_no 
-                AND tbl_petrol.ptrl_sitecode = meter_summary.shipto_no
+                tbl_petrol_tank.tnk_number = meter_summary.tank_no 
+                AND meter_summary.shipto_no = '${orderData.ptrl_number}'
             )
-
-            WHERE tbl_order_item.order_no = ${id}
-            AND tbl_order_item.order_item_flag = 1
+            WHERE CAST(tbl_order_item.order_no AS TEXT) = '${id}'
+            AND tbl_order_item.order_item_flag = '1'
             ORDER BY tbl_order_item.id ASC`;
 
         // ======== ยิง Query เพื่อดึงรายการสินค้า (Items) และจัดการข้อมูล null ========
