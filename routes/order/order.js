@@ -50,6 +50,8 @@ exports.getOrderInformation = async (req, res, next) => {
         // =========================================================================
         if (page_index > 0) page_index -= 1;
 
+        let original_start_date = start_date;
+        let original_end_date = end_date;
 
         if (start_date.length === 10) start_date += ' 00:00:00';
         if (end_date.length === 10) end_date += ' 23:59:59';
@@ -57,7 +59,7 @@ exports.getOrderInformation = async (req, res, next) => {
         // =========================================================================
         // สร้าง Dynamic WHERE Clause สำหรับ Query หลัก (ดึงข้อมูล Order)
         // =========================================================================
-        let conditions = ["tbl_order.rm_dt IS NULL"];
+        let conditions = ["tbl_order.rm_dt IS NULL", "tbl_order.order_flag = '1'"];
 
         if (order_no.toString().toUpperCase() !== 'ALL') conditions.push(`tbl_order.order_no = '${order_no}'`);
         if (status_deli.toString().toUpperCase() !== 'ALL') conditions.push(`tbl_order.status_deli = '${status_deli}'`);
@@ -65,6 +67,9 @@ exports.getOrderInformation = async (req, res, next) => {
         if (auto_order.toString().toUpperCase() !== 'ALL') conditions.push(`tbl_order.auto_order = '${auto_order}'`);
         if (order_status.toString().toUpperCase() !== 'ALL') conditions.push(`tbl_order.order_status = '${order_status}'`);
 
+        if (original_start_date.toString().toUpperCase() !== 'ALL' && original_end_date.toString().toUpperCase() !== 'ALL' && original_start_date !== '' && original_end_date !== '') {
+            conditions.push(`tbl_order.ist_dt >= '${start_date}' AND tbl_order.ist_dt <= '${end_date}'`);
+        }
 
         if (ptrl_number !== undefined && ptrl_number.toString().toUpperCase() !== 'ALL') {
             conditions.push(`tbl_order.ship_to = '${ptrl_number}'`);
@@ -144,6 +149,8 @@ exports.getOrderInformation = async (req, res, next) => {
             ORDER BY tbl_order.ist_dt DESC 
             OFFSET (${page_index} * ${page_limit}) LIMIT ${page_limit};
         `;
+
+        console.log(dataScript)
 
         // =========================================================================
         // Execute Query หลัก และประมวลผลผลลัพธ์เพื่อส่ง Response
@@ -1585,6 +1592,9 @@ exports.getOrderInformationHana = async (req, res, next) => {
                             current_order_status = 9;
                         }
 
+                        let rejection = salesOrder.OverallSDDocumentRejectionSts;
+                        if (rejection === "C") current_order_status = 2;
+
                         // ================ อัพเดต tbl_order ==================
                         console.log(`   🔄  กำลังอัปเดต tbl_order และ tbl_order_item...`);
                         let update_script_order = `UPDATE tbl_order SET 
@@ -1599,7 +1609,7 @@ exports.getOrderInformationHana = async (req, res, next) => {
                             status_block = '${salesOrder.TotalBlockStatus || ''}',
                             status_sd_process = '${salesOrder.OverallSDProcessStatus || ''}',
                             status_check = '${salesOrder.TotalCreditCheckStatus || ''}',
-                            sd_doc_reject = '${salesOrder.OverallSDDocumentRejectionSts || ''}',
+                            sd_doc_reject = '${rejection || ''}',
                             cus_group = '${salesOrder.CustomerGroup1 || ''}',
                             hana_created = ${salesOrder.CreationDate ? `'${salesOrder.CreationDate}'` : 'NULL'},
                             hana_time = '${salesOrder.CreationTime || ''}',
@@ -3315,11 +3325,11 @@ exports.reCreateOrderInformation = async (req, res, next) => {
                     order_type, order_group, chanel, division, sold_to, ship_to,
                     cus_ref, cus_date_ref, po_name, order_by, ship_cond, pay_term,
                     deli_date_req, deli_time_req, description, sh_cus_ref, sh_cus_date_ref,
-                    status_deli, ist_dt, order_flag, auto_order, order_status
+                    status_deli, ist_dt, order_flag, auto_order, order_status, order_ref
                 ) VALUES (
                     $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 
                     $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, 
-                    $21, $22
+                    $21, $22, $23
                 ) RETURNING id`;
 
             const paramsOrder = [
@@ -3329,7 +3339,7 @@ exports.reCreateOrderInformation = async (req, res, next) => {
                 oldOrder.po_name || 'AOS', oldOrder.order_by || 'AOS', oldOrder.ship_cond || 'T1', oldOrder.pay_term || '',
                 moment().format('YYYY-MM-DD'), oldOrder.deli_time_req || 'Z00', oldOrder.description || '',
                 current_sh_cus_ref, currentDateTime,
-                'A', currentDateTime, '1', '0', '0'
+                'A', currentDateTime, '1', '0', '0', oldOrder.id
             ];
 
             const resNewOrder = await pgConn.execute2params(insertOrderScript, paramsOrder);
