@@ -2,6 +2,7 @@ const config = require('../../configuration/connection');
 const pgConn = require('../../library/pgConnection');
 const moment = require('moment');
 const axios = require('axios');
+const { sapApiClient } = require('./sap-api-config');
 const xglobal = require('../../middleware/global');
 const dbPrefix = config.dbPrefix();
 
@@ -1310,20 +1311,9 @@ const getConfirmOrder = async (lic_code, order_id, action) => {
         });
         // console.log(payloadData);
 
-        // ================ API Config ==================
-        let axiosConfig = {
-            method: 'post',
-            maxBodyLength: Infinity,
-            url: 'https://apiqas-bcp.test01.apimanagement.ap11.hana.ondemand.com:443/v1/Logistics/SDI001/SOCreation',
-            headers: {
-                'APIKey': 'TRtiSlDe7esbl0lWftGvbEJwY8pfsp86',
-                'Content-Type': 'application/json'
-            },
-            data: payloadData
-        };
-
         try {
-            let api_response = await axios.request(axiosConfig);
+            // ============ SAP API =============
+            let api_response = await sapApiClient.post('/Logistics/SDI001/SOCreation', payloadData);
             let statusRes = api_response.data.SalesDocuments[0].MessageType;
             let response = [];
 
@@ -1522,20 +1512,9 @@ exports.getOrderInformationHana = async (req, res, next) => {
             }
         });
 
-        // ================ API Config ==================
-        let axiosConfig = {
-            method: 'post',
-            maxBodyLength: Infinity,
-            url: 'https://apiqas-bcp.test01.apimanagement.ap11.hana.ondemand.com:443/v1/Logistics/SDI024/SODetail',
-            headers: {
-                'APIKey': 'TRtiSlDe7esbl0lWftGvbEJwY8pfsp86',
-                'Content-Type': 'application/json'
-            },
-            data: payloadData
-        };
-
         try {
-            let apiResponse = await axios.request(axiosConfig);
+            // ============ SAP API ==============
+            let apiResponse = await sapApiClient.post('/Logistics/SDI024/SODetail', payloadData);
 
             for (let i = 0; i < apiResponse.data.Response.SalesOrders.length; i++) {
                 let salesOrder = apiResponse.data.Response.SalesOrders[i];
@@ -1800,20 +1779,9 @@ exports.getOrderInformationHanaBackUp = async (req, res, next) => {
             }
         });
 
-        // ================ API Config ==================
-        let axiosConfig = {
-            method: 'post',
-            maxBodyLength: Infinity,
-            url: 'https://apiqas-bcp.test01.apimanagement.ap11.hana.ondemand.com:443/v1/Logistics/SDI024/SODetail',
-            headers: {
-                'APIKey': 'TRtiSlDe7esbl0lWftGvbEJwY8pfsp86',
-                'Content-Type': 'application/json'
-            },
-            data: payloadData
-        };
-
         try {
-            let apiResponse = await axios.request(axiosConfig);
+            // ============ SAP API =============
+            let apiResponse = await sapApiClient.post('/Logistics/SDI024/SODetail', payloadData);
             let response = [{
                 status: 'success',
                 invalid_code: '0',
@@ -2199,22 +2167,11 @@ exports.cancelOrderInformationHana = async (req, res, next) => {
 
         const updateStatusOrder = async (payload) => {
             // console.log('payload', payload);
-            // ================ API Config ==================
-            let axiosConfig = {
-                method: 'post',
-                maxBodyLength: Infinity,
-                url: 'https://apiqas-bcp.test01.apimanagement.ap11.hana.ondemand.com:443/v1/Logistics/SDI022/SOUpdate',
-                headers: {
-                    'APIKey': 'TRtiSlDe7esbl0lWftGvbEJwY8pfsp86',
-                    'Content-Type': 'application/json'
-                },
-                data: payload
-            };
-
             let order_no = payload.SalesDocuments[0].SalesOrder;
 
             try {
-                let apiResponse = await axios.request(axiosConfig);
+                // ============ SAP API =============
+                let apiResponse = await sapApiClient.post('/Logistics/SDI022/SOUpdate', payload);
                 let status = false;
                 if (apiResponse.data.SalesDocuments[0].MessageType === 'S') {
                     status = true;
