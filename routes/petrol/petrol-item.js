@@ -509,7 +509,7 @@ exports.getMergePetrolItem = async (req, res, next) => {
                 WHERE tbpi.ptrl_item_flag = '1' AND tbpi.itm_merge = '1' ${wh}
             `;
             let pageLimit = `order by tbi.itm_desc asc limit ${limit} offset ${offset}`;
-            // console.log(script);
+
 
             let tbl_temporary = await pgConn.get(dbPrefix + lic_code, script + pageLimit, config.connectionString());
             if (!tbl_temporary.code) {

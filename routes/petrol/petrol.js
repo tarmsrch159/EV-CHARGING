@@ -554,8 +554,6 @@ exports.setPetrolInformation = async (req, res, next) => {
             amph_code,
             tamb_code
         } = req.body[0];
-
-        // console.log(req.body[0]);
         //เช็คเฉพาะส่วนที่สำคัญ   
         if (ptrl_code == undefined || ptrl_number == undefined || ptrl_sitecode == undefined || ptrl_desc == undefined
             || ptrl_short_desc == undefined || ptrl_address == undefined || ptrl_zip_code == undefined || ptrl_country_code == undefined || ptrl_unloading_minute == undefined
@@ -606,7 +604,7 @@ exports.setPetrolInformation = async (req, res, next) => {
             where ptrl_code = '${ptrl_code}';`
 
             script = script.replace(/'NULL'/gi, "NULL")
-            // console.log(script);
+
             let tbl_temporary = await pgConn.execute(dbPrefix + lic_code, script, config.connectionString());
             if (!tbl_temporary.code) {
                 //debugger

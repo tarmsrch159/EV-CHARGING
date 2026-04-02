@@ -163,9 +163,9 @@ exports.addPetrolType = async (req, res, next) => {
             if (!desc_value || desc_value.trim() === '') continue;
 
             let check_script = `SELECT ord_type_desc FROM tbl_order_type WHERE ord_type_desc = '${desc_value.replace(/'/g, "''")}' AND ord_type_flag = '1';`
-            console.log(check_script)
+
             let check_tbl_temporary = await pgConn.get(dbPrefix + lic_code, check_script, config.connectionString());
-            console.log(check_tbl_temporary)
+
             if (check_tbl_temporary.code || check_tbl_temporary.data.length > 0) {
                 let response = [{
                     status: 'error',

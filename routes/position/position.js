@@ -89,7 +89,6 @@ exports.getPositionInformation = async (req, res, next) => {
 
             script += ` order by tbl_position.ist_dt desc`
             script += ` limit ${page_limit} offset ${page_index * page_limit}`;
-            console.log(script)
             let tbl_temporary = await pgConn.get(dbPrefix + lic_code, script, config.connectionString());
             if (!tbl_temporary.code) {
                 //debugger
@@ -133,7 +132,7 @@ exports.getPositionInformation = async (req, res, next) => {
                             page_total = parseInt(tbl_temporary_count.data[0].page_total);
                         }
                     }
-                    console.log(script)
+
                     let response = [{
                         status: 'success',
                         invalid_code: '0',
