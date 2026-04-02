@@ -319,12 +319,12 @@ exports.getPetrolInformationFilter = async (req, res, next) => {
         let baseSelectQuery = `
             SELECT 
                 tbl_petrol_group.ptrl_group_code, 
-                tbl_petrol_group.ptrl_group_desc
-                ptrl_code, 
-                ptrl_number, 
-                ptrl_sitecode, 
-                ptrl_desc, 
-                ptrl_short_desc
+                tbl_petrol_group.ptrl_group_desc,
+                tbl_petrol.ptrl_code, 
+                tbl_petrol.ptrl_number, 
+                tbl_petrol.ptrl_sitecode, 
+                tbl_petrol.ptrl_desc, 
+                tbl_petrol.ptrl_short_desc
             FROM tbl_petrol 
             LEFT JOIN tbl_petrol_group ON tbl_petrol.ptrl_group_code = tbl_petrol_group.ptrl_group_code 
         `;
@@ -337,7 +337,6 @@ exports.getPetrolInformationFilter = async (req, res, next) => {
             ORDER BY tbl_petrol.ist_dt DESC 
             LIMIT ${page_limit} OFFSET (${page_index} * ${page_limit});
         `;
-
 
         let tbl_temporary = await pgConn.get(dbPrefix + lic_code, dataScript, config.connectionString());
         if (!tbl_temporary.code) {
