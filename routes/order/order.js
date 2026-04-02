@@ -418,7 +418,7 @@ exports.getOrderReportInformation = async (req, res, next) => {
     return (async () => {
 
         let lic_code = req.header('lic_code');
-        let { order_no, start_date, end_date, order_type, order_status, auto_order, status_deli,
+        let { order_no, start_date, end_date, order_type, order_status, auto_order, status_deli, ptrl_group_code, ptrl_number,
             search, page_index, page_limit, action } = req.body[0];
 
         page_index = page_index === undefined ? 1 : page_index;
@@ -426,7 +426,8 @@ exports.getOrderReportInformation = async (req, res, next) => {
         auto_order = auto_order === undefined ? 'ALL' : auto_order;
         status_deli = status_deli === undefined ? 'ALL' : status_deli;
         order_status = order_status === undefined || order_status === 'ALL' || order_status === '' ? 0 : order_status;
-        console.log(order_status);
+        ptrl_group_code = ptrl_group_code === undefined ? 'ALL' : ptrl_group_code;
+        ptrl_number = ptrl_number === undefined ? 'ALL' : ptrl_number;
         // ========== เช็คเฉพาะส่วนที่สำคัญ ==========
         if (start_date === undefined || end_date === undefined || order_type === undefined ||
             order_status === undefined || action === undefined) {
@@ -454,7 +455,7 @@ exports.getOrderReportInformation = async (req, res, next) => {
         // =========================================================
         // 1. จัดการเงื่อนไข WHERE แบบรวมศูนย์ (Dynamic Conditions)
         // =========================================================
-        let conditions = ["tbl_order.rm_dt IS NULL"]; // เงื่อนไขตั้งต้น (บังคับมี)
+        let conditions = ["tbl_order.rm_dt IS NULL", "tbl_order.order_flag = '1'"];
 
         if (order_no.toString().toUpperCase() !== 'ALL' && order_no.toString().toUpperCase() !== '') {
             conditions.push(`tbl_order.order_no = '${order_no}'`);
@@ -471,6 +472,16 @@ exports.getOrderReportInformation = async (req, res, next) => {
         if (order_status.toString().toUpperCase() !== 'ALL' && order_status.toString().toUpperCase() !== '') {
             conditions.push(`tbl_order.order_status = '${order_status}'`);
         }
+
+        if (ptrl_number !== undefined && ptrl_number.toString().toUpperCase() !== 'ALL') {
+            conditions.push(`tbl_order.ship_to = '${ptrl_number}'`);
+        }
+
+        if (ptrl_group_code !== undefined && ptrl_group_code.toString().toUpperCase() !== 'ALL') {
+
+            conditions.push(`tbl_petrol.ptrl_group_code = '${ptrl_group_code}'`);
+        }
+
         if (search !== '' && search !== undefined && search !== null) {
             conditions.push(`(
                 tbl_order.order_no LIKE '%${search}%' 
@@ -482,6 +493,18 @@ exports.getOrderReportInformation = async (req, res, next) => {
         }
         if (original_start_date.toString().toUpperCase() !== 'ALL' && original_end_date.toString().toUpperCase() !== 'ALL') {
             conditions.push(`tbl_order.ist_dt >= '${original_start_date}' AND tbl_order.ist_dt <= '${original_end_date}'`);
+        }
+
+        let act_val = action[0].value.toString().toUpperCase();
+        let act_id = action[0].id;
+
+        if (act_val === 'GROUP') {
+            // สิทธิ์ GROUP (เช่น Planner/CS): มองเห็นเฉพาะ Order ของปั๊มที่อยู่ในความดูแลของตัวเอง
+            conditions.push(`tbl_petrol.ptrl_group_code IN (SELECT ptrl_group_code FROM tbl_employee_petrol_group WHERE emp_code = '${act_id}' AND emp_pgrp_flag = 1)`);
+            conditions.push(`tbl_petrol.ptrl_flag = '1'`);
+        } else if (act_val !== 'ALL') {
+            // สิทธิ์พนักงานทั่วไป: มองเห็นเฉพาะ Order ที่ตัวเองเป็นคนสร้าง
+            conditions.push(`tbl_order.created_by_tms = '${act_id}'`);
         }
 
         // รวมเงื่อนไขทั้งหมดเข้าด้วยกัน
@@ -561,6 +584,7 @@ exports.getOrderReportInformation = async (req, res, next) => {
             SELECT tbl_order.created_by_tms, tbl_employee.emp_name , MAX(tbl_order.ist_dt) AS latest_order_date
             FROM tbl_order 
             LEFT JOIN tbl_employee ON tbl_order.created_by_tms = tbl_employee.emp_code
+            LEFT JOIN tbl_petrol ON tbl_order.ship_to = tbl_petrol.ptrl_number
             ${whereClause}
             AND tbl_order.created_by_tms IS NOT NULL 
             AND TRIM(tbl_order.created_by_tms) <> '' 
@@ -629,6 +653,8 @@ exports.getOrderReportInformation = async (req, res, next) => {
             OFFSET (${page_index} * ${page_limit}) LIMIT ${page_limit};
         `;
 
+        console.log(script)
+
         let tbl_temporary = await pgConn.get(dbPrefix + lic_code, script, config.connectionString());
 
         if (!tbl_temporary.code) {
@@ -641,9 +667,11 @@ exports.getOrderReportInformation = async (req, res, next) => {
                 let countScript = `
                     SELECT CEIL((CEIL(SUM(rows_total)) / ${page_limit})) as page_total, SUM(rows_total) as rows_total  
                     FROM (
-                        SELECT 1 as rows_total FROM tbl_order 
+                        SELECT 1 as rows_total FROM tbl_order_item
+                        LEFT JOIN tbl_order ON tbl_order_item.order_no = tbl_order.id
                         LEFT JOIN tbl_petrol ON tbl_order.ship_to = tbl_petrol.ptrl_number
                         ${whereClause}
+                        ORDER BY tbl_order.ist_dt DESC 
                     ) xtbl_master;
                 `;
 

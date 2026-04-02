@@ -119,29 +119,29 @@ exports.getPetrolInformation = async (req, res, next) => {
             if (tbl_temporary.data.length > 0) {
 
                 tbl_temporary.data = JSON.parse(JSON.stringify(tbl_temporary.data).replace(/\:null/gi, "\:\"\""));
-                let rawData = tbl_temporary.data;
-                let responseData = rawData;
+                // let rawData = tbl_temporary.data;
+                // let responseData = rawData;
 
-                // =========== กรองข้อมูลปั๊มและกลุ่มปั๊ม ==========
-                if (act_val === 'GROUP') {
-                    let groupMap = new Map();
+                // // =========== กรองข้อมูลปั๊มและกลุ่มปั๊ม ==========
+                // if (act_val === 'GROUP') {
+                //     let groupMap = new Map();
 
-                    // ดึงรายชื่อกลุ่ม (แบบไม่ซ้ำ)
-                    rawData.forEach(item => {
-                        let groupCode = item.ptrl_group_code || 'UNASSIGNED';
-                        if (!groupMap.has(groupCode)) {
-                            groupMap.set(groupCode, {
-                                ptrl_group_code: groupCode,
-                                ptrl_group_desc: item.ptrl_group_desc || 'ไม่ระบุกลุ่ม'
-                            });
-                        }
-                    });
+                //     // ดึงรายชื่อกลุ่ม (แบบไม่ซ้ำ)
+                //     rawData.forEach(item => {
+                //         let groupCode = item.ptrl_group_code || 'UNASSIGNED';
+                //         if (!groupMap.has(groupCode)) {
+                //             groupMap.set(groupCode, {
+                //                 ptrl_group_code: groupCode,
+                //                 ptrl_group_desc: item.ptrl_group_desc || 'ไม่ระบุกลุ่ม'
+                //             });
+                //         }
+                //     });
 
-                    responseData = {
-                        ptrl_group_code: Array.from(groupMap.values()),
-                        station: rawData // ปั๊มทั้งหมดรวมกันใน Array เดียว
-                    };
-                }
+                //     responseData = {
+                //         ptrl_group_code: Array.from(groupMap.values()),
+                //         station: rawData // ปั๊มทั้งหมดรวมกันใน Array เดียว
+                //     };
+                // }
 
                 let page_total = 0;
                 let rows_total = 0;
@@ -168,7 +168,7 @@ exports.getPetrolInformation = async (req, res, next) => {
                     status: 'success',
                     invalid_code: '0',
                     message: '',
-                    data: responseData,
+                    data: tbl_temporary,
                     response_time: moment().format('YYYY-MM-DD HH:mm:ss'),
                     page_total: (page_total <= 0 ? 1 : page_total),
                     rows_total: rows_total
@@ -317,10 +317,19 @@ exports.getPetrolInformationFilter = async (req, res, next) => {
 
         // ======== SQL สำหรับดึงข้อมูล ========
         let baseSelectQuery = `
-            SELECT ptrl_code, ptrl_number, ptrl_sitecode, ptrl_desc, ptrl_short_desc, tbl_petrol_group.ptrl_group_code, tbl_petrol_group.ptrl_group_desc
+            SELECT 
+                tbl_petrol_group.ptrl_group_code, 
+                tbl_petrol_group.ptrl_group_desc
+                ptrl_code, 
+                ptrl_number, 
+                ptrl_sitecode, 
+                ptrl_desc, 
+                ptrl_short_desc
             FROM tbl_petrol 
             LEFT JOIN tbl_petrol_group ON tbl_petrol.ptrl_group_code = tbl_petrol_group.ptrl_group_code 
         `;
+
+
 
         let dataScript = `
             ${baseSelectQuery}
@@ -329,34 +338,35 @@ exports.getPetrolInformationFilter = async (req, res, next) => {
             LIMIT ${page_limit} OFFSET (${page_index} * ${page_limit});
         `;
 
+
         let tbl_temporary = await pgConn.get(dbPrefix + lic_code, dataScript, config.connectionString());
         if (!tbl_temporary.code) {
             if (tbl_temporary.data.length > 0) {
 
                 tbl_temporary.data = JSON.parse(JSON.stringify(tbl_temporary.data).replace(/\:null/gi, "\:\"\""));
-                let rawData = tbl_temporary.data;
-                let responseData = rawData;
+                // let rawData = tbl_temporary.data;
+                // let responseData = rawData;
 
-                // =========== กรองข้อมูลปั๊มและกลุ่มปั๊ม ==========
-                if (act_val === 'GROUP') {
-                    let groupMap = new Map();
+                // // =========== กรองข้อมูลปั๊มและกลุ่มปั๊ม ==========
+                // if (act_val === 'GROUP') {
+                //     let groupMap = new Map();
 
-                    // ดึงรายชื่อกลุ่ม (แบบไม่ซ้ำ)
-                    rawData.forEach(item => {
-                        let groupCode = item.ptrl_group_code || 'UNASSIGNED';
-                        if (!groupMap.has(groupCode)) {
-                            groupMap.set(groupCode, {
-                                ptrl_group_code: groupCode,
-                                ptrl_group_desc: item.ptrl_group_desc || 'ไม่ระบุกลุ่ม'
-                            });
-                        }
-                    });
+                //     // ดึงรายชื่อกลุ่ม (แบบไม่ซ้ำ)
+                //     rawData.forEach(item => {
+                //         let groupCode = item.ptrl_group_code || 'UNASSIGNED';
+                //         if (!groupMap.has(groupCode)) {
+                //             groupMap.set(groupCode, {
+                //                 ptrl_group_code: groupCode,
+                //                 ptrl_group_desc: item.ptrl_group_desc || 'ไม่ระบุกลุ่ม'
+                //             });
+                //         }
+                //     });
 
-                    responseData = {
-                        ptrl_group_code: Array.from(groupMap.values()),
-                        station: rawData // ปั๊มทั้งหมดรวมกันใน Array เดียว
-                    };
-                }
+                //     responseData = {
+                //         ptrl_group_code: Array.from(groupMap.values()),
+                //         station: rawData // ปั๊มทั้งหมดรวมกันใน Array เดียว
+                //     };
+                // }
 
                 let page_total = 0;
                 let rows_total = 0;
@@ -383,7 +393,7 @@ exports.getPetrolInformationFilter = async (req, res, next) => {
                     status: 'success',
                     invalid_code: '0',
                     message: '',
-                    data: responseData,
+                    data: tbl_temporary,
                     response_time: moment().format('YYYY-MM-DD HH:mm:ss'),
                     page_total: (page_total <= 0 ? 1 : page_total),
                     rows_total: rows_total
