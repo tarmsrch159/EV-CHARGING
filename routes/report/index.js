@@ -29,8 +29,9 @@ router.post('/stock', reportStock.getReportStock);
 const runSyncSalesTask = () => {
     console.log('Running sync sales task:', moment().format('YYYY-MM-DD HH:mm:ss'));
     let lic_code = 'aos01';
-    let ptrl_number = 'ALL';
+    let ptrl_number = '12269';
     let date_at = moment().format('YYYY-MM-DD');
+    // let date_at = '2026-04-01';
     reportStock.syncSalesInfo(date_at, ptrl_number, lic_code);
 };
 
