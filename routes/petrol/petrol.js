@@ -168,7 +168,7 @@ exports.getPetrolInformation = async (req, res, next) => {
                     status: 'success',
                     invalid_code: '0',
                     message: '',
-                    data: tbl_temporary,
+                    data: tbl_temporary.data,
                     response_time: moment().format('YYYY-MM-DD HH:mm:ss'),
                     page_total: (page_total <= 0 ? 1 : page_total),
                     rows_total: rows_total
@@ -393,7 +393,7 @@ exports.getPetrolInformationFilter = async (req, res, next) => {
                     status: 'success',
                     invalid_code: '0',
                     message: '',
-                    data: tbl_temporary,
+                    data: tbl_temporary.data,
                     response_time: moment().format('YYYY-MM-DD HH:mm:ss'),
                     page_total: (page_total <= 0 ? 1 : page_total),
                     rows_total: rows_total
