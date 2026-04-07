@@ -606,7 +606,9 @@ exports.getOrderReportInformation = async (req, res, next) => {
                 'auto_order', tbl_order_item.auto_order ,
                 'remark', tbl_order_item.remark
             )) as item_information,
-            tbl_order.auto_order
+            tbl_order.auto_order,
+            tbl_order_item.remark,
+            tbl_employee_role.emp_role_desc
             FROM tbl_order  
             INNER JOIN tbl_order_item ON CAST(tbl_order.id AS TEXT) = CAST(tbl_order_item.order_no AS TEXT) 
             LEFT JOIN tbl_order_type ON tbl_order.order_type = tbl_order_type.ord_type_code
@@ -614,6 +616,8 @@ exports.getOrderReportInformation = async (req, res, next) => {
             LEFT JOIN tbl_petrol ON tbl_order.ship_to = tbl_petrol.ptrl_number
             LEFT JOIN tbl_petrol_group ON tbl_petrol.ptrl_group_code = tbl_petrol_group.ptrl_group_code
             LEFT JOIN tbl_master_time ON tbl_order.deli_time_req = tbl_master_time.time_code
+            LEFT JOIN tbl_employee ON tbl_order.created_by_tms = tbl_employee.emp_code
+            LEFT JOIN tbl_employee_role ON tbl_employee.emp_role_code = tbl_employee_role.emp_role_code
             LEFT JOIN (
                 SELECT ptrl_code, itm_code, string_agg(tnk_number, ', ') as tnk_number 
                 FROM tbl_petrol_tank 
