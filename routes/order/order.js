@@ -735,7 +735,8 @@ exports.getLoggingOrderInformation = async (req, res, next) => {
 
     return (async () => {
         let lic_code = req.header('lic_code');
-        let { action_desc, page_index, page_limit, action } = req.body[0];
+        console.log("DEBUG: getLoggingOrderInformation body:", req.body[0]);
+        let { action_desc, page_index, page_limit, start_date, end_date, search, role, ptrl_group_code, action } = req.body[0];
 
         page_index = page_index == undefined ? 1 : page_index;
         page_limit = page_limit == undefined ? 10 : page_limit;
@@ -758,6 +759,9 @@ exports.getLoggingOrderInformation = async (req, res, next) => {
             page_index -= 1;
         }
 
+        if (start_date && start_date.length === 10) start_date += ' 00:00:00';
+        if (end_date && end_date.length === 10) end_date += ' 23:59:59';
+
         // =========================================================
         //      จัดการเงื่อนไข WHERE แบบรวมศูนย์ (Dynamic Conditions)
         // =========================================================
@@ -767,148 +771,166 @@ exports.getLoggingOrderInformation = async (req, res, next) => {
             action_desc = action_desc.toString().toLowerCase();
             conditions.push(`tbl_action_logs.action_desc = '${action_desc}'`);
         } else {
-            conditions.push(`tbl_action_logs.action_desc IN ('override', 'manual', 'cancel', 'confirm', 'approve', 'confirm_order_sap', 'cancel_order_sap')`);
+            conditions.push(`tbl_action_logs.action_desc IN ('override', 'manual', 'cancel', 'cancel_order_sap')`);
+        }
+
+
+
+        if (start_date) conditions.push(`tbl_action_logs.ist_dt >= '${start_date}'`);
+        if (end_date) conditions.push(`tbl_action_logs.ist_dt <= '${end_date}'`);
+
+        // ========== ระบบกรองตาม Role ==========
+        if (role && role !== 'ALL') {
+            conditions.push(`tbl_employee.emp_role_code = '${role}'`);
+        }
+
+
+
+
+        // ========== ระบบกรองตามกลุ่มปั๊ม ==========
+        if (ptrl_group_code && ptrl_group_code !== 'ALL') {
+            conditions.push(`tbl_petrol.ptrl_group_code = '${ptrl_group_code}'`);
+        }
+
+        // ========== ระบบค้นหา (Search Engine) ==========
+        if (search) {
+            conditions.push(`(
+                tbl_action_logs.action_body::text ILIKE '%${search}%'
+                OR EXISTS (
+                    SELECT 1 FROM tbl_petrol 
+                    WHERE ptrl_number = COALESCE(tbl_action_logs.action_body::json->'body'->>'ship_to', tbl_action_logs.action_body::json->>'ship_to')
+                    AND ptrl_desc ILIKE '%${search}%'
+                )
+            )`);
         }
 
         let whereClause = "WHERE " + conditions.join(" AND ");
+
+        let summary = {
+            manual: 0,
+            override: 0,
+            cancel: 0,
+            total_logs: 0
+        };
+
+        // ========== สร้างเงื่อนไขจำเพาะสำหรับสรุป (Summary) ==========
+        let summaryFilter = ``;
+        if (start_date) summaryFilter += ` AND tbl_action_logs.ist_dt >= '${start_date}'`;
+        if (end_date) summaryFilter += ` AND tbl_action_logs.ist_dt <= '${end_date}'`;
+        if (role && role !== 'ALL') summaryFilter += ` AND emp_role_code = '${role}'`;
+        if (ptrl_group_code && ptrl_group_code !== 'ALL') summaryFilter += ` AND tbl_petrol.ptrl_group_code = '${ptrl_group_code}'`;
+        if (act_val === 'GROUP') {
+            summaryFilter += ` AND tbl_petrol.ptrl_group_code IN (SELECT ptrl_group_code FROM tbl_employee_petrol_group WHERE emp_code = '${act_id}' AND emp_pgrp_flag = 1)`;
+        }
+
+        if (search) {
+            summaryFilter += ` AND (
+                tbl_action_logs.action_body::text ILIKE '%${search}%'
+                OR EXISTS (
+                    SELECT 1 FROM tbl_petrol subp 
+                    WHERE subp.ptrl_number = COALESCE(tbl_action_logs.action_body::json->'body'->>'ship_to', tbl_action_logs.action_body::json->>'ship_to')
+                    AND subp.ptrl_desc ILIKE '%${search}%'
+                )
+            )`;
+        }
+
+        // ========== คำนวณสรุปแยกตามประเภท วันที่ คำค้นหา และ Role ==========
+        let summaryScript = `
+            SELECT 
+                COUNT(*) FILTER (WHERE LOWER(tbl_action_logs.action_desc) = 'manual' ${summaryFilter}) as manual_count,
+                COUNT(*) FILTER (WHERE LOWER(tbl_action_logs.action_desc) = 'override' ${summaryFilter}) as override_count,
+                COUNT(*) FILTER (WHERE LOWER(tbl_action_logs.action_desc) IN ('cancel', 'cancel_order_sap') ${summaryFilter}) as cancel_count,
+                COUNT(*) FILTER (WHERE LOWER(tbl_action_logs.action_desc) IN ('manual', 'override', 'cancel', 'cancel_order_sap')) as total_count
+            FROM tbl_action_logs 
+            LEFT JOIN tbl_employee ON tbl_action_logs.action_code = tbl_employee.emp_code
+            LEFT JOIN tbl_petrol ON COALESCE(tbl_action_logs.action_body::json->'body'->>'ship_to', tbl_action_logs.action_body::json->>'ship_to') = tbl_petrol.ptrl_number
+            WHERE tbl_action_logs.rm_dt IS NULL;
+        `;
+        let tbl_summary = await pgConn.get(dbPrefix + lic_code, summaryScript, config.connectionString());
+        if (!tbl_summary.code && tbl_summary.data && tbl_summary.data.length > 0) {
+            summary.manual = parseInt(tbl_summary.data[0].manual_count) || 0;
+            summary.override = parseInt(tbl_summary.data[0].override_count) || 0;
+            summary.cancel = parseInt(tbl_summary.data[0].cancel_count) || 0;
+            summary.total_logs = parseInt(tbl_summary.data[0].total_count) || 0;
+        }
 
         // =========================================================
         //                   Query ดึงข้อมูลหลัก
         // =========================================================
         script = `SELECT 
-            tbl_action_logs.action_code as action_by,
+            tbl_employee.emp_name || ' / ' || tbl_employee_role.emp_role_desc as action_by,
             tbl_action_logs.action_desc as event_type,
             tbl_action_logs.action_body,
-            tbl_action_logs.ist_dt as action_date
+            tbl_action_logs.ist_dt as action_date,
+            tbl_petrol_group.ptrl_group_desc as station_group
             FROM tbl_action_logs 
+            LEFT JOIN tbl_employee ON tbl_action_logs.action_code = tbl_employee.emp_code
+            LEFT JOIN tbl_employee_role ON tbl_employee.emp_role_code = tbl_employee_role.emp_role_code
+            LEFT JOIN tbl_petrol ON COALESCE(tbl_action_logs.action_body::json->'body'->>'ship_to', tbl_action_logs.action_body::json->>'ship_to') = tbl_petrol.ptrl_number
+            LEFT JOIN tbl_petrol_group ON tbl_petrol.ptrl_group_code = tbl_petrol_group.ptrl_group_code
+            
             ${whereClause}
             ORDER BY tbl_action_logs.ist_dt DESC 
             OFFSET (${page_index}*${page_limit}) LIMIT ${page_limit};`;
 
-        let tbl_temporary = await pgConn.get(dbPrefix + lic_code, script, config.connectionString());
+        let mainLogResult = await pgConn.get(dbPrefix + lic_code, script, config.connectionString());
 
-        if (!tbl_temporary.code) {
-            if (tbl_temporary.data.length > 0) {
-                let rawData = JSON.parse(JSON.stringify(tbl_temporary.data).replace(/\:null/gi, "\:\"\""));
+        if (!mainLogResult.code && mainLogResult.data) {
+            if (mainLogResult.data.length > 0) {
+                let { processedData, allShipTos } = xglobal.formatAuditLogs(mainLogResult.data);
 
-                let processedData = [];
-                let allOrderNos = new Set(); // เก็บ Order No ทั้งหมดแบบไม่ซ้ำ เพื่อทำ Batch Query
+                // -- ดึงชื่อปั๊มทั้งหมดทีเดียว (Batch Query) --
+                if (allShipTos.size > 0) {
+                    let shipToArr = Array.from(allShipTos).map(s => `'${s}'`).join(', ');
+                    let stationScript = `SELECT ptrl_number, ptrl_desc FROM tbl_petrol WHERE ptrl_number IN (${shipToArr})`;
+                    let stationTemp = await pgConn.get(dbPrefix + lic_code, stationScript, config.connectionString());
 
-                // =========== Parse JSON และรวบรวม Order No ===========
-                for (let i = 0; i < rawData.length; i++) {
-                    let item = rawData[i];
-                    let parsedBody = null;
-                    try {
-                        if (item.action_body && typeof item.action_body === 'string') {
-                            parsedBody = JSON.parse(item.action_body);
-                        } else if (typeof item.action_body === 'object') {
-                            parsedBody = item.action_body;
-                        }
-                    } catch (e) {
-                        console.log("Parse JSON Error on action_body:", e.message);
+                    if (!stationTemp.code && stationTemp.data.length > 0) {
+                        let stationDataMap = {};
+                        stationTemp.data.forEach(row => {
+                            stationDataMap[row.ptrl_number] = row.ptrl_desc;
+                        });
+
+                        // Map ชื่อปั๊มกลับเข้าไป
+                        processedData.forEach(item => {
+                            if (item.ship_to && stationDataMap[item.ship_to]) {
+                                item.station_name = stationDataMap[item.ship_to];
+                            }
+                        });
                     }
-
-                    let flatItem = {
-                        event_type: item.event_type,
-                        action_by: item.action_by,
-                        action_date: item.action_date,
-                        log_data: parsedBody || item.action_body,
-                        reason: '',
-                        order_no: '',
-                        // ptrl_number: '',
-                        // ptrl_desc: ''
-                    };
-
-                    if (parsedBody) {
-                        let bodyContent = parsedBody.body || parsedBody;
-                        flatItem.reason = bodyContent.reason || bodyContent.remark || '';
-                        flatItem.log_data = bodyContent;
-
-                        let extracted_order = parsedBody.query?.order_no || bodyContent.query?.order_no || bodyContent.order_no || parsedBody.order_no || '';
-
-                        if (Array.isArray(extracted_order)) {
-                            flatItem.order_no = extracted_order.join(', ');
-                            extracted_order.forEach(o => allOrderNos.add(o.trim())); // เก็บลง Set
-                        } else if (extracted_order !== '') {
-                            flatItem.order_no = extracted_order.toString();
-                            flatItem.order_no.split(',').forEach(o => allOrderNos.add(o.trim())); // เก็บลง Set
-                        }
-                    }
-                    processedData.push(flatItem);
                 }
 
-                // -- รอบที่ 2: Batch Query ดึงชื่อปั๊มทั้งหมดทีเดียว (แก้ N+1) --
-                // let stationMap = {};
-                // if (allOrderNos.size > 0) {
-                //     let orderNoArr = Array.from(allOrderNos).map(o => `'${o}'`).join(', ');
-                //     let stationScript = `
-                //         SELECT t1.ord_code, t2.ptrl_number, t2.ptrl_desc 
-                //         FROM tbl_order_petrol t1
-                //         LEFT JOIN tbl_petrol t2 ON t1.ptrl_code = t2.ptrl_code 
-                //         WHERE t1.ord_code IN (${orderNoArr}) AND t1.ord_petrol_flag = '1'
-                //     `;
-                //     let stationTemp = await pgConn.get(dbPrefix + lic_code, stationScript, config.connectionString());
-
-                //     if (!stationTemp.code && stationTemp.data.length > 0) {
-                //         for (let row of stationTemp.data) {
-                //             if (!stationMap[row.ord_code]) {
-                //                 stationMap[row.ord_code] = { numbers: new Set(), descs: new Set() };
-                //             }
-                //             if (row.ptrl_number) stationMap[row.ord_code].numbers.add(row.ptrl_number);
-                //             if (row.ptrl_desc) stationMap[row.ord_code].descs.add(row.ptrl_desc);
-                //         }
-                //     }
-                // }
-
-                // // -- รอบที่ 3: หยอดชื่อปั๊มกลับเข้าไปใน Data หลัก --
-                // for (let flatItem of processedData) {
-                //     if (flatItem.order_no) {
-                //         let orders = flatItem.order_no.split(',').map(o => o.trim());
-                //         let nums = new Set();
-                //         let descs = new Set();
-
-                //         for (let o of orders) {
-                //             if (stationMap[o]) {
-                //                 stationMap[o].numbers.forEach(n => nums.add(n));
-                //                 stationMap[o].descs.forEach(d => descs.add(d));
-                //             }
-                //         }
-                //         flatItem.ptrl_number = Array.from(nums).join(', ');
-                //         flatItem.ptrl_desc = Array.from(descs).join(', ');
-                //     }
-                // }
-
-                tbl_temporary.data = processedData;
+                mainLogResult.data = processedData;
 
                 // =========================================================
-                //       Query หาจำนวนแถวทั้งหมด (Count Rows)
+                //       Query หาจำนวนแถวทั้งหมดตาม Filter (Count Rows)
                 // =========================================================
-                let page_total = 0;
+                let page_total = 1;
                 let rows_total = 0;
 
-                // ========== Count Rows ==========
                 let countScript = `
-                    SELECT CEIL((CEIL(SUM(rows_total)) / ${page_limit})) as page_total, SUM(rows_total) as rows_total  
-                    FROM (
-                        SELECT 1 as rows_total FROM tbl_action_logs 
-                        ${whereClause}
-                    ) xtbl_master;
+                    SELECT 
+                        CEIL(COUNT(*)::float / ${page_limit}) as page_total, 
+                        COUNT(*) as rows_total  
+                    FROM tbl_action_logs 
+                    LEFT JOIN tbl_employee ON tbl_action_logs.action_code = tbl_employee.emp_code
+                    LEFT JOIN tbl_petrol ON COALESCE(tbl_action_logs.action_body::json->'body'->>'ship_to', tbl_action_logs.action_body::json->>'ship_to') = tbl_petrol.ptrl_number
+                    ${whereClause}
                 `;
 
-                let tbl_temporary0 = await pgConn.get(dbPrefix + lic_code, countScript, config.connectionString());
+                let countResult = await pgConn.get(dbPrefix + lic_code, countScript, config.connectionString());
 
-                if (!tbl_temporary0.code) {
-                    if (tbl_temporary0.data.length > 0) {
-                        page_total = parseInt(tbl_temporary0.data[0].page_total);
-                        rows_total = parseInt(tbl_temporary0.data[0].rows_total);
-                    }
+                if (!countResult.code && countResult.data && countResult.data.length > 0) {
+                    page_total = parseInt(countResult.data[0].page_total) || 1;
+                    rows_total = parseInt(countResult.data[0].rows_total) || 0;
                 }
 
                 let response = [{
                     status: 'success',
                     invalid_code: '0',
                     message: '',
-                    data: tbl_temporary.data,
+                    data: mainLogResult.data,
+                    summary: summary,
                     response_time: moment().format('YYYY-MM-DD HH:mm:ss'),
                     page_total: (page_total <= 0 ? 1 : page_total),
                     rows_total: rows_total
@@ -952,6 +974,12 @@ exports.getLoggingOrderInformation = async (req, res, next) => {
         res.status(200).send(response);
     });
 }
+
+// =========================================================
+//  Helper Functions
+// =========================================================
+
+
 
 // =========== ดึงข้อมูลรายการสั่งซื้อ Order Report ===========
 exports.getOrderReport = async (req, res, next) => {
@@ -1334,14 +1362,24 @@ const getConfirmOrder = async (lic_code, order_id, action) => {
                     message: api_response.data
                 });
 
-                await xglobal.action_logs(lic_code, action[0].id, 'confirm_order_sap', JSON.stringify({ order_id, ...JSON.parse(payloadData) }), 'error', action[0].value);
+                let logPayloadErr = {
+                    order_id: order_id,
+                    reason: req.body[0].reason || req.body[0].description || '',
+                    ...JSON.parse(payloadData)
+                };
+                await xglobal.action_logs(lic_code, action[0].id, 'confirm_order_sap', JSON.stringify(logPayloadErr), 'error', action[0].value);
             } else {
                 response.push({
                     status: 'success',
                     data: api_response.data,
                 });
 
-                await xglobal.action_logs(lic_code, action[0].id, 'confirm_order_sap', JSON.stringify({ order_id, ...JSON.parse(payloadData) }), 'success', action[0].value);
+                let logPayload = {
+                    order_id: order_id,
+                    reason: req.body[0].reason || req.body[0].description || '',
+                    ...JSON.parse(payloadData)
+                };
+                await xglobal.action_logs(lic_code, action[0].id, 'confirm_order_sap', JSON.stringify(logPayload), 'success', action[0].value);
 
                 let update_order_status_script = `update tbl_order set order_status = '1', mdf_dt = '${moment().format('YYYY-MM-DD HH:mm:ss')}' `
                 update_order_status_script += ` where id = '${order_id}'`;
@@ -2203,7 +2241,11 @@ exports.cancelOrderInformationHana = async (req, res, next) => {
                     response_time: moment().format('YYYY-MM-DD HH:mm:ss')
                 }];
 
-                await xglobal.action_logs(lic_code, action[0].id, 'cancel_order_sap', JSON.stringify({ payload }), 'success', action[0].value);
+                let logPayloadSuccess = {
+                    reason: req.body[0].reason || '',
+                    ...payload
+                };
+                await xglobal.action_logs(lic_code, action[0].id, 'cancel_order_sap', JSON.stringify(logPayloadSuccess), 'success', action[0].value);
                 return response;
 
             } catch (error) {
@@ -2610,8 +2652,34 @@ exports.addOrderInformation = async (req, res, next) => {
 
         res.status(200).send(response);
         let event_type = req.body[0].event_type || 'manual';
-        let logPayload = { order_no: order_no, ...req.body[0] };
-        await xglobal.action_logs(lic_code, action[0].id, event_type, JSON.stringify(logPayload), 'success', action[0].value);
+
+        // ========== Audit Log: สร้าง changes array และบันทึกทีละ order_item ==========
+        if (order_item && Array.isArray(order_item) && order_item.length > 0) {
+            for (let item of order_item) {
+                let itemDesc = item.itm_material_number || item.itm_code || 'N/A';
+                let logPayloadItem = {
+                    order_no: sh_cus_ref,
+                    order_id: order_id,
+                    ship_to: ship_to || '',
+                    reason: item.remark || req.body[0].remark || req.body[0].reason || req.body[0].description || '',
+                    field: `Order Qty (${itemDesc})`,
+                    before: '0',
+                    after: String(item.item_quantity || 0)
+                };
+                await xglobal.action_logs(lic_code, action[0].id, event_type, JSON.stringify(logPayloadItem), 'success', action[0].value);
+            }
+        } else {
+            let logPayload = {
+                order_no: sh_cus_ref,
+                order_id: order_id,
+                ship_to: ship_to || '',
+                reason: req.body[0].remark || req.body[0].reason || req.body[0].description || '',
+                field: '',
+                before: '',
+                after: ''
+            };
+            await xglobal.action_logs(lic_code, action[0].id, event_type, JSON.stringify(logPayload), 'success', action[0].value);
+        }
         return;
 
     })().catch(async (err) => {
@@ -2655,7 +2723,19 @@ exports.setOrderInformation = async (req, res, next) => {
             return;
         }
 
-        let order_no = order_id;
+        let order_no = order_id || req.body[0].order_id || req.body[0].order_no;
+        if (order_no == undefined || order_no == '') {
+            let response = [{
+                status: 'error',
+                invalid_code: '-1',
+                message: 'ไม่สามารถบันทึกข้อมูล, เนื่องจากไม่พบ order_id',
+                data: [],
+                response_time: moment().format('YYYY-MM-DD HH:mm:ss')
+            }];
+            res.status(200).send(response);
+            return;
+        }
+
         deli_date_req = deli_date_req != undefined ? moment(deli_date_req).format('YYYY-MM-DD') : moment().format('YYYY-MM-DD');
         deli_time_req = deli_time_req != undefined ? deli_time_req : "Z00";
 
@@ -2677,10 +2757,11 @@ exports.setOrderInformation = async (req, res, next) => {
             }
         }
 
-        let scriptCheckStatus = `SELECT status_deli FROM tbl_order WHERE id = ${order_no}`;
-        let status_deli = await pgConn.get(dbPrefix + lic_code, scriptCheckStatus, config.connectionString());
+        // ========== Audit Log: ดึงข้อมูลเก่าก่อน update ==========
+        let scriptGetOldOrder = `SELECT description, deli_date_req, deli_time_req, status_deli, ship_to, order_no, sh_cus_ref FROM tbl_order WHERE id = $1`;
+        let oldOrderResult = await pgConn.getWithParams(dbPrefix + lic_code, scriptGetOldOrder, [order_no], config.connectionString());
 
-        if (status_deli.code || status_deli.data.length === 0 || status_deli.data[0].status_deli != 'A') {
+        if (oldOrderResult.code || oldOrderResult.data.length === 0 || oldOrderResult.data[0].status_deli != 'A') {
             let response = [{
                 status: 'error',
                 invalid_code: '-1',
@@ -2693,6 +2774,7 @@ exports.setOrderInformation = async (req, res, next) => {
             await xglobal.action_logs(lic_code, action[0].id, 'แก้ไขข้อมูล Order', JSON.stringify(logPayloadObj), 'ไม่พบข้อมูลออเดอร์ที่สามารถแก้ไขได้ในระบบ Not Found Status Delivery หรือ Status Delivery ไม่ใช่ A', action[0].value);
             return;
         } else {
+            let oldOrder = oldOrderResult.data[0];
 
             let addOrderScript = `
                 UPDATE tbl_order SET 
@@ -2720,6 +2802,34 @@ exports.setOrderInformation = async (req, res, next) => {
                 return;
             }
 
+            let event_type = req.body[0].event_type || 'override';
+
+            // ========== Audit Log: สร้าง changes array สำหรับ order level ==========
+            let orderLevelChanges = [];
+
+            // -- เปรียบเทียบ order-level fields --
+            if (oldOrder.description !== description) {
+                orderLevelChanges.push({ field: 'Description', before: oldOrder.description || '', after: description || '' });
+            }
+            let oldDeliDate = oldOrder.deli_date_req ? moment(oldOrder.deli_date_req).format('YYYY-MM-DD') : '';
+            if (oldDeliDate !== deli_date_req) {
+                orderLevelChanges.push({ field: 'Delivery Date', before: oldDeliDate, after: deli_date_req || '' });
+            }
+            if ((oldOrder.deli_time_req || '') !== (deli_time_req || '')) {
+                orderLevelChanges.push({ field: 'Delivery Time', before: oldOrder.deli_time_req || '', after: deli_time_req || '' });
+            }
+
+            if (orderLevelChanges.length > 0) {
+                let logPayloadOrder = {
+                    order_no: oldOrder.sh_cus_ref || oldOrder.order_no || order_no,
+                    order_id: order_no,
+                    ship_to: oldOrder.ship_to || '',
+                    reason: req.body[0].remark || req.body[0].reason || description || '',
+                    changes: orderLevelChanges
+                };
+                await xglobal.action_logs(lic_code, action[0].id, event_type, JSON.stringify(logPayloadOrder), 'success', action[0].value);
+            }
+
             // ============= UPDATE tbl_order_item (item_quantity) =================
             if (order_item && Array.isArray(order_item) && order_item.length > 0) {
                 for (let i = 0; i < order_item.length; i++) {
@@ -2728,12 +2838,28 @@ exports.setOrderInformation = async (req, res, next) => {
                         let item_no = currentItem.item_no;
                         let item_quantity = parseFloat(currentItem.item_quantity) || 0;
                         let remark = currentItem.remark || '';
+                        let itemChanges = [];
 
-                        let getItemScript = `SELECT id FROM public.tbl_order_item WHERE order_no = ${order_no} and item_no = '${item_no}' order by id desc limit 1`;
-                        let oldItemResult = await pgConn.get(dbPrefix + lic_code, getItemScript, config.connectionString());
+                        // ========== Audit Log: ดึงค่าเก่าของ item ==========
+                        let getItemScript = `SELECT oi.id, oi.item_qty, oi.remark, itm.itm_desc 
+                            FROM public.tbl_order_item oi 
+                            LEFT JOIN tbl_item itm ON oi.item_no = itm.itm_code
+                            WHERE oi.order_no = $1 and oi.item_no = $2 order by oi.id desc limit 1`;
+                        let oldItemResult = await pgConn.getWithParams(dbPrefix + lic_code, getItemScript, [order_no, item_no], config.connectionString());
 
                         if (!oldItemResult.code && oldItemResult.data.length > 0) {
-                            //============ ดึงข้อมูลเก่ามาสร้าง Row ใหม่ =============
+                            let oldItem = oldItemResult.data[0];
+                            let itemLabel = oldItem.itm_desc || item_no;
+
+                            // -- เปรียบเทียบ item_qty --
+                            let oldQty = parseFloat(oldItem.item_qty) || 0;
+                            if (oldQty !== item_quantity) {
+                                itemChanges.push({ field: `Order Qty (${itemLabel})`, before: String(oldQty), after: String(item_quantity) });
+                            }
+                            // -- เปรียบเทียบ remark --
+                            if ((oldItem.remark || '') !== remark) {
+                                itemChanges.push({ field: `Remark (${itemLabel})`, before: oldItem.remark || '', after: remark });
+                            }
 
                             let script_item = `
                                 UPDATE public.tbl_order_item
@@ -2745,6 +2871,8 @@ exports.setOrderInformation = async (req, res, next) => {
 
                         } else {
                             // ============= กรณีหาของเดิมไม่เจอ ให้ทำการ Insert ของใหม่เข้าไปเลยครับ โดยผูกกับ new_order_id =============
+                            itemChanges.push({ field: `Order Qty (${item_no})`, before: '0', after: String(item_quantity) });
+
                             let script_item = `
                                 INSERT INTO public.tbl_order_item
                                 (order_no, item_no, item_qty, long_text_id, long_text, ist_dt, order_item_flag, auto_order)
@@ -2754,10 +2882,20 @@ exports.setOrderInformation = async (req, res, next) => {
                             `;
                             await pgConn.execute(dbPrefix + lic_code, script_item, config.connectionString());
                         }
+
+                        if (itemChanges.length > 0) {
+                            let logPayloadItem = {
+                                order_no: oldOrder.sh_cus_ref || oldOrder.order_no || order_no,
+                                order_id: order_no,
+                                ship_to: oldOrder.ship_to || '',
+                                reason: remark || req.body[0].remark || req.body[0].reason || '',
+                                changes: itemChanges
+                            };
+                            await xglobal.action_logs(lic_code, action[0].id, event_type, JSON.stringify(logPayloadItem), 'success', action[0].value);
+                        }
                     }
                 }
             }
-
             // ============= Success response =============
             let response = [{
                 status: 'success',
@@ -2766,10 +2904,6 @@ exports.setOrderInformation = async (req, res, next) => {
                 data: [],
                 response_time: moment().format('YYYY-MM-DD HH:mm:ss')
             }];
-
-            let event_type = req.body[0].event_type || 'override';
-            let logPayloadObj = { order_no: order_no, ...req.body[0] };
-            await xglobal.action_logs(lic_code, action[0].id, event_type, JSON.stringify(logPayloadObj), 'success', action[0].value);
             res.status(200).send(response);
         }
 
@@ -2815,9 +2949,23 @@ exports.editOrderItem = async (req, res, next) => {
             return;
         }
 
+        let order_no = order_id || req.body[0].order_id || req.body[0].order_no;
+
+        if (order_no == undefined || order_no == '') {
+            let response = [{
+                status: 'error',
+                invalid_code: '-1',
+                message: 'ไม่สามารถบันทึกข้อมูล, เนื่องจากไม่พบ order_id',
+                data: [],
+                response_time: moment().format('YYYY-MM-DD HH:mm:ss')
+            }];
+            res.status(200).send(response);
+            return;
+        }
+
         deli_date_req = deli_date_req != undefined ? moment(deli_date_req).format('YYYY-MM-DD') : moment().format('YYYY-MM-DD');
         deli_time_req = deli_time_req != undefined ? deli_time_req : "Z00";
-        let order_no = order_id;
+
         // ====================== เช็ค Validate item_quantity ======================
         if (order_item && Array.isArray(order_item) && order_item.length > 0) {
             for (var i = 0; i < order_item.length; i++) {
@@ -2836,10 +2984,10 @@ exports.editOrderItem = async (req, res, next) => {
             }
         }
 
-        let scriptCheckStatus = `SELECT status_deli FROM tbl_order WHERE id = ${order_id}`;
-        let status_deli = await pgConn.get(dbPrefix + lic_code, scriptCheckStatus, config.connectionString());
+        let scriptCheckOrderNo = `SELECT id, order_no, sh_cus_ref, ship_to, status_deli, order_status FROM tbl_order WHERE id = $1`;
+        let checkOrderNo = await pgConn.getWithParams(dbPrefix + lic_code, scriptCheckOrderNo, [order_no], config.connectionString());
 
-        if (status_deli.code || status_deli.data.length === 0 || status_deli.data[0].status_deli != 'A') {
+        if (checkOrderNo.code || checkOrderNo.data.length === 0 || checkOrderNo.data[0].status_deli != 'A') {
             let response = [{
                 status: 'error',
                 invalid_code: '-1',
@@ -2853,27 +3001,36 @@ exports.editOrderItem = async (req, res, next) => {
             return;
         } else {
 
-            let scriptCheckOrderNo = `SELECT * FROM tbl_order WHERE id = ${order_id}`;
-            let checkOrderNo = await pgConn.get(dbPrefix + lic_code, scriptCheckOrderNo, config.connectionString());
-            if (checkOrderNo.code || checkOrderNo.data.length == 0) {
-                let response = [{
-                    status: 'error',
-                    invalid_code: '-1',
-                    message: 'ไม่สามารถบันทึกข้อมูล, เนื่องจากข้อมูลพารามิเตอร์ไม่ถูกต้อง',
-                    data: [],
-                    response_time: moment().format('YYYY-MM-DD HH:mm:ss')
-                }];
+            let orderInfo = checkOrderNo.data[0];
+            let event_type = req.body[0].event_type || 'override';
 
-                res.status(200).send(response);
-                let logPayloadObj = { order_no: order_no, ...req.body[0] };
-                await xglobal.action_logs(lic_code, action[0].id, 'แก้ไขข้อมูล Order', JSON.stringify(logPayloadObj), 'ไม่สามารถบันทึกข้อมูล, เนื่องจากข้อมูลพารามิเตอร์ไม่ถูกต้อง', action[0].value);
-                return;
-            }
-
-            order_item.map(async item => {
+            for (let i = 0; i < order_item.length; i++) {
+                let item = order_item[i];
                 let item_quantity = item.item_quantity;
                 let item_no = item.item_no;
                 let remark = item.remark;
+                let itemChanges = [];
+
+                // ========== Audit Log: ดึงค่าเก่าของ item ==========
+                let getOldItemScript = `SELECT oi.item_qty, oi.remark, itm.itm_desc 
+                    FROM public.tbl_order_item oi 
+                    LEFT JOIN tbl_item itm ON oi.item_no = itm.itm_code
+                    WHERE oi.order_no = $1 AND oi.item_no = $2 ORDER BY oi.id DESC LIMIT 1`;
+                let oldItemRes = await pgConn.getWithParams(dbPrefix + lic_code, getOldItemScript, [order_no, item_no], config.connectionString());
+
+                if (!oldItemRes.code && oldItemRes.data.length > 0) {
+                    let oldItem = oldItemRes.data[0];
+                    let itemLabel = oldItem.itm_desc || item_no;
+                    let oldQty = parseFloat(oldItem.item_qty) || 0;
+                    let newQty = parseFloat(item_quantity) || 0;
+
+                    if (oldQty !== newQty) {
+                        itemChanges.push({ field: `Order Qty (${itemLabel})`, before: String(oldQty), after: String(newQty) });
+                    }
+                    if ((oldItem.remark || '') !== (remark || '')) {
+                        itemChanges.push({ field: `Remark (${itemLabel})`, before: oldItem.remark || '', after: remark || '' });
+                    }
+                }
 
                 let update = `
                     UPDATE tbl_order_item 
@@ -2892,8 +3049,17 @@ exports.editOrderItem = async (req, res, next) => {
                 let paramsOrder = [0, order_no];
                 await pgConn.execute2params(updateOrder, paramsOrder, config.connectionString());
 
-                await xglobal.action_logs(lic_code, action[0].id, 'แก้ไขข้อมูล Order', JSON.stringify({ id: order_no, ...item }), 'แก้ไขข้อมูล Order สำเร็จ', action[0].value);
-            });
+                if (itemChanges.length > 0) {
+                    let editLogPayload = {
+                        order_no: orderInfo.sh_cus_ref || orderInfo.order_no || order_no,
+                        order_id: order_no,
+                        ship_to: orderInfo.ship_to || '',
+                        reason: remark || req.body[0].remark || req.body[0].reason || '',
+                        changes: itemChanges
+                    };
+                    await xglobal.action_logs(lic_code, action[0].id, event_type, JSON.stringify(editLogPayload), 'success', action[0].value);
+                }
+            }
 
             // ============= Success response =============
             let response = [{
@@ -2944,8 +3110,9 @@ exports.setStatusDeli = async (req, res, next) => {
             return;
         }
 
-        let scriptCheckOrderNo = `SELECT * FROM tbl_order WHERE order_no = '${order_no}'`;
-        let checkOrderNo = await pgConn.get(dbPrefix + lic_code, scriptCheckOrderNo, config.connectionString());
+        // ========== Audit Log: ดึงข้อมูลเดิมก่อน update ==========
+        let scriptCheckOrderNo = `SELECT id, order_no, sh_cus_ref, ship_to, status_deli, order_status FROM tbl_order WHERE order_no = $1`;
+        let checkOrderNo = await pgConn.getWithParams(dbPrefix + lic_code, scriptCheckOrderNo, [order_no], config.connectionString());
         if (checkOrderNo.code || checkOrderNo.data.length == 0) {
             let response = [{
                 status: 'error',
@@ -2958,6 +3125,9 @@ exports.setStatusDeli = async (req, res, next) => {
             res.status(200).send(response);
             return;
         }
+
+        let oldOrderData = checkOrderNo.data[0];
+        let old_status_deli = oldOrderData.status_deli || '';
 
         let updateOrderScript = `UPDATE tbl_order SET status_deli = $1, mdf_dt = $2 WHERE order_no = $3`;
         let tbl_temporary_update_order = await pgConn.execute2params(updateOrderScript, [
@@ -2990,7 +3160,18 @@ exports.setStatusDeli = async (req, res, next) => {
 
         res.status(200).send(response);
         let event_type = req.body[0].event_type || 'approve';
-        let logPayloadObj = { order_no: order_no, status_deli: status_deli, action: action };
+        // ========== Audit Log: สร้าง changes array ==========
+        let auditChangesApprove = [];
+        if (old_status_deli !== status_deli) {
+            auditChangesApprove.push({ field: 'Status Delivery', before: old_status_deli, after: status_deli });
+        }
+        let logPayloadObj = {
+            order_no: oldOrderData.sh_cus_ref || order_no,
+            order_id: oldOrderData.id,
+            ship_to: oldOrderData.ship_to || '',
+            reason: req.body[0].remark || req.body[0].reason || '',
+            changes: auditChangesApprove
+        };
         await xglobal.action_logs(lic_code, action[0].id, event_type, JSON.stringify(logPayloadObj), 'success', action[0].value);
         return;
 
@@ -3032,7 +3213,7 @@ exports.removeOrderInformationById_bk = async (req, res, next) => {
             let order_idIn = order_idArr.map(c => `'${c}'`).join(', ');
 
             // ================= เช็ค Validate Status Deli และ Flag =================
-            let scriptCheckStatus = `SELECT id, order_no, status_deli, order_flag FROM tbl_order WHERE id IN (${order_idIn})`;
+            let scriptCheckStatus = `SELECT id, order_no, sh_cus_ref, ship_to, status_deli, order_flag FROM tbl_order WHERE id IN (${order_idIn})`;
             let status_deli_res = await pgConn.get(dbPrefix + lic_code, scriptCheckStatus, config.connectionString());
 
             if (status_deli_res.code || status_deli_res.data.length === 0) {
@@ -3116,7 +3297,21 @@ exports.removeOrderInformationById_bk = async (req, res, next) => {
                 }]
 
                 let event_type = req.body[0].event_type || 'cancel_aos';
-                let logPayload = { id: id, ...req.body[0] };
+
+                // ========== Audit Log: สร้าง changes array สำหรับ cancel (บันทึกครั้งเดียว) ==========
+                let auditChangesCancel = [];
+                if (validIds.length > 0) {
+                    auditChangesCancel.push({ field: 'Order Status', before: 'Active', after: 'Cancelled' });
+                }
+
+                let firstOrder = status_deli_res.data.find(o => validIds.includes(o.id)) || {};
+                let logPayload = {
+                    order_no: firstOrder.sh_cus_ref || firstOrder.order_no || '',
+                    order_id: validIds.join(', '),
+                    ship_to: firstOrder.ship_to || '',
+                    reason: req.body[0].remark || req.body[0].reason || '',
+                    changes: auditChangesCancel
+                };
                 await xglobal.action_logs(lic_code, action[0].id, event_type, JSON.stringify(logPayload), 'success', action[0].value);
 
                 res.status(200).send(response);
@@ -3182,12 +3377,14 @@ exports.removeOrderInformationById = async (req, res, next) => {
         let order_idArr = Array.isArray(order_id) ? order_id : [order_id];
         let order_idIn = order_idArr.map(c => `${c}`).join(', ');
 
-        let script = `SELECT id, order_no, status_deli FROM tbl_order WHERE id IN (${order_idIn});`;
-        let rs = await pgConn.get(dbPrefix + lic_code, script, config.connectionString());
+        // ========== Audit Log: ดึงข้อมูล order ก่อนลบ ==========
+        let scriptGetOrders = `SELECT id, order_no, sh_cus_ref, ship_to, status_deli FROM tbl_order WHERE id IN (${order_idIn});`;
+        let rs = await pgConn.get(dbPrefix + lic_code, scriptGetOrders, config.connectionString());
         let orderData = rs.data;
         let dataResponse = [];
+        let auditChangesMain = [];
 
-        orderData.map(async item => {
+        for (let item of orderData) {
             if (item.status_deli !== 'A') {
                 dataResponse.push({ order_no: item.order_no, message: 'สถานะถูกวางแผนแล้ว ไม่สามารถลบได้' });
             } else {
@@ -3199,7 +3396,24 @@ exports.removeOrderInformationById = async (req, res, next) => {
                 `;
                 await pgConn.execute(dbPrefix + lic_code, script, config.connectionString());
             }
-        });
+        }
+
+        // ========== Audit Log (บันทึกครั้งเดียวรวมทุก order) ==========
+        let validOrders = orderData.filter(o => o.status_deli === 'A');
+        if (validOrders.length > 0) {
+            auditChangesMain.push({ field: 'Order Status', before: 'Confirmed', after: 'Cancelled' });
+        }
+
+        let firstOrder = orderData.length > 0 ? orderData[0] : {};
+        let event_type_main = req.body[0].event_type || 'cancel';
+        let cancelLogPayload = {
+            order_no: firstOrder.sh_cus_ref || firstOrder.order_no || '',
+            order_id: order_idArr.join(', '),
+            ship_to: firstOrder.ship_to || '',
+            reason: req.body[0].remark || req.body[0].reason || '',
+            changes: auditChangesMain
+        };
+        await xglobal.action_logs(lic_code, action[0].id, event_type_main, JSON.stringify(cancelLogPayload), 'success', action[0].value);
 
         let response = [{
             status: 'success',
