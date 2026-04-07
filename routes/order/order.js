@@ -559,22 +559,25 @@ exports.getOrderReportInformation = async (req, res, next) => {
 
         let top_orderer = "-";
         let topOrdererScript = `
-            SELECT tbl_order.created_by_tms, tbl_employee.emp_name, MAX(tbl_order.ist_dt) as latest_order
+            SELECT tbl_order.created_by_tms, tbl_employee.emp_name, tbl_employee_role.emp_role_desc, MAX(tbl_order.ist_dt) as latest_order
             FROM tbl_order 
             LEFT JOIN tbl_employee ON tbl_order.created_by_tms = tbl_employee.emp_code
+            LEFT JOIN tbl_employee_role ON tbl_employee.emp_role_code = tbl_employee_role.emp_role_code
             LEFT JOIN tbl_petrol ON tbl_order.ship_to = tbl_petrol.ptrl_number
             ${whereClause}
             AND tbl_order.created_by_tms IS NOT NULL 
             AND TRIM(tbl_order.created_by_tms) <> '' 
-            GROUP BY tbl_order.created_by_tms, tbl_employee.emp_name
+            GROUP BY tbl_order.created_by_tms, tbl_employee.emp_name, tbl_employee_role.emp_role_desc
             ORDER BY latest_order DESC 
             LIMIT 1;
         `;
+        console.log(topOrdererScript)
         let tbl_top_orderer = await pgConn.get(dbPrefix + lic_code, topOrdererScript, config.connectionString());
         if (!tbl_top_orderer.code && tbl_top_orderer.data && tbl_top_orderer.data.length > 0) {
-            let Orderer_name = tbl_top_orderer.data[0].emp_name;
+            let Orderer_name = tbl_top_orderer.data[0].emp_role_desc;
             let code = tbl_top_orderer.data[0].created_by_tms;
             top_orderer = Orderer_name ? Orderer_name : code;
+            console.log(Orderer_name)
         }
 
         // =========================================================
