@@ -4484,3 +4484,73 @@ exports.postSyncVMIOrder_BK = async (lic_code) => {
     }
 
 }
+
+/**
+ * รูปแบบ JSON action_body ให้เป็น Flat format (1-to-1 array)
+ */
+exports.formatAuditLogs = (dbData) => {
+    let rawData = JSON.parse(JSON.stringify(dbData).replace(/\:null/gi, "\:\"\""));
+
+    let processedData = [];
+    let allShipTos = new Set();
+
+    for (let i = 0; i < rawData.length; i++) {
+        let item = rawData[i];
+        let parsedBody = null;
+        try {
+            if (item.action_body && typeof item.action_body === 'string') {
+                parsedBody = JSON.parse(item.action_body);
+            } else if (typeof item.action_body === 'object') {
+                parsedBody = item.action_body;
+            }
+        } catch (e) {
+            console.log("Parse JSON Error on action_body:", e.message);
+        }
+
+        let flatItem = {
+            order_no: '',
+            ship_to: '',
+            station_name: '',
+            station_group: item.station_group || '',
+            event_type: item.event_type ? item.event_type.charAt(0).toUpperCase() + item.event_type.slice(1) : '',
+            action_by: item.action_by,
+            action_date: item.action_date,
+            remark: '',
+            field: '',
+            before: '',
+            after: '',
+            changes: [],
+        };
+
+        if (parsedBody) {
+            let bodyContent = parsedBody.body || parsedBody;
+            flatItem.remark = bodyContent.remark || '';
+
+            flatItem.ship_to = bodyContent.ship_to || parsedBody.ship_to || '';
+            if (flatItem.ship_to) {
+                allShipTos.add(flatItem.ship_to.trim());
+            }
+
+            flatItem.field = bodyContent.field || '';
+            flatItem.before = bodyContent.before || '';
+            flatItem.after = bodyContent.after || '';
+
+            if (Array.isArray(bodyContent.changes) && bodyContent.changes.length > 0) {
+                flatItem.field = bodyContent.changes[0].field || '';
+                flatItem.before = bodyContent.changes[0].before || '';
+                flatItem.after = bodyContent.changes[0].after || '';
+            }
+
+            let extracted_order = parsedBody.query?.order_no || bodyContent.query?.order_no || bodyContent.order_no || parsedBody.order_no || '';
+
+            if (Array.isArray(extracted_order)) {
+                flatItem.order_no = extracted_order.join(', ');
+            } else if (extracted_order !== '') {
+                flatItem.order_no = extracted_order.toString();
+            }
+        }
+        processedData.push(flatItem);
+    }
+
+    return { processedData, allShipTos };
+}
