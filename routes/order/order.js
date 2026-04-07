@@ -740,7 +740,9 @@ exports.getLoggingOrderInformation = async (req, res, next) => {
         page_index = page_index == undefined ? 1 : page_index;
         page_limit = page_limit == undefined ? 10 : page_limit;
 
-        // เช็คเฉพาะส่วนที่สำคัญ
+        // =========================================================
+        //          ตรวจสอบความถูกต้องของพารามิเตอร์เบื้องต้น
+        // =========================================================
         if (action_desc == undefined || action == undefined) {
             let response = [{
                 status: 'error',
@@ -758,6 +760,9 @@ exports.getLoggingOrderInformation = async (req, res, next) => {
             page_index -= 1;
         }
 
+        // =========================================================
+        //             จัดการรูปแบบวันที่ (Date Formatting)
+        // =========================================================
         if (start_date && start_date.length === 10) start_date += ' 00:00:00';
         if (end_date && end_date.length === 10) end_date += ' 23:59:59';
 
@@ -773,25 +778,26 @@ exports.getLoggingOrderInformation = async (req, res, next) => {
             conditions.push(`tbl_action_logs.action_desc IN ('override', 'manual', 'cancel', 'cancel_order_sap')`);
         }
 
-
-
         if (start_date) conditions.push(`tbl_action_logs.ist_dt >= '${start_date}'`);
         if (end_date) conditions.push(`tbl_action_logs.ist_dt <= '${end_date}'`);
 
-        // ========== ระบบกรองตาม Role ==========
+        // =========================================================
+        //                ระบบกรองตาม Role (Role Filter)
+        // =========================================================
         if (role && role !== 'ALL') {
             conditions.push(`tbl_employee.emp_role_code = '${role}'`);
         }
 
-
-
-
-        // ========== ระบบกรองตามกลุ่มปั๊ม ==========
+        // =========================================================
+        //             ระบบกรองตามกลุ่มปั๊ม (Station Group)
+        // =========================================================
         if (ptrl_group_code && ptrl_group_code !== 'ALL') {
             conditions.push(`tbl_petrol.ptrl_group_code = '${ptrl_group_code}'`);
         }
 
-        // ========== ระบบค้นหา (Search Engine) ==========
+        // =========================================================
+        //              ระบบค้นหา (Search Engine Logic)
+        // =========================================================
         if (search) {
             conditions.push(`(
                 tbl_action_logs.action_body::text ILIKE '%${search}%'
@@ -812,7 +818,9 @@ exports.getLoggingOrderInformation = async (req, res, next) => {
             total_logs: 0
         };
 
-        // ========== สร้างเงื่อนไขจำเพาะสำหรับสรุป (Summary) ==========
+        // =========================================================
+        //       สร้างเงื่อนไขจำเพาะสำหรับส่วนสรุป (Summary Filter)
+        // =========================================================
         let summaryFilter = ``;
         if (start_date) summaryFilter += ` AND tbl_action_logs.ist_dt >= '${start_date}'`;
         if (end_date) summaryFilter += ` AND tbl_action_logs.ist_dt <= '${end_date}'`;
@@ -830,7 +838,9 @@ exports.getLoggingOrderInformation = async (req, res, next) => {
             )`;
         }
 
-        // ========== คำนวณสรุปแยกตามประเภท วันที่ คำค้นหา และ Role ==========
+        // =========================================================
+        //      คำนวณสรุปแยกประเภทตามเงื่อนไข (Summary Aggregation)
+        // =========================================================
         let summaryScript = `
             SELECT 
                 COUNT(*) FILTER (WHERE LOWER(tbl_action_logs.action_desc) = 'manual' ${summaryFilter}) as manual_count,
@@ -851,7 +861,7 @@ exports.getLoggingOrderInformation = async (req, res, next) => {
         }
 
         // =========================================================
-        //                   Query ดึงข้อมูลหลัก
+        //             ดึงข้อมูล Audit Logs หลัก (Main Query)
         // =========================================================
         script = `SELECT 
             tbl_employee.emp_name || ' / ' || tbl_employee_role.emp_role_desc as action_by,
@@ -873,9 +883,14 @@ exports.getLoggingOrderInformation = async (req, res, next) => {
 
         if (!mainLogResult.code && mainLogResult.data) {
             if (mainLogResult.data.length > 0) {
+                // =========================================================
+                //      จัดฟอร์แมตข้อมูลและดึงรายชื่อ Ship-To ทั้งหมด
+                // =========================================================
                 let { processedData, allShipTos } = xglobal.formatAuditLogs(mainLogResult.data);
 
-                // -- ดึงชื่อปั๊มทั้งหมดทีเดียว (Batch Query) --
+                // =========================================================
+                //         ดึงชื่อปั๊มทั้งหมดแบบรวมศูนย์ (Batch Station Query)
+                // =========================================================
                 if (allShipTos.size > 0) {
                     let shipToArr = Array.from(allShipTos).map(s => `'${s}'`).join(', ');
                     let stationScript = `SELECT ptrl_number, ptrl_desc FROM tbl_petrol WHERE ptrl_number IN (${shipToArr})`;
@@ -887,7 +902,7 @@ exports.getLoggingOrderInformation = async (req, res, next) => {
                             stationDataMap[row.ptrl_number] = row.ptrl_desc;
                         });
 
-                        // Map ชื่อปั๊มกลับเข้าไป
+                        // จับคู่ชื่อสถานีกลับเข้ากับรายการข้อมูล
                         processedData.forEach(item => {
                             if (item.ship_to && stationDataMap[item.ship_to]) {
                                 item.station_name = stationDataMap[item.ship_to];
@@ -899,7 +914,7 @@ exports.getLoggingOrderInformation = async (req, res, next) => {
                 mainLogResult.data = processedData;
 
                 // =========================================================
-                //       Query หาจำนวนแถวทั้งหมดตาม Filter (Count Rows)
+                //     นับจำนวนแถวและหน้าทั้งหมด (Pagination Calculation)
                 // =========================================================
                 let page_total = 1;
                 let rows_total = 0;
@@ -921,6 +936,9 @@ exports.getLoggingOrderInformation = async (req, res, next) => {
                     rows_total = parseInt(countResult.data[0].rows_total) || 0;
                 }
 
+                // =========================================================
+                //               ส่งข้อมูลตอบกลับ (Success Response)
+                // =========================================================
                 let response = [{
                     status: 'success',
                     invalid_code: '0',
@@ -935,6 +953,9 @@ exports.getLoggingOrderInformation = async (req, res, next) => {
                 res.status(200).send(response);
                 return;
             } else {
+                // =========================================================
+                //            กรณีไม่พบข้อมูล (No Data Found)
+                // =========================================================
                 let response = [{
                     status: 'success',
                     invalid_code: '0',
@@ -947,6 +968,9 @@ exports.getLoggingOrderInformation = async (req, res, next) => {
                 return;
             }
         } else {
+            // =========================================================
+            //            จัดการข้อผิดพลาดจาก DB (DB Error Handling)
+            // =========================================================
             let response = [{
                 status: 'error',
                 invalid_code: '-3',
@@ -959,6 +983,9 @@ exports.getLoggingOrderInformation = async (req, res, next) => {
             return;
         }
     })().catch(async (err) => {
+        // =========================================================
+        //         จัดการข้อผิดพลาดที่ไม่คาดคิด (Exception Handling)
+        // =========================================================
         console.log(err);
         let response = [{
             status: 'error',
@@ -970,7 +997,6 @@ exports.getLoggingOrderInformation = async (req, res, next) => {
         res.status(200).send(response);
     });
 }
-
 // =========================================================
 //  Helper Functions
 // =========================================================
