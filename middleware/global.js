@@ -4504,7 +4504,7 @@ exports.formatAuditLogs = (dbData) => {
                 parsedBody = item.action_body;
             }
         } catch (e) {
-            console.log("Parse JSON Error on action_body:", e.message);
+            console.log("Json ผิดพลาด :", e.message);
         }
 
         let flatItem = {
