@@ -422,9 +422,9 @@ exports.getOrderReportInformation = async (req, res, next) => {
 
         page_index = page_index === undefined ? 1 : page_index;
         page_limit = page_limit === undefined ? 10 : page_limit;
-        auto_order = auto_order === undefined ? 'ALL' : auto_order;
+        auto_order = auto_order === undefined || auto_order === '' ? '0' : auto_order;
         status_deli = status_deli === undefined ? 'ALL' : status_deli;
-        order_status = order_status === undefined || order_status === 'ALL' || order_status === '' ? 0 : order_status;
+        order_status = order_status === undefined ? 'ALL' : order_status;
         ptrl_group_code = ptrl_group_code === undefined ? 'ALL' : ptrl_group_code;
         ptrl_number = ptrl_number === undefined ? 'ALL' : ptrl_number;
         // ========== เช็คเฉพาะส่วนที่สำคัญ ==========
@@ -491,7 +491,7 @@ exports.getOrderReportInformation = async (req, res, next) => {
             )`);
         }
         if (original_start_date.toString().toUpperCase() !== 'ALL' && original_end_date.toString().toUpperCase() !== 'ALL') {
-            conditions.push(`tbl_order.ist_dt >= '${original_start_date}' AND tbl_order.ist_dt <= '${original_end_date}'`);
+            conditions.push(`tbl_order.ist_dt >= '${start_date}' AND tbl_order.ist_dt <= '${end_date}'`);
         }
 
         let act_val = action[0].value.toString().toUpperCase();
@@ -513,30 +513,23 @@ exports.getOrderReportInformation = async (req, res, next) => {
         // [SUMMARY 1] คำนวณยอดรวมของ Manual Order (auto_order = '0')
         // =========================================================================
         let total_manual_order = 0;
-
         let countManualOrderScript = `
-            SELECT COUNT(tbl_order.id) AS total_manual_order 
+            SELECT COUNT(DISTINCT tbl_order.id) AS total_manual_order 
             FROM tbl_order 
             LEFT JOIN tbl_petrol ON tbl_order.ship_to = tbl_petrol.ptrl_number
             ${whereClause} AND tbl_order.auto_order = '0';
         `;
-
         let tbl_count_manual = await pgConn.get(dbPrefix + lic_code, countManualOrderScript, config.connectionString());
-
         if (!tbl_count_manual.code && tbl_count_manual.data && tbl_count_manual.data.length > 0) {
             total_manual_order = parseInt(tbl_count_manual.data[0].total_manual_order) || 0;
         }
 
-        // =========================================================================
-        // [SUMMARY 2] ค้นหา Top Remark (หมายเหตุที่พบบ่อยที่สุดในช่วงเวลานี้)
-        // =========================================================================
         let top_remark = "-";
-
         let topRemarkScript = `
             SELECT item.remark, COUNT(*) AS remark_count 
             FROM tbl_order 
+            INNER JOIN tbl_order_item item ON CAST(tbl_order.id AS TEXT) = CAST(item.order_no AS TEXT)
             LEFT JOIN tbl_petrol ON tbl_order.ship_to = tbl_petrol.ptrl_number
-            INNER JOIN tbl_order_item item ON TRIM(CAST(tbl_order.id AS TEXT)) = TRIM(CAST(item.order_no AS TEXT))
             ${whereClause} 
             AND item.rm_dt IS NULL 
             AND item.remark IS NOT NULL 
@@ -545,42 +538,28 @@ exports.getOrderReportInformation = async (req, res, next) => {
             ORDER BY remark_count DESC 
             LIMIT 1;
         `;
-
         let tbl_top_remark = await pgConn.get(dbPrefix + lic_code, topRemarkScript, config.connectionString());
-
         if (!tbl_top_remark.code && tbl_top_remark.data && tbl_top_remark.data.length > 0) {
             top_remark = tbl_top_remark.data[0].remark;
         }
 
-        // =========================================================================
-        // [SUMMARY 3] ค้นหาผลรวมจำนวนสินค้า (Top Sum Qty ในช่วงเวลานี้)
-        // =========================================================================
         let top_sum_qty = 0;
-
         let topSumQtyScript = `
             SELECT SUM(CAST(item.item_qty AS numeric)) AS sum_qty 
             FROM tbl_order 
+            INNER JOIN tbl_order_item item ON CAST(tbl_order.id AS TEXT) = CAST(item.order_no AS TEXT)
             LEFT JOIN tbl_petrol ON tbl_order.ship_to = tbl_petrol.ptrl_number
-            INNER JOIN tbl_order_item item ON TRIM(CAST(tbl_order.id AS TEXT)) = TRIM(CAST(item.order_no AS TEXT))
             ${whereClause} 
-            AND item.rm_dt IS NULL 
-            AND item.item_qty IS NOT NULL 
+            AND item.rm_dt IS NULL;
         `;
-
-
         let tbl_top_sum_qty = await pgConn.get(dbPrefix + lic_code, topSumQtyScript, config.connectionString());
-
         if (!tbl_top_sum_qty.code && tbl_top_sum_qty.data && tbl_top_sum_qty.data.length > 0) {
             top_sum_qty = parseFloat(tbl_top_sum_qty.data[0].sum_qty) || 0;
         }
 
-        // =========================================================================
-        // [SUMMARY 4] ค้นหา Top Orderer (ผู้สั่งที่พบบ่อยที่สุดในช่วงเวลานี้)
-        // =========================================================================
         let top_orderer = "-";
-
         let topOrdererScript = `
-            SELECT tbl_order.created_by_tms, tbl_employee.emp_name , MAX(tbl_order.ist_dt) AS latest_order_date
+            SELECT tbl_order.created_by_tms, tbl_employee.emp_name, MAX(tbl_order.ist_dt) as latest_order
             FROM tbl_order 
             LEFT JOIN tbl_employee ON tbl_order.created_by_tms = tbl_employee.emp_code
             LEFT JOIN tbl_petrol ON tbl_order.ship_to = tbl_petrol.ptrl_number
@@ -588,10 +567,9 @@ exports.getOrderReportInformation = async (req, res, next) => {
             AND tbl_order.created_by_tms IS NOT NULL 
             AND TRIM(tbl_order.created_by_tms) <> '' 
             GROUP BY tbl_order.created_by_tms, tbl_employee.emp_name
-            ORDER BY latest_order_date DESC 
+            ORDER BY latest_order DESC 
             LIMIT 1;
         `;
-
         let tbl_top_orderer = await pgConn.get(dbPrefix + lic_code, topOrdererScript, config.connectionString());
         if (!tbl_top_orderer.code && tbl_top_orderer.data && tbl_top_orderer.data.length > 0) {
             let Orderer_name = tbl_top_orderer.data[0].emp_name;
@@ -602,18 +580,19 @@ exports.getOrderReportInformation = async (req, res, next) => {
         // =========================================================
         // 2. Query ดึงข้อมูลหลัก (Main Script)
         // =========================================================
-        let baseSelectQuery = `SELECT 
-            tbl_order.id, tbl_order.order_no, tbl_order.sh_cus_ref as aos_order_no, tbl_order.order_type, tbl_order.order_group, 
+        let baseSelectQuery = `
+            SELECT 
+            tbl_order.id, tbl_order.order_no, tbl_order.sh_cus_ref as aos_order_no, 
+            tbl_order.order_type, tbl_order.order_group, 
             tbl_order_type.ord_type_desc, tbl_petrol_group.ptrl_group_desc, tbl_order.order_status,
             tbl_order.chanel, tbl_order.division, tbl_order.sold_to, tbl_order.ship_to, 
             tbl_petrol.ptrl_desc as station, tbl_order.cus_ref, tbl_order.cus_date_ref, tbl_order.po_name, tbl_order.order_by, 
-            tbl_order.ship_cond, tbl_order.pay_term, tbl_order.deli_date_req as request_date, tbl_master_time.time_value as RequestTime, 
+            tbl_order.ship_cond, tbl_order.pay_term, tbl_order.deli_date_req as request_date, tbl_master_time.time_value as requesttime, 
             tbl_order.description, tbl_order.sh_cus_date_ref, tbl_order.status_deli, tbl_order.status_block, tbl_order.status_sd_process, 
             tbl_order.status_check, tbl_order.sd_doc_reject, tbl_order.cus_group, 
             tbl_order.hana_created, tbl_order.hana_time, tbl_order.created_by, 
             tbl_order.ist_dt, tbl_order.mdf_dt, tbl_order.rm_dt,
-            
-            json_build_object(
+            json_build_array(json_build_object(
                 'id', tbl_order_item.id,
                 'sales_order_item', tbl_order_item.sales_order_item,
                 'itm_code', tbl_item.itm_code,
@@ -626,31 +605,31 @@ exports.getOrderReportInformation = async (req, res, next) => {
                 'long_text', tbl_order_item.long_text,
                 'auto_order', tbl_order_item.auto_order ,
                 'remark', tbl_order_item.remark
-            ) as item_information,
+            )) as item_information,
             tbl_order.auto_order
             FROM tbl_order  
+            INNER JOIN tbl_order_item ON CAST(tbl_order.id AS TEXT) = CAST(tbl_order_item.order_no AS TEXT) 
             LEFT JOIN tbl_order_type ON tbl_order.order_type = tbl_order_type.ord_type_code
-            LEFT JOIN tbl_petrol_group ON tbl_petrol_group.ptrl_group_code = tbl_order.order_group
-            LEFT JOIN tbl_petrol ON tbl_order.ship_to = tbl_petrol.ptrl_number
-            LEFT JOIN (
-                SELECT DISTINCT ON (order_no, item_no) * FROM tbl_order_item 
-                WHERE rm_dt IS NULL ORDER BY order_no, item_no, ist_dt DESC
-            ) tbl_order_item ON CAST(tbl_order.id AS TEXT) = CAST(tbl_order_item.order_no AS TEXT) 
             LEFT JOIN tbl_item ON tbl_order_item.item_no = tbl_item.itm_code
+            LEFT JOIN tbl_petrol ON tbl_order.ship_to = tbl_petrol.ptrl_number
+            LEFT JOIN tbl_petrol_group ON tbl_petrol.ptrl_group_code = tbl_petrol_group.ptrl_group_code
             LEFT JOIN tbl_master_time ON tbl_order.deli_time_req = tbl_master_time.time_code
             LEFT JOIN (
                 SELECT ptrl_code, itm_code, string_agg(tnk_number, ', ') as tnk_number 
                 FROM tbl_petrol_tank 
                 WHERE rm_dt IS NULL GROUP BY ptrl_code, itm_code
-            ) tbl_petrol_tank ON tbl_item.itm_code = tbl_petrol_tank.itm_code AND tbl_petrol.ptrl_code = tbl_petrol_tank.ptrl_code`;
+            ) tbl_petrol_tank ON tbl_item.itm_code = tbl_petrol_tank.itm_code AND tbl_petrol.ptrl_code = tbl_petrol_tank.ptrl_code
+            WHERE tbl_order_item.rm_dt IS NULL
+        `;
 
         // ประกอบร่าง Script หลัก
         let script = `
             ${baseSelectQuery}
-            ${whereClause}
+            AND ${whereClause.replace('WHERE', '')}
             ORDER BY tbl_order.ist_dt DESC 
             OFFSET (${page_index} * ${page_limit}) LIMIT ${page_limit};
         `;
+
 
 
 
@@ -664,14 +643,11 @@ exports.getOrderReportInformation = async (req, res, next) => {
                 //              Query หาจำนวนแถวทั้งหมด (Count Rows)
                 // =========================================================
                 let countScript = `
-                    SELECT CEIL((CEIL(SUM(rows_total)) / ${page_limit})) as page_total, SUM(rows_total) as rows_total  
-                    FROM (
-                        SELECT 1 as rows_total FROM tbl_order_item
-                        LEFT JOIN tbl_order ON tbl_order_item.order_no = tbl_order.id
-                        LEFT JOIN tbl_petrol ON tbl_order.ship_to = tbl_petrol.ptrl_number
-                        ${whereClause}
-                        ORDER BY tbl_order.ist_dt DESC 
-                    ) xtbl_master;
+                    SELECT CEIL((COUNT(*)::numeric / ${page_limit})) as page_total, COUNT(*) as rows_total  
+                    FROM tbl_order
+                    INNER JOIN tbl_order_item ON CAST(tbl_order.id AS TEXT) = CAST(tbl_order_item.order_no AS TEXT)
+                    LEFT JOIN tbl_petrol ON tbl_order.ship_to = tbl_petrol.ptrl_number
+                    ${whereClause} AND tbl_order_item.rm_dt IS NULL;
                 `;
 
                 let tbl_temporary0 = await pgConn.get(dbPrefix + lic_code, countScript, config.connectionString());
