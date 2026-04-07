@@ -29,7 +29,7 @@ exports.getOrderInformation = async (req, res, next) => {
         ptrl_group_code = ptrl_group_code === undefined ? 'ALL' : ptrl_group_code;
 
         // =========================================================================
-        // Data Validation (ตรวจสอบความครบถ้วนของข้อมูลสำคัญ)
+        // (ตรวจสอบความครบถ้วนของข้อมูลสำคัญ)
         // =========================================================================
         if (start_date === undefined || end_date === undefined ||
             order_type === undefined || order_status === undefined ||
