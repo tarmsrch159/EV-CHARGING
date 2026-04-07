@@ -652,7 +652,7 @@ exports.getOrderReportInformation = async (req, res, next) => {
             OFFSET (${page_index} * ${page_limit}) LIMIT ${page_limit};
         `;
 
-        console.log(script)
+
 
         let tbl_temporary = await pgConn.get(dbPrefix + lic_code, script, config.connectionString());
 
@@ -2158,7 +2158,7 @@ exports.cancelOrderInformationHana = async (req, res, next) => {
                 WHERE tod.id = ${id} AND tod.order_no IS NOT NULL
             `;
             var check_sales_order = await pgConn.get(dbPrefix + lic_code, script_check_sales_order, config.connectionString());
-            // console.log(check_sales_order.data);
+
 
             if (!check_sales_order.code && check_sales_order.data.length <= 0) {
                 let response = [{
@@ -2193,7 +2193,7 @@ exports.cancelOrderInformationHana = async (req, res, next) => {
 
 
         const updateStatusOrder = async (payload) => {
-            // console.log('payload', payload);
+
             let order_no = payload.SalesDocuments[0].SalesOrder;
 
             try {

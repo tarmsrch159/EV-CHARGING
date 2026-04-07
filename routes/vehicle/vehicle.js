@@ -15,7 +15,7 @@ exports.getVehicleInformation = async (req, res, next) => {
         let { veh_code, veh_group_code, off_code, action, page_index, page_limit } = req.body[0];
         page_index == undefined ? page_index = 1 : page_index;
         page_limit == undefined ? page_limit = 10 : page_limit;
-        console.log(lic_code)
+
         if (page_index > 0) {
             page_index -= 1;
         }
