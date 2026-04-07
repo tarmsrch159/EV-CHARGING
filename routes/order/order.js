@@ -735,7 +735,6 @@ exports.getLoggingOrderInformation = async (req, res, next) => {
 
     return (async () => {
         let lic_code = req.header('lic_code');
-        console.log("DEBUG: getLoggingOrderInformation body:", req.body[0]);
         let { action_desc, page_index, page_limit, start_date, end_date, search, role, ptrl_group_code, action } = req.body[0];
 
         page_index = page_index == undefined ? 1 : page_index;
@@ -819,9 +818,6 @@ exports.getLoggingOrderInformation = async (req, res, next) => {
         if (end_date) summaryFilter += ` AND tbl_action_logs.ist_dt <= '${end_date}'`;
         if (role && role !== 'ALL') summaryFilter += ` AND emp_role_code = '${role}'`;
         if (ptrl_group_code && ptrl_group_code !== 'ALL') summaryFilter += ` AND tbl_petrol.ptrl_group_code = '${ptrl_group_code}'`;
-        if (act_val === 'GROUP') {
-            summaryFilter += ` AND tbl_petrol.ptrl_group_code IN (SELECT ptrl_group_code FROM tbl_employee_petrol_group WHERE emp_code = '${act_id}' AND emp_pgrp_flag = 1)`;
-        }
 
         if (search) {
             summaryFilter += ` AND (
