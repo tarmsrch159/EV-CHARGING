@@ -4486,7 +4486,7 @@ exports.postSyncVMIOrder_BK = async (lic_code) => {
 }
 
 /**
- * รูปแบบ JSON action_body ให้เป็น Flat format (1-to-1 array)
+ * รูปแบบ JSON action_body ให้เป็น Flat format
  */
 exports.formatAuditLogs = (dbData) => {
     let rawData = JSON.parse(JSON.stringify(dbData).replace(/\:null/gi, "\:\"\""));
@@ -4524,7 +4524,7 @@ exports.formatAuditLogs = (dbData) => {
 
         if (parsedBody) {
             let bodyContent = parsedBody.body || parsedBody;
-            flatItem.remark = bodyContent.remark || '';
+            flatItem.remark = bodyContent.remark || bodyContent.reason || bodyContent.description || '';
 
             flatItem.ship_to = bodyContent.ship_to || parsedBody.ship_to || '';
             if (flatItem.ship_to) {
