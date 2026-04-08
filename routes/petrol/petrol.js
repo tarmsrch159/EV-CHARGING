@@ -9,11 +9,10 @@ const dbPrefix = config.dbPrefix();
 exports.getPetrolInformation = async (req, res, next) => {
 
     var xresult = [];
+    let lic_code = req.header('lic_code');
+    let payload = req.body?.[0] || {};
 
-    return (async () => {
-        let lic_code = req.header('lic_code');
-        let payload = req.body?.[0] || {};
-
+    try {
         let {
             ptrl_code, off_code, ptrl_group_code, search,
             page_index, page_limit, action, auto_order
@@ -22,10 +21,11 @@ exports.getPetrolInformation = async (req, res, next) => {
         // ======== กำหนดค่าเริ่มต้น ========
         page_index = page_index === undefined ? 1 : page_index;
         page_limit = page_limit === undefined ? 10 : page_limit;
+        off_code = off_code === undefined || off_code === '' ? 'ALL' : off_code;
 
         // ======== ตรวจสอบพารามิเตอร์ที่จำเป็น ========
         if (ptrl_code === undefined || off_code === undefined || ptrl_group_code === undefined ||
-            lic_code === undefined || search === undefined || action === undefined) {
+            lic_code === undefined || search === undefined || action === undefined || auto_order === undefined) {
 
             let response = [{
                 status: 'error',
@@ -52,15 +52,15 @@ exports.getPetrolInformation = async (req, res, next) => {
             conditions.push(`tbl_petrol.ptrl_code = '${ptrl_code}'`);
         }
 
-        if (auto_order !== undefined && auto_order !== '') {
+        if (auto_order.toString().toUpperCase() !== 'ALL') {
             conditions.push(`tbl_petrol.auto_order = ${auto_order}`);
         }
 
-        if (ptrl_group_code.toString().toUpperCase() !== 'ALL' && ptrl_group_code !== '') {
+        if (ptrl_group_code.toString().toUpperCase() !== 'ALL') {
             conditions.push(`tbl_petrol.ptrl_group_code = '${ptrl_group_code}'`);
         }
 
-        if (off_code.toString().toUpperCase() !== 'ALL' && off_code !== '') {
+        if (off_code.toString().toUpperCase() !== 'ALL') {
             conditions.push(`tbl_petrol.off_code = '${off_code}'`);
         }
 
@@ -114,34 +114,13 @@ exports.getPetrolInformation = async (req, res, next) => {
             LIMIT ${page_limit} OFFSET (${page_index} * ${page_limit});
         `;
 
+        console.log(dataScript)
+
         let tbl_temporary = await pgConn.get(dbPrefix + lic_code, dataScript, config.connectionString());
         if (!tbl_temporary.code) {
             if (tbl_temporary.data.length > 0) {
 
                 tbl_temporary.data = JSON.parse(JSON.stringify(tbl_temporary.data).replace(/\:null/gi, "\:\"\""));
-                // let rawData = tbl_temporary.data;
-                // let responseData = rawData;
-
-                // // =========== กรองข้อมูลปั๊มและกลุ่มปั๊ม ==========
-                // if (act_val === 'GROUP') {
-                //     let groupMap = new Map();
-
-                //     // ดึงรายชื่อกลุ่ม (แบบไม่ซ้ำ)
-                //     rawData.forEach(item => {
-                //         let groupCode = item.ptrl_group_code || 'UNASSIGNED';
-                //         if (!groupMap.has(groupCode)) {
-                //             groupMap.set(groupCode, {
-                //                 ptrl_group_code: groupCode,
-                //                 ptrl_group_desc: item.ptrl_group_desc || 'ไม่ระบุกลุ่ม'
-                //             });
-                //         }
-                //     });
-
-                //     responseData = {
-                //         ptrl_group_code: Array.from(groupMap.values()),
-                //         station: rawData // ปั๊มทั้งหมดรวมกันใน Array เดียว
-                //     };
-                // }
 
                 let page_total = 0;
                 let rows_total = 0;
@@ -208,9 +187,8 @@ exports.getPetrolInformation = async (req, res, next) => {
             return;
         }
 
-    })().catch(async (err) => {
+    } catch (err) {
         console.error(err);
-        let payload = req.body?.[0] || {};
         let act_id = payload.action?.[0]?.id || '';
         let act_val = payload.action?.[0]?.value || '';
 
@@ -226,21 +204,20 @@ exports.getPetrolInformation = async (req, res, next) => {
 
         res.status(200).send(response);
 
-        if (act_id) {
+        if (lic_code && act_id) {
             await xglobal.action_logs(lic_code, act_id, 'ดึงข้อมูลปั้ม', JSON.stringify(payload), 'ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ', act_val);
         }
         return;
-    });
+    }
 }
 
 exports.getPetrolInformationFilter = async (req, res, next) => {
 
     var xresult = [];
+    let lic_code = req.header('lic_code');
+    let payload = req.body?.[0] || {};
 
-    return (async () => {
-        let lic_code = req.header('lic_code');
-        let payload = req.body?.[0] || {};
-
+    try {
         let {
             ptrl_code, ptrl_group_code, search,
             page_index, page_limit, action, auto_order
@@ -329,8 +306,6 @@ exports.getPetrolInformationFilter = async (req, res, next) => {
             LEFT JOIN tbl_petrol_group ON tbl_petrol.ptrl_group_code = tbl_petrol_group.ptrl_group_code 
         `;
 
-
-
         let dataScript = `
             ${baseSelectQuery}
             ${whereClause}
@@ -343,29 +318,6 @@ exports.getPetrolInformationFilter = async (req, res, next) => {
             if (tbl_temporary.data.length > 0) {
 
                 tbl_temporary.data = JSON.parse(JSON.stringify(tbl_temporary.data).replace(/\:null/gi, "\:\"\""));
-                // let rawData = tbl_temporary.data;
-                // let responseData = rawData;
-
-                // // =========== กรองข้อมูลปั๊มและกลุ่มปั๊ม ==========
-                // if (act_val === 'GROUP') {
-                //     let groupMap = new Map();
-
-                //     // ดึงรายชื่อกลุ่ม (แบบไม่ซ้ำ)
-                //     rawData.forEach(item => {
-                //         let groupCode = item.ptrl_group_code || 'UNASSIGNED';
-                //         if (!groupMap.has(groupCode)) {
-                //             groupMap.set(groupCode, {
-                //                 ptrl_group_code: groupCode,
-                //                 ptrl_group_desc: item.ptrl_group_desc || 'ไม่ระบุกลุ่ม'
-                //             });
-                //         }
-                //     });
-
-                //     responseData = {
-                //         ptrl_group_code: Array.from(groupMap.values()),
-                //         station: rawData // ปั๊มทั้งหมดรวมกันใน Array เดียว
-                //     };
-                // }
 
                 let page_total = 0;
                 let rows_total = 0;
@@ -432,9 +384,8 @@ exports.getPetrolInformationFilter = async (req, res, next) => {
             return;
         }
 
-    })().catch(async (err) => {
+    } catch (err) {
         console.error(err);
-        let payload = req.body?.[0] || {};
         let act_id = payload.action?.[0]?.id || '';
         let act_val = payload.action?.[0]?.value || '';
 
@@ -450,18 +401,19 @@ exports.getPetrolInformationFilter = async (req, res, next) => {
 
         res.status(200).send(response);
 
-        if (act_id) {
+        if (lic_code && act_id) {
             await xglobal.action_logs(lic_code, act_id, 'ดึงข้อมูลปั้ม', JSON.stringify(payload), 'ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ', act_val);
         }
         return;
-    });
+    }
 }
 exports.removePetrol = async (req, res, next) => {
 
-    return (async () => {
+    let lic_code = req.header('lic_code');
+    let payload = req.body?.[0] || {};
 
-        let lic_code = req.header('lic_code');
-        let { ptrl_code, action } = req.body[0];
+    try {
+        let { ptrl_code, action } = payload;
         //เช็คเฉพาะส่วนที่สำคัญ
         if (ptrl_code == undefined || lic_code == undefined || action == undefined) {
             let response = [{
@@ -501,13 +453,14 @@ exports.removePetrol = async (req, res, next) => {
                     response_time: moment().format('YYYY-MM-DD HH:mm:ss')
                 }]
                 res.status(200).send(response);
-                await xglobal.action_logs(lic_code, action[0].id, 'ลบข้อมูลปั้ม', JSON.stringify(req.body[0]), 'ไม่สามารถลบข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ', action[0].value);
+                await xglobal.action_logs(lic_code, action[0].id, 'ลบข้อมูลปั้ม', JSON.stringify(payload), 'ไม่สามารถลบข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ', action[0].value);
                 return;
             }
         }
 
-    })().catch(async (err) => {
+    } catch (err) {
         console.log(err);
+        let action = payload?.action || [];
         let response = [{
             status: 'error',
             invalid_code: '-4',
@@ -516,18 +469,21 @@ exports.removePetrol = async (req, res, next) => {
             response_time: moment().format('YYYY-MM-DD HH:mm:ss').toString()
         }]
         res.status(200).send(response);
-        await xglobal.action_logs(lic_code, action[0].id, 'ลบข้อมูลปั้ม', JSON.stringify(req.body[0]), 'ไม่สามารถลบข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ', action[0].value);
+        if (lic_code && action[0]) {
+            await xglobal.action_logs(lic_code, action[0].id, 'ลบข้อมูลปั้ม', JSON.stringify(payload), 'ไม่สามารถลบข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ', action[0].value);
+        }
         return;
-    });
+    }
 
 }
 
 exports.setPetrolInformation = async (req, res, next) => {
 
-    return (async () => {
-        debugger
-        let lic_code = req.header('lic_code');
-        let { ptrl_code } = req.query;
+    let lic_code = req.header('lic_code');
+    let { ptrl_code } = req.query;
+    let payload = req.body?.[0] || {};
+
+    try {
         let {
             ptrl_number,
             ptrl_sitecode,
@@ -553,7 +509,8 @@ exports.setPetrolInformation = async (req, res, next) => {
             prov_code,
             amph_code,
             tamb_code
-        } = req.body[0];
+        } = payload;
+
         //เช็คเฉพาะส่วนที่สำคัญ   
         if (ptrl_code == undefined || ptrl_number == undefined || ptrl_sitecode == undefined || ptrl_desc == undefined
             || ptrl_short_desc == undefined || ptrl_address == undefined || ptrl_zip_code == undefined || ptrl_country_code == undefined || ptrl_unloading_minute == undefined
@@ -617,7 +574,7 @@ exports.setPetrolInformation = async (req, res, next) => {
                 }]
 
                 res.status(200).send(response);
-                await xglobal.action_logs(lic_code, action[0].id, 'แก้ไขข้อมูลปั้ม', JSON.stringify(req.body[0]), 'success', action[0].value);
+                await xglobal.action_logs(lic_code, action[0].id, 'แก้ไขข้อมูลปั้ม', JSON.stringify(payload), 'success', action[0].value);
                 return;
             } else {
                 let response = [{
@@ -628,14 +585,14 @@ exports.setPetrolInformation = async (req, res, next) => {
                     response_time: moment().format('YYYY-MM-DD HH:mm:ss')
                 }]
                 res.status(200).send(response);
-                await xglobal.action_logs(lic_code, action[0].id, 'แก้ไขข้อมูลปั้ม', JSON.stringify(req.body[0]), 'ไม่สามารถบันทึกข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ', action[0].value);
+                await xglobal.action_logs(lic_code, action[0].id, 'แก้ไขข้อมูลปั้ม', JSON.stringify(payload), 'ไม่สามารถบันทึกข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ', action[0].value);
                 return;
             }
         }
 
-    })().catch(async (err) => {
-
+    } catch (err) {
         console.log(err);
+        let action = payload?.action || [];
         let response = [{
             status: 'error',
             invalid_code: '-4',
@@ -644,17 +601,20 @@ exports.setPetrolInformation = async (req, res, next) => {
             response_time: moment().format('YYYY-MM-DD HH:mm:ss').toString()
         }]
         res.status(200).send(response);
-        await xglobal.action_logs(lic_code, action[0].id, 'แก้ไขข้อมูลปั้ม', JSON.stringify(req.body[0]), 'ไม่สามารถบันทึกข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ', action[0].value);
+        if (lic_code && action[0]) {
+            await xglobal.action_logs(lic_code, action[0].id, 'แก้ไขข้อมูลปั้ม', JSON.stringify(payload), 'ไม่สามารถบันทึกข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ', action[0].value);
+        }
         return;
-    });
+    }
 
 }
 
 exports.addPetrolInformation = async (req, res, next) => {
 
-    return (async () => {
-        debugger
-        let lic_code = req.header('lic_code');
+    let lic_code = req.header('lic_code');
+    let payload = req.body?.[0] || {};
+
+    try {
         let {
             ptrl_number,
             ptrl_sitecode,
@@ -680,7 +640,7 @@ exports.addPetrolInformation = async (req, res, next) => {
             prov_code,
             amph_code,
             tamb_code
-        } = req.body[0];
+        } = payload;
 
         //เช็คเฉพาะส่วนที่สำคัญ
         if (ptrl_number == undefined || ptrl_sitecode == undefined || ptrl_desc == undefined || ptrl_short_desc == undefined || ptrl_address == undefined || ptrl_zip_code == undefined || ptrl_country_code == undefined || ptrl_unloading_minute == undefined
@@ -716,12 +676,12 @@ exports.addPetrolInformation = async (req, res, next) => {
                     }]
 
                     res.status(200).send(response);
-                    await xglobal.action_logs(lic_code, action[0].id, 'เพิ่มข้อมูลปั้ม', JSON.stringify(req.body[0]), 'ไม่สามารถบันทึกข้อมูลได้, เนื่องจากข้อมูลปั้มซ้ำ', action[0].value);
+                    await xglobal.action_logs(lic_code, action[0].id, 'เพิ่มข้อมูลปั้ม', JSON.stringify(payload), 'ไม่สามารถบันทึกข้อมูลได้, เนื่องจากข้อมูลปั้มซ้ำ', action[0].value);
                     return;
                 }
             }
 
-            let ptrl_code = 'petr-' + moment().format('x');
+            let ptrl_code = 'petr-' + moment().format('YYYYMMDDHHmmss') + Math.floor(Math.random() * 1000);
             script = `insert into tbl_petrol 
             (ptrl_code, ptrl_number, ptrl_sitecode, ptrl_desc, ptrl_short_desc, ptrl_address, ptrl_zip_code, ptrl_country_code, ptrl_unloading_minute,
             ptrl_expenses_per_km, ptrl_area, ptrl_option_pump, ptrl_option_mrge_orders,
@@ -747,7 +707,7 @@ exports.addPetrolInformation = async (req, res, next) => {
                 }]
 
                 res.status(200).send(response);
-                await xglobal.action_logs(lic_code, action[0].id, 'เพิ่มข้อมูลปั้ม', JSON.stringify(req.body[0]), 'success', action[0].value);
+                await xglobal.action_logs(lic_code, action[0].id, 'เพิ่มข้อมูลปั้ม', JSON.stringify(payload), 'success', action[0].value);
                 return;
             } else {
                 let response = [{
@@ -758,13 +718,14 @@ exports.addPetrolInformation = async (req, res, next) => {
                     response_time: moment().format('YYYY-MM-DD HH:mm:ss')
                 }]
                 res.status(200).send(response);
-                await xglobal.action_logs(lic_code, action[0].id, 'เพิ่มข้อมูลปั้ม', JSON.stringify(req.body[0]), 'ไม่สามารถบันทึกข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ', action[0].value);
+                await xglobal.action_logs(lic_code, action[0].id, 'เพิ่มข้อมูลปั้ม', JSON.stringify(payload), 'ไม่สามารถบันทึกข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ', action[0].value);
                 return;
             }
         }
 
-    })().catch(async (err) => {
+    } catch (err) {
         console.log(err);
+        let action = payload?.action || [];
         let response = [{
             status: 'error',
             invalid_code: '-4',
@@ -773,8 +734,10 @@ exports.addPetrolInformation = async (req, res, next) => {
             response_time: moment().format('YYYY-MM-DD HH:mm:ss').toString()
         }]
         res.status(200).send(response);
-        await xglobal.action_logs(lic_code, action[0].id, 'เพิ่มข้อมูลปั้ม', JSON.stringify(req.body[0]), 'ไม่สามารถบันทึกข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ', action[0].value);
+        if (lic_code && action[0]) {
+            await xglobal.action_logs(lic_code, action[0].id, 'เพิ่มข้อมูลปั้ม', JSON.stringify(payload), 'ไม่สามารถบันทึกข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ', action[0].value);
+        }
         return;
-    });
+    }
 
 }
