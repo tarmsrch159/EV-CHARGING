@@ -4508,7 +4508,7 @@ exports.formatAuditLogs = (dbData) => {
         }
 
         let flatItem = {
-            order_no: '',
+            order_no: (item.real_order_no && item.real_order_no !== "") ? item.real_order_no : '-',
             ship_to: '',
             station_name: '',
             station_group: item.station_group || '',
@@ -4541,13 +4541,7 @@ exports.formatAuditLogs = (dbData) => {
                 flatItem.after = bodyContent.changes[0].after || '';
             }
 
-            let extracted_order = parsedBody.query?.order_no || bodyContent.query?.order_no || bodyContent.order_no || parsedBody.order_no || '';
-
-            if (Array.isArray(extracted_order)) {
-                flatItem.order_no = extracted_order.join(', ');
-            } else if (extracted_order !== '') {
-                flatItem.order_no = extracted_order.toString();
-            }
+            // Removed fallback extraction of order_no to prioritize tbl_order.order_no
         }
         processedData.push(flatItem);
     }
