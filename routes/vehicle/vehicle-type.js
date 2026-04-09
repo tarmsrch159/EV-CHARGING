@@ -1710,163 +1710,92 @@ exports.setVehicleTypeInformation = async (req, res, next) => {
         config.connectionString(),
       );
       if (!tbl_temporary.code) {
-        // วนลูป compartment_item เพื่อ Insert เข้า tbl_compartment_item
-        if (
-          !isError &&
-          Array.isArray(compartment_item) &&
-          compartment_item.length > 0
-        ) {
-          for (let i = 0; i < compartment_item.length; i++) {
-            let item = compartment_item[i];
-            let current_compartment_no = item.compartment_no || "";
-            let current_compartment_total =
-              item.compartment_total != undefined ? item.compartment_total : 0;
-            let current_compartment_max =
-              item.compartment_max != undefined ? item.compartment_max : 0;
-            let current_compartment_min =
-              item.compartment_min != undefined ? item.compartment_min : 0;
-            let level_data = item.level_data || [];
+        // ========== Delete and Insert Compartment Items (ตามคำสั่ง: ลบของเก่าแล้ว insert ของใหม่ มาแทน) ==========
+        if (!isError) {
+          // ลบ level เก่าออกก่อน
+          let scriptDeleteLevel = `DELETE FROM tbl_vehicle_type_compartment_level WHERE compartment_item_id IN (SELECT id FROM tbl_compartment_item WHERE veh_type_code = '${veh_type_code}');`;
+          await pgConn.execute(
+            dbPrefix + lic_code,
+            scriptDeleteLevel,
+            config.connectionString(),
+          );
 
-            // เช็คว่า compartment_no นี้มีอยู่แล้วหรือยัง
-            let scriptCheckExist = `SELECT id FROM tbl_compartment_item 
-                            WHERE veh_type_code = '${veh_type_code}' AND compartment_no = '${current_compartment_no}';`;
-            let tbl_checkExist = await pgConn.get(
-              dbPrefix + lic_code,
-              scriptCheckExist,
-              config.connectionString(),
-            );
+          // ลบ compartment เก่าออก
+          let scriptDeleteCompartment = `DELETE FROM tbl_compartment_item WHERE veh_type_code = '${veh_type_code}';`;
+          await pgConn.execute(
+            dbPrefix + lic_code,
+            scriptDeleteCompartment,
+            config.connectionString(),
+          );
 
-            if (
-              tbl_checkExist &&
-              tbl_checkExist.data &&
-              tbl_checkExist.data.length > 0
-            ) {
-              // compartment มีอยู่แล้ว → ข้าม insert compartment แต่ยังเพิ่ม level_data ได้
-              let existing_compartment_item_id = tbl_checkExist.data[0].id;
+          // วนลูป compartment_item เพื่อ Insert ใหม่ทั้งหมด
+          if (Array.isArray(compartment_item) && compartment_item.length > 0) {
+            for (let i = 0; i < compartment_item.length; i++) {
+              let item = compartment_item[i];
+              let current_compartment_no = item.compartment_no || "";
+              let current_compartment_total =
+                item.compartment_total != undefined ? item.compartment_total : 0;
+              let current_compartment_max =
+                item.compartment_max != undefined ? item.compartment_max : 0;
+              let current_compartment_min =
+                item.compartment_min != undefined ? item.compartment_min : 0;
+              let level_data = item.level_data || [];
 
-              existingCompartments.push({
-                compartment_no: current_compartment_no,
-                message: `ช่องน้ำมัน '${current_compartment_no}' มีอยู่แล้ว`,
-              });
+              let scriptInsertItem = `INSERT INTO tbl_compartment_item 
+                              (veh_type_code, compartment_no, compartment_total, compartment_max, compartment_min, ist_dt) VALUES 
+                              ('${veh_type_code}', '${current_compartment_no}', ${current_compartment_total}, ${current_compartment_max}, ${current_compartment_min}, '${moment().format("YYYY-MM-DD HH:mm:ss")}') RETURNING id;`;
 
-              // ถ้ามี level_data ใหม่มา → เพิ่มเข้าไปได้เลย
-              if (Array.isArray(level_data) && level_data.length > 0) {
-                for (let j = 0; j < level_data.length; j++) {
-                  let lvl = level_data[j];
-                  let veh_compartment_level_type_code = `veh-com-lev-${moment().format("x")}-${j}`;
+              let tbl_insertItem = await pgConn.get(
+                dbPrefix + lic_code,
+                scriptInsertItem,
+                config.connectionString(),
+              );
 
-                  let scriptCheckLevelExist = `SELECT vect_compartment_level_id FROM tbl_vehicle_type_compartment_level 
-                                        WHERE compartment_item_id = '${existing_compartment_item_id}' 
-                                        AND veh_compartment_type_code = '${current_compartment_no}'
-                                        AND veh_compartment_type_level_number = '${lvl.level_number}'`;
+              if (
+                !tbl_insertItem.code &&
+                tbl_insertItem.data &&
+                tbl_insertItem.data.length > 0
+              ) {
+                let new_compartment_item_id = tbl_insertItem.data[0].id;
+                let insertedLevels = [];
 
-                  let tbl_checkLevelExist = await pgConn.get(
-                    dbPrefix + lic_code,
-                    scriptCheckLevelExist,
-                    config.connectionString(),
-                  );
+                if (Array.isArray(level_data) && level_data.length > 0) {
+                  for (let j = 0; j < level_data.length; j++) {
+                    let lvl = level_data[j];
+                    let veh_compartment_level_type_code = `veh-com-lev-${moment().format("x")}-${j}`;
+                    let scriptInsertLevel = `INSERT INTO tbl_vehicle_type_compartment_level 
+                                          (compartment_item_id, veh_compartment_level_type_code, veh_compartment_type_code, veh_compartment_type_level_number, veh_compartment_type_level, veh_compartment_type_level_flag, ist_dt) VALUES 
+                                          ('${new_compartment_item_id}', '${veh_compartment_level_type_code}', '${current_compartment_no}', '${lvl.level_number}', ${lvl.level_capacity}, '1', '${moment().format("YYYY-MM-DD HH:mm:ss")}');`;
 
-                  // ถ้ามีข้อมูล level นี้อยู่แล้ว → อัพเดตข้อมูล
-                  if (
-                    tbl_checkLevelExist &&
-                    tbl_checkLevelExist.data &&
-                    tbl_checkLevelExist.data.length > 0
-                  ) {
-                    let existing_level_id =
-                      tbl_checkLevelExist.data[0].vect_compartment_level_id;
-                    let scriptUpdateLevel = `UPDATE tbl_vehicle_type_compartment_level SET 
-                                            veh_compartment_type_level = ${lvl.level_capacity},
-                                            mdf_dt = '${moment().format("YYYY-MM-DD HH:mm:ss")}'
-                                            WHERE vect_compartment_level_id = '${existing_level_id}';`;
-                    let tbl_updateLevel = await pgConn.execute(
+                    let tbl_insertLevel = await pgConn.execute(
                       dbPrefix + lic_code,
-                      scriptUpdateLevel,
+                      scriptInsertLevel,
                       config.connectionString(),
                     );
-                    if (tbl_updateLevel.code) {
+
+                    if (tbl_insertLevel.code) {
                       isError = true;
                       break;
+                    } else {
+                      insertedLevels.push(lvl);
                     }
-                    continue;
-                  }
-
-                  let scriptInsertLevel = `INSERT INTO tbl_vehicle_type_compartment_level 
-                                        (compartment_item_id, veh_compartment_level_type_code, veh_compartment_type_code, veh_compartment_type_level_number, veh_compartment_type_level, veh_compartment_type_level_flag, ist_dt) VALUES 
-                                        ('${existing_compartment_item_id}', '${veh_compartment_level_type_code}', '${current_compartment_no}', '${lvl.level_number}', ${lvl.level_capacity}, '1', '${moment().format("YYYY-MM-DD HH:mm:ss")}');`;
-
-                  let tbl_insertLevel = await pgConn.execute(
-                    dbPrefix + lic_code,
-                    scriptInsertLevel,
-                    config.connectionString(),
-                  );
-
-                  if (tbl_insertLevel.code) {
-                    isError = true;
-                    break;
                   }
                 }
+
+                if (isError) break;
+
+                insertedCompartments.push({
+                  veh_type_code: veh_type_code,
+                  compartment_no: current_compartment_no,
+                  compartment_total: current_compartment_total,
+                  compartment_max: current_compartment_max,
+                  compartment_min: current_compartment_min,
+                  level_data: insertedLevels,
+                });
+              } else {
+                isError = true;
+                break;
               }
-
-              if (isError) break;
-              continue;
-            }
-
-            // ยังไม่มี → Insert ใหม่
-            let scriptInsertItem = `INSERT INTO tbl_compartment_item 
-                            (veh_type_code, compartment_no, compartment_total, compartment_max, compartment_min, ist_dt) VALUES 
-                            ('${veh_type_code}', '${current_compartment_no}', ${current_compartment_total}, ${current_compartment_max}, ${current_compartment_min}, '${moment().format("YYYY-MM-DD HH:mm:ss")}') RETURNING id;`;
-
-            let tbl_insertItem = await pgConn.get(
-              dbPrefix + lic_code,
-              scriptInsertItem,
-              config.connectionString(),
-            );
-
-            if (
-              !tbl_insertItem.code &&
-              tbl_insertItem.data &&
-              tbl_insertItem.data.length > 0
-            ) {
-              let new_compartment_item_id = tbl_insertItem.data[0].id;
-              let insertedLevels = [];
-
-              // เช็คและเพิ่มข้อมูล level_data ลง tbl_vehicle_type_compartment_level
-              if (Array.isArray(level_data) && level_data.length > 0) {
-                for (let j = 0; j < level_data.length; j++) {
-                  let lvl = level_data[j];
-                  let veh_compartment_level_type_code = `veh-com-lev-${moment().format("x")}-${j}`;
-                  let scriptInsertLevel = `INSERT INTO tbl_vehicle_type_compartment_level 
-                                        (compartment_item_id, veh_compartment_level_type_code, veh_compartment_type_code, veh_compartment_type_level_number, veh_compartment_type_level, veh_compartment_type_level_flag, ist_dt) VALUES 
-                                        ('${new_compartment_item_id}', '${veh_compartment_level_type_code}', '${current_compartment_no}', '${lvl.level_number}', ${lvl.level_capacity}, '1', '${moment().format("YYYY-MM-DD HH:mm:ss")}');`;
-
-                  let tbl_insertLevel = await pgConn.execute(
-                    dbPrefix + lic_code,
-                    scriptInsertLevel,
-                    config.connectionString(),
-                  );
-
-                  if (tbl_insertLevel.code) {
-                    isError = true;
-                    break;
-                  } else {
-                    insertedLevels.push(lvl);
-                  }
-                }
-              }
-
-              if (isError) break;
-
-              insertedCompartments.push({
-                veh_type_code: veh_type_code,
-                compartment_no: current_compartment_no,
-                compartment_total: current_compartment_total,
-                compartment_max: current_compartment_max,
-                compartment_min: current_compartment_min,
-                level_data: insertedLevels,
-              });
-            } else {
-              isError = true;
-              break;
             }
           }
         }
