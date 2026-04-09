@@ -157,9 +157,8 @@ exports.getVehicleTypeInformationWithDetail = async (req, res, next) => {
                 );
                 if (!currCompItem) {
                   acc[key].compartment_list.push({
-                    compartment_no: acc[key].compartment_list.length + 1,
                     compartment_id: curr.compartment_id,
-                    compartment_no_2: curr.compartment_no,
+                    compartment_no: curr.compartment_no,
                     compartment_total: curr.compartment_total,
                     compartment_max: curr.compartment_max,
                     compartment_min: curr.compartment_min,
