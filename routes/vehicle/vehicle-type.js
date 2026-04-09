@@ -168,7 +168,7 @@ exports.getVehicleTypeInformationWithDetail = async (req, res, next) => {
                   });
                   currCompItem =
                     acc[key].compartment_list[
-                      acc[key].compartment_list.length - 1
+                    acc[key].compartment_list.length - 1
                     ];
                 }
 
@@ -1904,7 +1904,7 @@ exports.removeVehicleType = async (req, res, next) => {
       return;
     } else {
       let script = ``;
-      script = `update tbl_vehicle_type set veh_type_flag = '0', rm_dt = '${moment().format("YYYY - MM - DD HH: mm:ss")}' where veh_type_code = '${veh_type_code}'; `;
+      script = `update tbl_vehicle_type set veh_type_flag = '0', rm_dt = '${moment().format("YYYY-MM-DD HH:mm:ss")}' where veh_type_code = '${veh_type_code}'; `;
 
       let tbl_temporary = await pgConn.execute(
         dbPrefix + lic_code,
