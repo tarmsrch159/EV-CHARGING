@@ -505,6 +505,43 @@ exports.setPetrolGroupInformation = async (req, res, next) => {
             res.status(200).send(response);
             return;
         } else {
+            // Validation: Ensure address structure is complete
+            if (address != undefined && Array.isArray(address)) {
+                for (const prov of address) {
+                    const districts = prov.districts || prov.district;
+                    if (!prov.prov_code || !districts || !Array.isArray(districts) || districts.length === 0) {
+                        let response = [
+                            {
+                                status: "error",
+                                invalid_code: "-1",
+                                message: "กรุณากรอกข้อมูล จังหวัด อำเภอ และ ตำบล ให้ครบถ้วน",
+                                data: [],
+                                response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+                            },
+                        ];
+                        res.status(200).send(response);
+                        return;
+                    }
+
+                    for (const dist of districts) {
+                        const subdistricts = dist.subdistricts || dist.subdistrict || dist.tamb_code;
+                        if (!dist.amph_code || !subdistricts || (Array.isArray(subdistricts) && subdistricts.length === 0)) {
+                            let response = [
+                                {
+                                    status: "error",
+                                    invalid_code: "-1",
+                                    message: "กรุณากรอกข้อมูล จังหวัด อำเภอ และ ตำบล ให้ครบถ้วน",
+                                    data: [],
+                                    response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+                                },
+                            ];
+                            res.status(200).send(response);
+                            return;
+                        }
+                    }
+                }
+            }
+
             let script = ``;
             script = `update tbl_petrol_group set
             ptrl_group_desc = '${ptrl_group_desc}', 
@@ -699,6 +736,43 @@ exports.addPetrolGroupInformation = async (req, res, next) => {
             res.status(200).send(response);
             return;
         } else {
+            // Validation: Ensure address structure is complete
+            if (address != undefined && Array.isArray(address)) {
+                for (const prov of address) {
+                    const districts = prov.districts || prov.district;
+                    if (!prov.prov_code || !districts || !Array.isArray(districts) || districts.length === 0) {
+                        let response = [
+                            {
+                                status: "error",
+                                invalid_code: "-1",
+                                message: "กรุณากรอกข้อมูล จังหวัด อำเภอ และ ตำบล ให้ครบถ้วน",
+                                data: [],
+                                response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+                            },
+                        ];
+                        res.status(200).send(response);
+                        return;
+                    }
+
+                    for (const dist of districts) {
+                        const subdistricts = dist.subdistricts || dist.subdistrict || dist.tamb_code;
+                        if (!dist.amph_code || !subdistricts || (Array.isArray(subdistricts) && subdistricts.length === 0)) {
+                            let response = [
+                                {
+                                    status: "error",
+                                    invalid_code: "-1",
+                                    message: "กรุณากรอกข้อมูล จังหวัด อำเภอ และ ตำบล ให้ครบถ้วน",
+                                    data: [],
+                                    response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+                                },
+                            ];
+                            res.status(200).send(response);
+                            return;
+                        }
+                    }
+                }
+            }
+
             let script = ``;
             script = `select ptrl_group_code from tbl_petrol_group 
                 where (ptrl_group_desc = '${ptrl_group_desc}' 
