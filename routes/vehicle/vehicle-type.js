@@ -74,7 +74,7 @@ exports.getVehicleTypeInformationWithDetail = async (req, res, next) => {
         script += ` and v.veh_type_code = '${veh_type_code}'`;
       }
 
-      script += ` order by v.ist_dt desc, GREATEST(c.ist_dt, COALESCE(c.mdf_dt, c.ist_dt)) desc, cl.ist_dt desc, GREATEST(cl.ist_dt, COALESCE(cl.mdf_dt, cl.ist_dt)) desc,c.compartment_no asc`;
+      script += ` order by v.ist_dt desc, c.compartment_no asc, cl.veh_compartment_type_level_number asc`;
       script += ` limit ${page_limit} offset ${page_index * page_limit}`;
       let tbl_temporary = await pgConn.get(
         dbPrefix + lic_code,
@@ -1734,7 +1734,9 @@ exports.setVehicleTypeInformation = async (req, res, next) => {
               let item = compartment_item[i];
               let current_compartment_no = item.compartment_no || "";
               let current_compartment_total =
-                item.compartment_total != undefined ? item.compartment_total : 0;
+                item.compartment_total != undefined
+                  ? item.compartment_total
+                  : 0;
               let current_compartment_max =
                 item.compartment_max != undefined ? item.compartment_max : 0;
               let current_compartment_min =
