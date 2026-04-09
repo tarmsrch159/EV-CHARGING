@@ -1,30 +1,36 @@
-const config = require('../../configuration/connection');
-const pgConn = require('../../library/pgConnection');
-const moment = require('moment');
-const xglobal = require('../../middleware/global');
+const config = require("../../configuration/connection");
+const pgConn = require("../../library/pgConnection");
+const moment = require("moment");
+const xglobal = require("../../middleware/global");
 
 const dbPrefix = config.dbPrefix();
 
 //example https://stackoverflow.com/questions/6182315/how-can-i-do-base64-encoding-in-node-js
 //Success
 exports.getPetrolGroupInformation = async (req, res, next) => {
-
     var xresult = [];
 
     return (async () => {
-
-        let lic_code = req.header('lic_code');
+        let lic_code = req.header("lic_code");
         let { ptrl_group_code, off_code, action } = req.body[0] || {};
 
         // เช็คเฉพาะส่วนที่สำคัญ
-        if (ptrl_group_code === undefined || lic_code === undefined || off_code === undefined || action === undefined) {
-            let response = [{
-                status: 'error',
-                invalid_code: '-1',
-                message: 'ไม่สามารถดึงข้อมูลได้, เนื่องจากข้อมูลพารามิเตอร์ไม่ถูกต้อง',
-                data: xresult,
-                response_time: moment().format('YYYY-MM-DD HH:mm:ss')
-            }]
+        if (
+            ptrl_group_code === undefined ||
+            lic_code === undefined ||
+            off_code === undefined ||
+            action === undefined
+        ) {
+            let response = [
+                {
+                    status: "error",
+                    invalid_code: "-1",
+                    message:
+                        "ไม่สามารถดึงข้อมูลได้, เนื่องจากข้อมูลพารามิเตอร์ไม่ถูกต้อง",
+                    data: xresult,
+                    response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+                },
+            ];
 
             res.status(200).send(response);
             return;
@@ -35,23 +41,27 @@ exports.getPetrolGroupInformation = async (req, res, next) => {
         // =========================================================================
         let conditions = ["tbl_petrol_group.ptrl_group_flag = '1'"];
 
-        if (ptrl_group_code.toString().toUpperCase() !== 'ALL') {
-            conditions.push(`tbl_petrol_group.ptrl_group_code = '${ptrl_group_code}'`);
+        if (ptrl_group_code.toString().toUpperCase() !== "ALL") {
+            conditions.push(
+                `tbl_petrol_group.ptrl_group_code = '${ptrl_group_code}'`,
+            );
         }
 
-        if (off_code.toString().toUpperCase() !== 'ALL') {
+        if (off_code.toString().toUpperCase() !== "ALL") {
             conditions.push(`tbl_petrol_group.off_code = '${off_code}'`);
         }
 
         // =========================================================================
         // กรองข้อมูลตามสิทธิ์การเข้าถึง (Role Authorization)
         // =========================================================================
-        let act_val = action[0]?.value?.toString().toUpperCase() || 'ALL';
-        let act_id = action[0]?.id || '';
+        let act_val = action[0]?.value?.toString().toUpperCase() || "ALL";
+        let act_id = action[0]?.id || "";
 
-        if (act_val === 'GROUP') {
+        if (act_val === "GROUP") {
             // ดึงเฉพาะกลุ่มปั๊มที่พนักงานคนนี้มีสิทธิ์ดูแลเท่านั้น
-            conditions.push(`tbl_petrol_group.ptrl_group_code IN (SELECT ptrl_group_code FROM tbl_employee_petrol_group WHERE emp_code = '${act_id}' AND emp_pgrp_flag = 1)`);
+            conditions.push(
+                `tbl_petrol_group.ptrl_group_code IN (SELECT ptrl_group_code FROM tbl_employee_petrol_group WHERE emp_code = '${act_id}' AND emp_pgrp_flag = 1)`,
+            );
         }
 
         let whereClause = "WHERE " + conditions.join(" AND ");
@@ -69,11 +79,17 @@ exports.getPetrolGroupInformation = async (req, res, next) => {
             ORDER BY tbl_petrol_group.ist_dt DESC;
         `;
 
-        let tbl_temporary = await pgConn.get(dbPrefix + lic_code, script, config.connectionString());
+        let tbl_temporary = await pgConn.get(
+            dbPrefix + lic_code,
+            script,
+            config.connectionString(),
+        );
 
         if (!tbl_temporary.code) {
             if (tbl_temporary.data.length > 0) {
-                tbl_temporary.data = JSON.parse(JSON.stringify(tbl_temporary.data).replace(/\:null/gi, "\:\"\""));
+                tbl_temporary.data = JSON.parse(
+                    JSON.stringify(tbl_temporary.data).replace(/\:null/gi, '\:""'),
+                );
 
                 // ดึงข้อมูลที่อยู่และประเภทรถของแต่ละกลุ่มปั้ม
                 for (let i = 0; i < tbl_temporary.data.length; i++) {
@@ -90,9 +106,15 @@ exports.getPetrolGroupInformation = async (req, res, next) => {
                         left join tbl_amphure on tbl_petrol_group_address.amph_code = tbl_amphure.amph_code
                         left join tbl_tambon on tbl_petrol_group_address.tamb_code = tbl_tambon.tamb_code
                         where tbl_petrol_group_address.ptrl_group_code = '${groupCode}' and tbl_petrol_group_address.flag = '1';`;
-                    let addrResult = await pgConn.get(dbPrefix + lic_code, addrScript, config.connectionString());
+                    let addrResult = await pgConn.get(
+                        dbPrefix + lic_code,
+                        addrScript,
+                        config.connectionString(),
+                    );
                     if (!addrResult.code && addrResult.data.length > 0) {
-                        tbl_temporary.data[i].address = JSON.parse(JSON.stringify(addrResult.data).replace(/\:null/gi, "\:\"\""));
+                        tbl_temporary.data[i].address = JSON.parse(
+                            JSON.stringify(addrResult.data).replace(/\:null/gi, '\:""'),
+                        );
                     } else {
                         tbl_temporary.data[i].address = [];
                     }
@@ -104,88 +126,119 @@ exports.getPetrolGroupInformation = async (req, res, next) => {
                         from tbl_petrol_group_veh
                         left join tbl_vehicle_type on tbl_petrol_group_veh.veh_type_code = tbl_vehicle_type.veh_type_code
                         where tbl_petrol_group_veh.ptrl_group_code = '${groupCode}' and tbl_petrol_group_veh.flag = '1';`;
-                    let vehResult = await pgConn.get(dbPrefix + lic_code, vehScript, config.connectionString());
+                    let vehResult = await pgConn.get(
+                        dbPrefix + lic_code,
+                        vehScript,
+                        config.connectionString(),
+                    );
                     if (!vehResult.code && vehResult.data.length > 0) {
-                        tbl_temporary.data[i].veh_type = JSON.parse(JSON.stringify(vehResult.data).replace(/\:null/gi, "\:\"\""));
+                        tbl_temporary.data[i].veh_type = JSON.parse(
+                            JSON.stringify(vehResult.data).replace(/\:null/gi, '\:""'),
+                        );
                     } else {
                         tbl_temporary.data[i].veh_type = [];
                     }
                 }
 
-                let response = [{
-                    status: 'success',
-                    invalid_code: '0',
-                    message: '',
-                    data: tbl_temporary.data,
-                    response_time: moment().format('YYYY-MM-DD HH:mm:ss')
-                }]
+                let response = [
+                    {
+                        status: "success",
+                        invalid_code: "0",
+                        message: "",
+                        data: tbl_temporary.data,
+                        response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+                    },
+                ];
 
                 res.status(200).send(response);
                 return;
             } else {
-                let response = [{
-                    status: 'success',
-                    invalid_code: '0',
-                    message: '',
-                    data: xresult,
-                    response_time: moment().format('YYYY-MM-DD HH:mm:ss')
-                }]
+                let response = [
+                    {
+                        status: "success",
+                        invalid_code: "0",
+                        message: "",
+                        data: xresult,
+                        response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+                    },
+                ];
 
                 res.status(200).send(response);
                 return;
             }
         } else {
-            let response = [{
-                status: 'error',
-                invalid_code: '-3',
-                message: `ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ`,
-                data: xresult,
-                response_time: moment().format('YYYY-MM-DD HH:mm:ss')
-            }]
+            let response = [
+                {
+                    status: "error",
+                    invalid_code: "-3",
+                    message: `ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ`,
+                    data: xresult,
+                    response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+                },
+            ];
             res.status(200).send(response);
-            await xglobal.action_logs(lic_code, action[0].id, 'ดึงข้อมูลกลุ่มปั้ม', JSON.stringify(req.body[0]), 'ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ', action[0].value);
+            await xglobal.action_logs(
+                lic_code,
+                action[0].id,
+                "ดึงข้อมูลกลุ่มปั้ม",
+                JSON.stringify(req.body[0]),
+                "ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ",
+                action[0].value,
+            );
             return;
         }
-
     })().catch(async (err) => {
         console.log(err);
-        let response = [{
-            status: 'error',
-            invalid_code: '-4',
-            message: `ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ`,
-            data: xresult,
-            response_time: moment().format('YYYY-MM-DD HH:mm:ss').toString()
-        }]
+        let response = [
+            {
+                status: "error",
+                invalid_code: "-4",
+                message: `ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ`,
+                data: xresult,
+                response_time: moment().format("YYYY-MM-DD HH:mm:ss").toString(),
+            },
+        ];
         res.status(200).send(response);
 
-        let act_id = req.body[0]?.action?.[0]?.id || '';
-        let act_val = req.body[0]?.action?.[0]?.value || '';
+        let act_id = req.body[0]?.action?.[0]?.id || "";
+        let act_val = req.body[0]?.action?.[0]?.value || "";
         if (act_id) {
-            await xglobal.action_logs(lic_code, act_id, 'ดึงข้อมูลกลุ่มปั้ม', JSON.stringify(req.body[0]), 'ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ', act_val);
+            await xglobal.action_logs(
+                lic_code,
+                act_id,
+                "ดึงข้อมูลกลุ่มปั้ม",
+                JSON.stringify(req.body[0]),
+                "ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ",
+                act_val,
+            );
         }
         return;
     });
-
-}
+};
 
 exports.getPetrolGroupInformationFilter = async (req, res, next) => {
-
     var xresult = [];
 
     return (async () => {
-
-        let lic_code = req.header('lic_code');
+        let lic_code = req.header("lic_code");
         let { ptrl_group_code, action } = req.body[0] || {};
 
         // เช็คเฉพาะส่วนที่สำคัญ
-        if (ptrl_group_code === undefined || lic_code === undefined || action === undefined) {
-            let response = [{
-                status: 'error',
-                invalid_code: '-1',
-                message: 'ไม่สามารถดึงข้อมูลได้, เนื่องจากข้อมูลพารามิเตอร์ไม่ถูกต้อง',
-                data: xresult,
-                response_time: moment().format('YYYY-MM-DD HH:mm:ss')
-            }]
+        if (
+            ptrl_group_code === undefined ||
+            lic_code === undefined ||
+            action === undefined
+        ) {
+            let response = [
+                {
+                    status: "error",
+                    invalid_code: "-1",
+                    message:
+                        "ไม่สามารถดึงข้อมูลได้, เนื่องจากข้อมูลพารามิเตอร์ไม่ถูกต้อง",
+                    data: xresult,
+                    response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+                },
+            ];
 
             res.status(200).send(response);
             return;
@@ -196,21 +249,23 @@ exports.getPetrolGroupInformationFilter = async (req, res, next) => {
         // =========================================================================
         let conditions = ["tbl_petrol_group.ptrl_group_flag = '1'"];
 
-        if (ptrl_group_code.toString().toUpperCase() !== 'ALL') {
-            conditions.push(`tbl_petrol_group.ptrl_group_code = '${ptrl_group_code}'`);
+        if (ptrl_group_code.toString().toUpperCase() !== "ALL") {
+            conditions.push(
+                `tbl_petrol_group.ptrl_group_code = '${ptrl_group_code}'`,
+            );
         }
-
-
 
         // =========================================================================
         // กรองข้อมูลตามสิทธิ์การเข้าถึง (Role Authorization)
         // =========================================================================
-        let act_val = action[0]?.value?.toString().toUpperCase() || 'ALL';
-        let act_id = action[0]?.id || '';
+        let act_val = action[0]?.value?.toString().toUpperCase() || "ALL";
+        let act_id = action[0]?.id || "";
 
-        if (act_val === 'GROUP') {
+        if (act_val === "GROUP") {
             // ดึงเฉพาะกลุ่มปั๊มที่พนักงานคนนี้มีสิทธิ์ดูแลเท่านั้น
-            conditions.push(`tbl_petrol_group.ptrl_group_code IN (SELECT ptrl_group_code FROM tbl_employee_petrol_group WHERE emp_code = '${act_id}' AND emp_pgrp_flag = 1)`);
+            conditions.push(
+                `tbl_petrol_group.ptrl_group_code IN (SELECT ptrl_group_code FROM tbl_employee_petrol_group WHERE emp_code = '${act_id}' AND emp_pgrp_flag = 1)`,
+            );
         }
 
         let whereClause = "WHERE " + conditions.join(" AND ");
@@ -225,290 +280,510 @@ exports.getPetrolGroupInformationFilter = async (req, res, next) => {
             ORDER BY tbl_petrol_group.ist_dt DESC;
         `;
 
-        let tbl_temporary = await pgConn.get(dbPrefix + lic_code, script, config.connectionString());
+        let tbl_temporary = await pgConn.get(
+            dbPrefix + lic_code,
+            script,
+            config.connectionString(),
+        );
 
         if (!tbl_temporary.code) {
             if (tbl_temporary.data.length > 0) {
-                tbl_temporary.data = JSON.parse(JSON.stringify(tbl_temporary.data).replace(/\:null/gi, "\:\"\""));
+                tbl_temporary.data = JSON.parse(
+                    JSON.stringify(tbl_temporary.data).replace(/\:null/gi, '\:""'),
+                );
 
-
-
-                let response = [{
-                    status: 'success',
-                    invalid_code: '0',
-                    message: '',
-                    data: tbl_temporary.data,
-                    response_time: moment().format('YYYY-MM-DD HH:mm:ss')
-                }]
+                let response = [
+                    {
+                        status: "success",
+                        invalid_code: "0",
+                        message: "",
+                        data: tbl_temporary.data,
+                        response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+                    },
+                ];
 
                 res.status(200).send(response);
                 return;
             } else {
-                let response = [{
-                    status: 'success',
-                    invalid_code: '0',
-                    message: '',
-                    data: xresult,
-                    response_time: moment().format('YYYY-MM-DD HH:mm:ss')
-                }]
+                let response = [
+                    {
+                        status: "success",
+                        invalid_code: "0",
+                        message: "",
+                        data: xresult,
+                        response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+                    },
+                ];
 
                 res.status(200).send(response);
                 return;
             }
         } else {
-            let response = [{
-                status: 'error',
-                invalid_code: '-3',
-                message: `ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ`,
-                data: xresult,
-                response_time: moment().format('YYYY-MM-DD HH:mm:ss')
-            }]
+            let response = [
+                {
+                    status: "error",
+                    invalid_code: "-3",
+                    message: `ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ`,
+                    data: xresult,
+                    response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+                },
+            ];
             res.status(200).send(response);
-            await xglobal.action_logs(lic_code, action[0].id, 'ดึงข้อมูลกลุ่มปั้ม', JSON.stringify(req.body[0]), 'ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ', action[0].value);
+            await xglobal.action_logs(
+                lic_code,
+                action[0].id,
+                "ดึงข้อมูลกลุ่มปั้ม",
+                JSON.stringify(req.body[0]),
+                "ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ",
+                action[0].value,
+            );
             return;
         }
-
     })().catch(async (err) => {
         console.log(err);
-        let response = [{
-            status: 'error',
-            invalid_code: '-4',
-            message: `ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ`,
-            data: xresult,
-            response_time: moment().format('YYYY-MM-DD HH:mm:ss').toString()
-        }]
+        let response = [
+            {
+                status: "error",
+                invalid_code: "-4",
+                message: `ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ`,
+                data: xresult,
+                response_time: moment().format("YYYY-MM-DD HH:mm:ss").toString(),
+            },
+        ];
         res.status(200).send(response);
 
-        let act_id = req.body[0]?.action?.[0]?.id || '';
-        let act_val = req.body[0]?.action?.[0]?.value || '';
+        let act_id = req.body[0]?.action?.[0]?.id || "";
+        let act_val = req.body[0]?.action?.[0]?.value || "";
         if (act_id) {
-            await xglobal.action_logs(lic_code, act_id, 'ดึงข้อมูลกลุ่มปั้ม', JSON.stringify(req.body[0]), 'ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ', act_val);
+            await xglobal.action_logs(
+                lic_code,
+                act_id,
+                "ดึงข้อมูลกลุ่มปั้ม",
+                JSON.stringify(req.body[0]),
+                "ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ",
+                act_val,
+            );
         }
         return;
     });
-
-}
+};
 
 //Success
 exports.removePetrolGroup = async (req, res, next) => {
-
     return (async () => {
-        let lic_code = req.header('lic_code');
+        let lic_code = req.header("lic_code");
         let { ptrl_group_code, action } = req.body[0];
         //เช็คเฉพาะส่วนที่สำคัญ
-        if (ptrl_group_code == undefined || lic_code == undefined || action == undefined) {
-            let response = [{
-                status: 'error',
-                invalid_code: '-1',
-                message: 'ไม่สามารถลบข้อมูล, เนื่องจากข้อมูลพารามิเตอร์ไม่ถูกต้อง',
-                data: [],
-                response_time: moment().format('YYYY-MM-DD HH:mm:ss')
-            }]
+        if (
+            ptrl_group_code == undefined ||
+            lic_code == undefined ||
+            action == undefined
+        ) {
+            let response = [
+                {
+                    status: "error",
+                    invalid_code: "-1",
+                    message: "ไม่สามารถลบข้อมูล, เนื่องจากข้อมูลพารามิเตอร์ไม่ถูกต้อง",
+                    data: [],
+                    response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+                },
+            ];
 
             res.status(200).send(response);
             return;
         } else {
-
             let script = ``;
-            script = `update tbl_petrol_group set ptrl_group_flag = '0', rm_dt = '${moment().format('YYYY-MM-DD HH:mm:ss')}' where ptrl_group_code = '${ptrl_group_code}';`
+            script = `update tbl_petrol_group set ptrl_group_flag = '0', rm_dt = '${moment().format("YYYY-MM-DD HH:mm:ss")}' where ptrl_group_code = '${ptrl_group_code}';`;
 
-            let tbl_temporary = await pgConn.execute(dbPrefix + lic_code, script, config.connectionString());
+            let tbl_temporary = await pgConn.execute(
+                dbPrefix + lic_code,
+                script,
+                config.connectionString(),
+            );
             if (!tbl_temporary.code) {
                 //debugger
-                let response = [{
-                    status: 'success',
-                    invalid_code: '0',
-                    message: '',
-                    data: [],
-                    response_time: moment().format('YYYY-MM-DD HH:mm:ss')
-                }]
+                let response = [
+                    {
+                        status: "success",
+                        invalid_code: "0",
+                        message: "",
+                        data: [],
+                        response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+                    },
+                ];
 
                 res.status(200).send(response);
-                await xglobal.action_logs(lic_code, action[0].id, 'ลบข้อมูลกลุ่มปั้ม', JSON.stringify(req.body[0]), 'success', action[0].value);
+                await xglobal.action_logs(
+                    lic_code,
+                    action[0].id,
+                    "ลบข้อมูลกลุ่มปั้ม",
+                    JSON.stringify(req.body[0]),
+                    "success",
+                    action[0].value,
+                );
                 return;
             } else {
-                let response = [{
-                    status: 'error',
-                    invalid_code: '-3',
-                    message: `ไม่สามารถลบข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ`,
-                    data: [],
-                    response_time: moment().format('YYYY-MM-DD HH:mm:ss')
-                }]
+                let response = [
+                    {
+                        status: "error",
+                        invalid_code: "-3",
+                        message: `ไม่สามารถลบข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ`,
+                        data: [],
+                        response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+                    },
+                ];
                 res.status(200).send(response);
-                await xglobal.action_logs(lic_code, action[0].id, 'ลบข้อมูลกลุ่มปั้ม', JSON.stringify(req.body[0]), 'ไม่สามารถลบข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ', action[0].value);
+                await xglobal.action_logs(
+                    lic_code,
+                    action[0].id,
+                    "ลบข้อมูลกลุ่มปั้ม",
+                    JSON.stringify(req.body[0]),
+                    "ไม่สามารถลบข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ",
+                    action[0].value,
+                );
                 return;
             }
         }
-
     })().catch(async (err) => {
         console.log(err);
-        let response = [{
-            status: 'error',
-            invalid_code: '-4',
-            message: `ไม่สามารถลบข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ`,
-            data: [],
-            response_time: moment().format('YYYY-MM-DD HH:mm:ss').toString()
-        }]
+        let response = [
+            {
+                status: "error",
+                invalid_code: "-4",
+                message: `ไม่สามารถลบข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ`,
+                data: [],
+                response_time: moment().format("YYYY-MM-DD HH:mm:ss").toString(),
+            },
+        ];
         res.status(200).send(response);
-        await xglobal.action_logs(lic_code, action[0].id, 'ลบข้อมูลกลุ่มปั้ม', JSON.stringify(req.body[0]), 'ไม่สามารถลบข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ', action[0].value);
+        await xglobal.action_logs(
+            lic_code,
+            action[0].id,
+            "ลบข้อมูลกลุ่มปั้ม",
+            JSON.stringify(req.body[0]),
+            "ไม่สามารถลบข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ",
+            action[0].value,
+        );
         return;
     });
-
-}
+};
 
 //Success
 exports.setPetrolGroupInformation = async (req, res, next) => {
-
     return (async () => {
         //debugger
-        let lic_code = req.header('lic_code');
+        let lic_code = req.header("lic_code");
         let { ptrl_group_code } = req.query;
-        let {
-            ptrl_group_desc,
-            ptrl_group_short_desc,
-            off_code,
-            action
-        } = req.body[0];
-
-        //เช็คเฉพาะส่วนที่สำคัญ
-        if (ptrl_group_code == undefined || ptrl_group_desc == undefined || ptrl_group_short_desc == undefined || off_code == undefined || action == undefined) {
-            let response = [{
-                status: 'error',
-                invalid_code: '-1',
-                message: 'ไม่สามารถบันทึกข้อมูล, เนื่องจากข้อมูลพารามิเตอร์ไม่ถูกต้อง',
-                data: [],
-                response_time: moment().format('YYYY-MM-DD HH:mm:ss')
-            }]
-
-            res.status(200).send(response);
-            return;
-        } else {
-
-            let script = ``;
-            script = `update tbl_petrol_group set
-            ptrl_group_desc = '${ptrl_group_desc}', 
-            ptrl_group_short_desc = '${ptrl_group_short_desc}',
-            off_code = '${off_code}', 
-            mdf_dt = '${moment().format('YYYY-MM-DD HH:mm:ss')}' 
-            where ptrl_group_code = '${ptrl_group_code}';`
-
-            let tbl_temporary = await pgConn.execute(dbPrefix + lic_code, script, config.connectionString());
-            if (!tbl_temporary.code) {
-                //debugger
-                let response = [{
-                    status: 'success',
-                    invalid_code: '0',
-                    message: '',
-                    data: [],
-                    response_time: moment().format('YYYY-MM-DD HH:mm:ss')
-                }]
-
-                res.status(200).send(response);
-                await xglobal.action_logs(lic_code, action[0].id, 'แก้ไขข้อมูลกลุ่มปั้ม', JSON.stringify(req.body[0]), 'success', action[0].value);
-                return;
-            } else {
-                let response = [{
-                    status: 'error',
-                    invalid_code: '-3',
-                    message: `ไม่สามารถบันทึกข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ`,
-                    data: [],
-                    response_time: moment().format('YYYY-MM-DD HH:mm:ss')
-                }]
-                res.status(200).send(response);
-                await xglobal.action_logs(lic_code, action[0].id, 'แก้ไขข้อมูลกลุ่มปั้ม', JSON.stringify(req.body[0]), 'ไม่สามารถบันทึกข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ', action[0].value);
-                return;
-            }
-        }
-
-    })().catch(async (err) => {
-        console.log(err);
-        let response = [{
-            status: 'error',
-            invalid_code: '-4',
-            message: `ไม่สามารถบันทึกข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ`,
-            data: [],
-            response_time: moment().format('YYYY-MM-DD HH:mm:ss').toString()
-        }]
-        res.status(200).send(response);
-        await xglobal.action_logs(lic_code, action[0].id, 'แก้ไขข้อมูลกลุ่มปั้ม', JSON.stringify(req.body[0]), 'ไม่สามารถบันทึกข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ', action[0].value);
-        return;
-    });
-}
-
-//Success
-exports.addPetrolGroupInformation = async (req, res, next) => {
-
-    return (async () => {
-        debugger
-        let lic_code = req.header('lic_code');
         let {
             ptrl_group_desc,
             ptrl_group_short_desc,
             off_code,
             address,
             veh_type,
-            action
+            action,
         } = req.body[0];
 
         //เช็คเฉพาะส่วนที่สำคัญ
-        if (ptrl_group_desc == undefined || ptrl_group_short_desc == undefined
-            || off_code == undefined || action == undefined || lic_code == undefined) {
-            let response = [{
-                status: 'error',
-                invalid_code: '-1',
-                message: 'ไม่สามารถบันทึกข้อมูล, เนื่องจากข้อมูลพารามิเตอร์ไม่ถูกต้อง',
-                data: [],
-                response_time: moment().format('YYYY-MM-DD HH:mm:ss')
-            }]
+        if (
+            ptrl_group_code == undefined ||
+            ptrl_group_desc == undefined ||
+            ptrl_group_short_desc == undefined ||
+            off_code == undefined ||
+            action == undefined
+        ) {
+            let response = [
+                {
+                    status: "error",
+                    invalid_code: "-1",
+                    message:
+                        "ไม่สามารถบันทึกข้อมูล, เนื่องจากข้อมูลพารามิเตอร์ไม่ถูกต้อง",
+                    data: [],
+                    response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+                },
+            ];
 
             res.status(200).send(response);
             return;
         } else {
+            let script = ``;
+            script = `update tbl_petrol_group set
+            ptrl_group_desc = '${ptrl_group_desc}', 
+            ptrl_group_short_desc = '${ptrl_group_short_desc}',
+            off_code = '${off_code}', 
+            mdf_dt = '${moment().format("YYYY-MM-DD HH:mm:ss")}' 
+            where ptrl_group_code = '${ptrl_group_code}';`;
 
+            let tbl_temporary = await pgConn.execute(
+                dbPrefix + lic_code,
+                script,
+                config.connectionString(),
+            );
+            if (!tbl_temporary.code) {
+                // --- อัพเดทที่อยู่ ปั้ม ---
+                if (address != undefined && Array.isArray(address)) {
+                    // ลบแล้ว insert ไปใหม่
+                    let scriptDeaddr = `delete from tbl_petrol_group_address where ptrl_group_code = '${ptrl_group_code}';`;
+                    await pgConn.execute(
+                        dbPrefix + lic_code,
+                        scriptDeaddr,
+                        config.connectionString(),
+                    );
+
+                    for (const prov of address) {
+                        const prov_code = prov.prov_code;
+                        const districts = prov.districts || prov.district;
+
+                        if (districts != undefined) {
+                            const distArr = Array.isArray(districts)
+                                ? districts
+                                : [districts];
+                            for (const dist of distArr) {
+                                const amph_code = dist.amph_code;
+                                const subdistricts =
+                                    dist.subdistricts || dist.subdistrict || dist.tamb_code;
+
+                                if (subdistricts != undefined) {
+                                    const tambArr = Array.isArray(subdistricts)
+                                        ? subdistricts
+                                        : [subdistricts];
+                                    for (const tamb_code of tambArr) {
+                                        if (prov_code && amph_code && tamb_code) {
+                                            const ptrl_group_addr_code =
+                                                "pgac-" +
+                                                moment().format("x") +
+                                                "-" +
+                                                Math.floor(Math.random() * 1000);
+                                            const addrScript = `insert into tbl_petrol_group_address 
+                                          (ptrl_group_addr_code, ptrl_group_code, prov_code, amph_code, tamb_code, ist_dt, off_code, flag) values 
+                                          ('${ptrl_group_addr_code}', '${ptrl_group_code}', '${prov_code}', '${amph_code}', '${tamb_code}', '${moment().format("YYYY-MM-DD HH:mm:ss")}', '${off_code}', '1');`;
+                                            await pgConn.execute(
+                                                dbPrefix + lic_code,
+                                                addrScript,
+                                                config.connectionString(),
+                                            );
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // --- อัพเดทประเภทรถ ---
+                if (veh_type != undefined && Array.isArray(veh_type)) {
+                    // ลบแล้ว insert ไปใหม่
+                    let scriptDeveh = `delete from tbl_petrol_group_veh where ptrl_group_code = '${ptrl_group_code}';`;
+                    await pgConn.execute(
+                        dbPrefix + lic_code,
+                        scriptDeveh,
+                        config.connectionString(),
+                    );
+
+                    for (const vCode of veh_type) {
+                        const ptrl_group_veh_code =
+                            "pgvc-" +
+                            moment().format("x") +
+                            "-" +
+                            Math.floor(Math.random() * 1000);
+                        const vehScript = `insert into tbl_petrol_group_veh 
+                        (ptrl_group_veh_code, ptrl_group_code, veh_type_code, flag, ist_dt, off_code) values 
+                        ('${ptrl_group_veh_code}', '${ptrl_group_code}', '${vCode}', '1', '${moment().format("YYYY-MM-DD HH:mm:ss")}', '${off_code}');`;
+                        await pgConn.execute(
+                            dbPrefix + lic_code,
+                            vehScript,
+                            config.connectionString(),
+                        );
+                    }
+                }
+
+                //debugger
+                let response = [
+                    {
+                        status: "success",
+                        invalid_code: "0",
+                        message: "",
+                        data: [],
+                        response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+                    },
+                ];
+
+                res.status(200).send(response);
+                await xglobal.action_logs(
+                    lic_code,
+                    action[0].id,
+                    "แก้ไขข้อมูลกลุ่มปั้ม",
+                    JSON.stringify(req.body[0]),
+                    "success",
+                    action[0].value,
+                );
+                return;
+            } else {
+                let response = [
+                    {
+                        status: "error",
+                        invalid_code: "-3",
+                        message: `ไม่สามารถบันทึกข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ`,
+                        data: [],
+                        response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+                    },
+                ];
+                res.status(200).send(response);
+                await xglobal.action_logs(
+                    lic_code,
+                    action[0].id,
+                    "แก้ไขข้อมูลกลุ่มปั้ม",
+                    JSON.stringify(req.body[0]),
+                    "ไม่สามารถบันทึกข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ",
+                    action[0].value,
+                );
+                return;
+            }
+        }
+    })().catch(async (err) => {
+        console.log(err);
+        let response = [
+            {
+                status: "error",
+                invalid_code: "-4",
+                message: `ไม่สามารถบันทึกข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ`,
+                data: [],
+                response_time: moment().format("YYYY-MM-DD HH:mm:ss").toString(),
+            },
+        ];
+        res.status(200).send(response);
+        await xglobal.action_logs(
+            lic_code,
+            action[0].id,
+            "แก้ไขข้อมูลกลุ่มปั้ม",
+            JSON.stringify(req.body[0]),
+            "ไม่สามารถบันทึกข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ",
+            action[0].value,
+        );
+        return;
+    });
+};
+
+//Success
+exports.addPetrolGroupInformation = async (req, res, next) => {
+    return (async () => {
+        debugger;
+        let lic_code = req.header("lic_code");
+        let {
+            ptrl_group_desc,
+            ptrl_group_short_desc,
+            off_code,
+            address,
+            veh_type,
+            action,
+        } = req.body[0];
+
+        //เช็คเฉพาะส่วนที่สำคัญ
+        if (
+            ptrl_group_desc == undefined ||
+            ptrl_group_short_desc == undefined ||
+            off_code == undefined ||
+            action == undefined ||
+            lic_code == undefined
+        ) {
+            let response = [
+                {
+                    status: "error",
+                    invalid_code: "-1",
+                    message:
+                        "ไม่สามารถบันทึกข้อมูล, เนื่องจากข้อมูลพารามิเตอร์ไม่ถูกต้อง",
+                    data: [],
+                    response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+                },
+            ];
+
+            res.status(200).send(response);
+            return;
+        } else {
             let script = ``;
             script = `select ptrl_group_code from tbl_petrol_group 
                 where (ptrl_group_desc = '${ptrl_group_desc}' 
                     or ptrl_group_short_desc = '${ptrl_group_short_desc}') 
                     and ptrl_group_flag = '1';
             `;
-            let tbl_temporary0 = await pgConn.get(dbPrefix + lic_code, script, config.connectionString());
+            let tbl_temporary0 = await pgConn.get(
+                dbPrefix + lic_code,
+                script,
+                config.connectionString(),
+            );
             if (!tbl_temporary0.code) {
                 if (tbl_temporary0.data.length > 0) {
-                    let response = [{
-                        status: 'error',
-                        invalid_code: '-4',
-                        message: `ไม่สามารถบันทึกข้อมูล, เนื่องจากข้อมูลซ้ำ`,
-                        data: [],
-                        response_time: moment().format('YYYY-MM-DD HH:mm:ss')
-                    }]
+                    let response = [
+                        {
+                            status: "error",
+                            invalid_code: "-4",
+                            message: `ไม่สามารถบันทึกข้อมูล, เนื่องจากข้อมูลซ้ำ`,
+                            data: [],
+                            response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+                        },
+                    ];
 
                     res.status(200).send(response);
-                    await xglobal.action_logs(lic_code, action[0].id, 'เพิ่มข้อมูลกลุ่มปั้ม', JSON.stringify(req.body[0]), 'ไม่สามารถบันทึกข้อมูล, เนื่องจากข้อมูลซ้ำ', action[0].value);
+                    await xglobal.action_logs(
+                        lic_code,
+                        action[0].id,
+                        "เพิ่มข้อมูลกลุ่มปั้ม",
+                        JSON.stringify(req.body[0]),
+                        "ไม่สามารถบันทึกข้อมูล, เนื่องจากข้อมูลซ้ำ",
+                        action[0].value,
+                    );
                     return;
                 }
             }
 
-            let ptrl_group_code = 'pgrd-' + moment().format('x');
+            let ptrl_group_code = "pgrd-" + moment().format("x");
             script = `insert into tbl_petrol_group 
             (ptrl_group_code, ptrl_group_desc, ptrl_group_short_desc, ptrl_group_flag, ist_dt, off_code) values 
-            ('${ptrl_group_code}', '${ptrl_group_desc}', '${ptrl_group_short_desc}', '1', '${moment().format('YYYY-MM-DD HH:mm:ss')}', '${off_code}');`
+            ('${ptrl_group_code}', '${ptrl_group_desc}', '${ptrl_group_short_desc}', '1', '${moment().format("YYYY-MM-DD HH:mm:ss")}', '${off_code}');`;
 
-            let tbl_temporary = await pgConn.execute(dbPrefix + lic_code, script, config.connectionString());
+            let tbl_temporary = await pgConn.execute(
+                dbPrefix + lic_code,
+                script,
+                config.connectionString(),
+            );
             if (!tbl_temporary.code) {
-
                 // --- เพิ่มที่อยู่ ปั้ม ---
-                let inserted_addresses = [];
                 if (address != undefined && Array.isArray(address)) {
-                    for (let a = 0; a < address.length; a++) {
-                        let { prov_code, amph_code, tamb_code } = address[a];
-                        let tambArr = Array.isArray(tamb_code) ? tamb_code : [tamb_code];
-                        for (let t = 0; t < tambArr.length; t++) {
-                            let ptrl_group_addr_code = 'pgac-' + moment().format('x');
-                            let addrScript = `insert into tbl_petrol_group_address 
-                            (ptrl_group_addr_code, ptrl_group_code, prov_code, amph_code, tamb_code, ist_dt, off_code, flag) values 
-                            ('${ptrl_group_addr_code}', '${ptrl_group_code}', '${prov_code}', '${amph_code}', '${tambArr[t]}', '${moment().format('YYYY-MM-DD HH:mm:ss')}', '${off_code}', '1');`
-                            await pgConn.execute(dbPrefix + lic_code, addrScript, config.connectionString());
-                            inserted_addresses.push({ ptrl_group_addr_code, prov_code, amph_code, tamb_code: tambArr[t] });
+                    for (const prov of address) {
+                        const prov_code = prov.prov_code;
+                        const districts = prov.districts || prov.district;
+
+                        if (districts != undefined) {
+                            const distArr = Array.isArray(districts)
+                                ? districts
+                                : [districts];
+                            for (const dist of distArr) {
+                                const amph_code = dist.amph_code;
+                                const subdistricts =
+                                    dist.subdistricts || dist.subdistrict || dist.tamb_code;
+
+                                if (subdistricts != undefined) {
+                                    const tambArr = Array.isArray(subdistricts)
+                                        ? subdistricts
+                                        : [subdistricts];
+                                    for (const tamb_code of tambArr) {
+                                        if (prov_code && amph_code && tamb_code) {
+                                            const ptrl_group_addr_code =
+                                                "pgac-" +
+                                                moment().format("x") +
+                                                "-" +
+                                                Math.floor(Math.random() * 1000);
+                                            const addrScript = `insert into tbl_petrol_group_address 
+                                          (ptrl_group_addr_code, ptrl_group_code, prov_code, amph_code, tamb_code, ist_dt, off_code, flag) values 
+                                          ('${ptrl_group_addr_code}', '${ptrl_group_code}', '${prov_code}', '${amph_code}', '${tamb_code}', '${moment().format("YYYY-MM-DD HH:mm:ss")}', '${off_code}', '1');`;
+                                            await pgConn.execute(
+                                                dbPrefix + lic_code,
+                                                addrScript,
+                                                config.connectionString(),
+                                            );
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -516,58 +791,95 @@ exports.addPetrolGroupInformation = async (req, res, next) => {
                 // --- เพิ่มประเภทรถ ---
                 let inserted_vehicles = [];
                 if (veh_type != undefined && Array.isArray(veh_type)) {
-                    for (let v = 0; v < veh_type.length; v++) {
-                        let ptrl_group_veh_code = 'pgvc-' + moment().format('x');
-                        let vehScript = `insert into tbl_petrol_group_veh 
+                    for (const vCode of veh_type) {
+                        const ptrl_group_veh_code =
+                            "pgvc-" +
+                            moment().format("x") +
+                            "-" +
+                            Math.floor(Math.random() * 1000);
+                        const vehScript = `insert into tbl_petrol_group_veh 
                         (ptrl_group_veh_code, ptrl_group_code, veh_type_code, flag, ist_dt, off_code) values 
-                        ('${ptrl_group_veh_code}', '${ptrl_group_code}', '${veh_type[v]}', '1', '${moment().format('YYYY-MM-DD HH:mm:ss')}', '${off_code}');`
-                        await pgConn.execute(dbPrefix + lic_code, vehScript, config.connectionString());
-                        inserted_vehicles.push({ ptrl_group_veh_code, veh_type_code: veh_type[v] });
+                        ('${ptrl_group_veh_code}', '${ptrl_group_code}', '${vCode}', '1', '${moment().format("YYYY-MM-DD HH:mm:ss")}', '${off_code}');`;
+                        await pgConn.execute(
+                            dbPrefix + lic_code,
+                            vehScript,
+                            config.connectionString(),
+                        );
+                        inserted_vehicles.push({
+                            ptrl_group_veh_code,
+                            veh_type_code: vCode,
+                        });
                     }
                 }
 
                 //debugger
-                let response = [{
-                    status: 'success',
-                    invalid_code: '0',
-                    message: '',
-                    data: [{
-                        ptrl_group_code: ptrl_group_code,
-                        inserted_addresses: inserted_addresses,
-                        inserted_vehicles: inserted_vehicles
-                    }],
-                    response_time: moment().format('YYYY-MM-DD HH:mm:ss')
-                }]
+                let response = [
+                    {
+                        status: "success",
+                        invalid_code: "0",
+                        message: "",
+                        data: [
+                            {
+                                ptrl_group_code: ptrl_group_code,
+                                inserted_vehicles: inserted_vehicles,
+                            },
+                        ],
+                        response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+                    },
+                ];
 
                 res.status(200).send(response);
-                await xglobal.action_logs(lic_code, action[0].id, 'เพิ่มข้อมูลกลุ่มปั้ม', JSON.stringify(req.body[0]), 'success', action[0].value);
+                await xglobal.action_logs(
+                    lic_code,
+                    action[0].id,
+                    "เพิ่มข้อมูลกลุ่มปั้ม",
+                    JSON.stringify(req.body[0]),
+                    "success",
+                    action[0].value,
+                );
                 return;
             } else {
-                let response = [{
-                    status: 'error',
-                    invalid_code: '-3',
-                    message: `ไม่สามารถบันทึกข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ`,
-                    data: [],
-                    response_time: moment().format('YYYY-MM-DD HH:mm:ss')
-                }]
+                let response = [
+                    {
+                        status: "error",
+                        invalid_code: "-3",
+                        message: `ไม่สามารถบันทึกข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ`,
+                        data: [],
+                        response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+                    },
+                ];
                 res.status(200).send(response);
-                await xglobal.action_logs(lic_code, action[0].id, 'เพิ่มข้อมูลกลุ่มปั้ม', JSON.stringify(req.body[0]), 'ไม่สามารถบันทึกข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ', action[0].value);
+                await xglobal.action_logs(
+                    lic_code,
+                    action[0].id,
+                    "เพิ่มข้อมูลกลุ่มปั้ม",
+                    JSON.stringify(req.body[0]),
+                    "ไม่สามารถบันทึกข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ",
+                    action[0].value,
+                );
                 return;
             }
         }
-
     })().catch(async (err) => {
         console.log(err);
-        let response = [{
-            status: 'error',
-            invalid_code: '-4',
-            message: `ไม่สามารถบันทึกข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ`,
-            data: [],
-            response_time: moment().format('YYYY-MM-DD HH:mm:ss').toString()
-        }]
+        let response = [
+            {
+                status: "error",
+                invalid_code: "-4",
+                message: `ไม่สามารถบันทึกข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ`,
+                data: [],
+                response_time: moment().format("YYYY-MM-DD HH:mm:ss").toString(),
+            },
+        ];
         res.status(200).send(response);
-        await xglobal.action_logs(lic_code, action[0].id, 'เพิ่มข้อมูลกลุ่มปั้ม', JSON.stringify(req.body[0]), 'ไม่สามารถบันทึกข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ', action[0].value);
+        await xglobal.action_logs(
+            lic_code,
+            action[0].id,
+            "เพิ่มข้อมูลกลุ่มปั้ม",
+            JSON.stringify(req.body[0]),
+            "ไม่สามารถบันทึกข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ",
+            action[0].value,
+        );
         return;
     });
-
-}
+};
