@@ -631,6 +631,7 @@ exports.setPetrolInformation = async (req, res, next) => {
       prov_code,
       amph_code,
       tamb_code,
+      coverage_days,
     } = payload;
 
     //เช็คเฉพาะส่วนที่สำคัญ
@@ -702,7 +703,8 @@ exports.setPetrolInformation = async (req, res, next) => {
                 auto_order = '${auto_order}',
                 prov_code = '${prov_code}',
                 amph_code = '${amph_code}',
-                tamb_code = '${tamb_code}'
+                tamb_code = '${tamb_code}',
+                coverage_days = ${coverage_days}
             where ptrl_code = '${ptrl_code}';`;
 
       script = script.replace(/'NULL'/gi, "NULL");
