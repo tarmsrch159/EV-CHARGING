@@ -506,7 +506,7 @@ exports.setPetrolGroupInformation = async (req, res, next) => {
             return;
         } else {
             // Validation: Ensure address structure is complete
-            if (address != undefined && Array.isArray(address)) {
+            if (address != undefined && Array.isArray(address) && address.length > 0) {
                 for (const prov of address) {
                     const districts = prov.districts || prov.district;
                     if (!prov.prov_code || !districts || !Array.isArray(districts) || districts.length === 0) {
@@ -540,6 +540,18 @@ exports.setPetrolGroupInformation = async (req, res, next) => {
                         }
                     }
                 }
+            } else {
+                let response = [
+                    {
+                        status: "error",
+                        invalid_code: "-1",
+                        message: "กรุณากรอกข้อมูล จังหวัด อำเภอ และ ตำบล ให้ครบถ้วน",
+                        data: [],
+                        response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+                    },
+                ];
+                res.status(200).send(response);
+                return;
             }
 
             let script = ``;
@@ -737,7 +749,7 @@ exports.addPetrolGroupInformation = async (req, res, next) => {
             return;
         } else {
             // Validation: Ensure address structure is complete
-            if (address != undefined && Array.isArray(address)) {
+            if (address != undefined && Array.isArray(address) && address.length > 0) {
                 for (const prov of address) {
                     const districts = prov.districts || prov.district;
                     if (!prov.prov_code || !districts || !Array.isArray(districts) || districts.length === 0) {
@@ -771,6 +783,18 @@ exports.addPetrolGroupInformation = async (req, res, next) => {
                         }
                     }
                 }
+            } else {
+                let response = [
+                    {
+                        status: "error",
+                        invalid_code: "-1",
+                        message: "กรุณากรอกข้อมูล จังหวัด อำเภอ และ ตำบล ให้ครบถ้วน",
+                        data: [],
+                        response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+                    },
+                ];
+                res.status(200).send(response);
+                return;
             }
 
             let script = ``;
