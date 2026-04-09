@@ -8,6 +8,7 @@ const vehicle_unavailable = require('./vehicle-unavailable')
 const vehicle_compartment = require('./vehicle-compartment')
 const vehicle_compartment_level = require('./vehicle-compartment-level')
 const vehicle_type = require('./vehicle-type')
+const vehicle_calendar_type = require('./vehicle-calendar-type')
 
 //vehicle
 router.post('/information', vehicle.getVehicleInformation);
@@ -66,5 +67,11 @@ router.post('/compartment/level/information', vehicle_compartment_level.getVehic
 router.delete('/compartment/level/information', vehicle_compartment_level.removeVehicleCompartmentLevel);
 router.patch('/compartment/level/information', vehicle_compartment_level.setVehicleCompartmentLevelInformation);
 router.put('/compartment/level/information', vehicle_compartment_level.addVehicleCompartmentLevelInformation);
+
+//calendar type
+router.post('/calendar/type/information', vehicle_calendar_type.getVehicleTypeCalendarInformation);
+router.delete('/calendar/type/information', vehicle_calendar_type.removeVehicleTypeCalendarInformation);
+router.patch('/calendar/type/information', vehicle_calendar_type.setVehicleTypeCalendarInformation);
+router.put('/calendar/type/information', vehicle_calendar_type.addVehicleTypeCalendarInformation);
 
 module.exports = router;
