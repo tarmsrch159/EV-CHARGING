@@ -15,6 +15,12 @@ const TYPE_MAP = {
     'sftp': ['sftp'],
     'all': ['ftp', 'sftp']
 };
+// ===== Test Local =====
+// const TYPE_MAP = {
+//     'ftp': ['ftp'],
+//     'sftp': ['sftp', 'sftp-local'],
+//     'all': ['ftp', 'sftp', 'sftp-local']
+// };
 
 const selectedTypes = TYPE_MAP[arg.toLowerCase()];
 if (!selectedTypes) {
@@ -39,6 +45,7 @@ async function processAllFiles() {
             SELECT * FROM tbl_connection_configs
             WHERE config_flag = '1' AND config_type IN (${placeholders})
         `, selectedTypes);
+
         allConfigs = result.rows;
 
     } catch (err) {
@@ -53,7 +60,7 @@ async function processAllFiles() {
 
     // สรุปจำนวน config แต่ละประเภท
     const ftpCount = allConfigs.filter(c => c.config_type === 'ftp').length;
-    const sftpCount = allConfigs.filter(c => c.config_type === 'sftp').length;
+    const sftpCount = allConfigs.filter(c => c.config_type === 'sftp' || c.config_type === 'sftp-local').length;
     console.log(`>> พบทั้งหมด: ${allConfigs.length} แหล่ง (FTP: ${ftpCount}, SFTP: ${sftpCount})`);
 
     // วน config ทีละตัว → switch ไปเรียก worker ตามที่กำหนด

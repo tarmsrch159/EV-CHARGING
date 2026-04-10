@@ -33,92 +33,60 @@ async function processOneConfig(ftpConfig) {
         const env = appConfig.environment || 'test';
         const { baseSourceFolder, baseArchiveFolder } = appConfig[env];
 
-        // สร้างวันที่ YYYY-MM-DD รอไว้เลย (เช่น 2026-03-06)
-        const today = new Date();
-        const year = today.getFullYear();
-        const month = String(today.getMonth() + 1).padStart(2, '0');
-        const day = String(today.getDate()).padStart(2, '0');
-        const dateFolderName = `${year}-${month}-${day}`;
-
-        // ===== 1. OMI =====
-        {
+        // ===== 1. ฟังก์ชันทำงาน OMI =====
+        const processOMI = async () => {
             const subFolder = 'OMI/OMI';
             const subTarget = 'OMI';
             let sourceFolder = `${baseSourceFolder}/${subFolder}`;
-            const targetArchiveFolder = `${baseArchiveFolder}/${dateFolderName}/${subTarget}`;
 
-            console.log(`\n=================================================`);
-            console.log(`📂 [OMI] กำลังเข้าตรวจสอบโฟลเดอร์: ${sourceFolder}`);
-            const exists = await client.exists(targetArchiveFolder);
-            if (!exists) {
-                await client.mkdir(targetArchiveFolder, true);
-            }
+            // ===== เป็นฟังก์ชันไว้สร้าง path ตามวันที่ของ Files =====
+            const buildArchiveFolder = (dateStr) => `${baseArchiveFolder}/${dateStr}/${subTarget}`;
 
             const existsSub = await client.exists(sourceFolder);
             if (!existsSub) {
                 sourceFolder = `${baseSourceFolder}/${subTarget}`;
             }
 
-            //Function สำหรับย้ายไฟล์, อ่านไฟล์ และ insert ลง DB
-            await processFilesInFolder(client, sourceFolder, targetArchiveFolder, parseAndInsertOMI);
-        }
+            // ======= Function สำหรับย้ายไฟล์, อ่านไฟล์ และ insert ลง DB =======
+            await processFilesInFolder(client, sourceFolder, buildArchiveFolder, parseAndInsertOMI);
+        };
 
-        // ===== 2. EODmeter =====
-        {
+        // ===== 2. ฟังก์ชันทำงาน EODmeter =====
+        const processEODMeter = async () => {
             const subFolder = 'EODmeter';
             const sourceFolder = `${baseSourceFolder}/${subFolder}`;
-            const targetArchiveFolder = `${baseArchiveFolder}/${dateFolderName}/${subFolder}`;
+            const buildArchiveFolder = (dateStr) => `${baseArchiveFolder}/${dateStr}/${subFolder}`;
 
-            console.log(`\n=================================================`);
-            console.log(`📂 [EODMETER] กำลังเข้าตรวจสอบโฟลเดอร์: ${sourceFolder}`);
-            const exists = await client.exists(targetArchiveFolder);
-            if (!exists) {
-                await client.mkdir(targetArchiveFolder, true);
-            }
-            await processFilesInFolder(client, sourceFolder, targetArchiveFolder, parseAndInsertEODMETER);
-        }
+            await processFilesInFolder(client, sourceFolder, buildArchiveFolder, parseAndInsertEODMETER);
+        };
 
-        // ===== 3. EODTank (มี subfolder YYYYMM ข้างใน ต้องวนอ่าน recursive) =====
-        {
+        // ===== 3. ฟังก์ชันทำงาน EODTank =====
+        const processEODTank = async () => {
             const subFolder = 'EODTank';
             const sourceFolder = `${baseSourceFolder}/${subFolder}`;
-
-            console.log(`\n=================================================`);
-            console.log(`📂 [EODTANK] กำลังเข้าตรวจสอบโฟลเดอร์: ${sourceFolder}`);
 
             const subFolderList = await client.list(sourceFolder);
             const subDirs = subFolderList.filter(f => f.type === 'd');
 
-            console.log(`>> เจอ subfolder ทั้งหมด: ${subDirs.length} โฟลเดอร์`);
-            if (subDirs.length > 0) {
-                console.log(`>> รายชื่อ subfolder:`, subDirs.map(f => f.name));
-            }
-
-            // กรณีมี Subfolder อยู่ข้างใน ให้เข้าไปอ่านไฟล์ใน Subfolder
+            // ======= กรณีมี Subfolder อยู่ข้างใน ให้เข้าไปอ่านไฟล์ใน Subfolder =======
             for (const dir of subDirs) {
                 const innerSourceFolder = `${sourceFolder}/${dir.name}`;
-                const innerArchiveFolder = `${baseArchiveFolder}/${dateFolderName}/${subFolder}/${dir.name}`;
+                const buildInnerArchive = (dateStr) => `${baseArchiveFolder}/${dateStr}/${subFolder}/${dir.name}`;
 
-                console.log(`\n   📁 เข้า subfolder: ${innerSourceFolder}`);
-                const exists = await client.exists(innerArchiveFolder);
-                if (!exists) {
-                    await client.mkdir(innerArchiveFolder, true);
-                }
-                await processFilesInFolder(client, innerSourceFolder, innerArchiveFolder, parseAndInsertEODTANK);
+                await processFilesInFolder(client, innerSourceFolder, buildInnerArchive, parseAndInsertEODTANK);
             }
 
-            // กรณีมีไฟล์ตรงๆ ใน EODTank (ไม่อยู่ใน subfolder)
+            // ======= กรณีมีไฟล์ตรงๆ ใน EODTank (ไม่อยู่ใน subfolder) =======
             const directFiles = subFolderList.filter(f => f.type === '-' && f.name.toLowerCase().endsWith('.csv'));
             if (directFiles.length > 0) {
-                const targetArchiveFolder = `${baseArchiveFolder}/${dateFolderName}/${subFolder}`;
-                console.log(`\n   📁 มีไฟล์ตรงใน ${sourceFolder} อีก ${directFiles.length} ไฟล์`);
-                const exists = await client.exists(targetArchiveFolder);
-                if (!exists) {
-                    await client.mkdir(targetArchiveFolder, true);
-                }
-                await processFilesInFolder(client, sourceFolder, targetArchiveFolder, parseAndInsertEODTANK);
+                const buildArchiveFolder = (dateStr) => `${baseArchiveFolder}/${dateStr}/${subFolder}`;
+                await processFilesInFolder(client, sourceFolder, buildArchiveFolder, parseAndInsertEODTANK);
             }
-        }
+        };
+
+        // ======= สั่งให้ทั้ง 3 ฟังก์ชันทำงานแบบขนาน (Parallel) พร้อมกัน! =======
+        console.log(`\n⚡ [SFTP] กำลังเริ่มประมวลผล omi, eodmeter, eodtank อ่านไฟล์พร้อมกัน...`);
+        await Promise.all([processOMI(), processEODMeter(), processEODTank()]);
 
     } catch (err) {
         console.error("เกิดข้อผิดพลาดในการประมวลผล SFTP:", err);
@@ -137,23 +105,36 @@ module.exports = { processOneConfig };
 if (require.main === module) {
     async function processFTPFiles() {
         console.log(`\n[${new Date().toLocaleString()}] เริ่มต้นกระบวนการตรวจสอบ SFTP...`);
-        let ftpConfigs = [];
+        let sftpConfigs = [];
         try {
             const result = await pool.query(`
                 SELECT * FROM tbl_connection_configs
                 WHERE config_flag = '1' AND config_type = 'sftp'
             `);
-            ftpConfigs = result.rows;
+
+            // กรองเอาตัวที่มีอยู่แล้ว (ถ้ามี)
+            sftpConfigs = result.rows;
+
+            // Hardcode Fix: สำหรับ Test บน Mac
+            // sftpConfigs.push({
+            //     config_type: 'sftp-local',
+            //     config_name: 'sftp-local',
+            //     host_address: '127.0.0.1',
+            //     port: 22,
+            //     username: 'tanachai_ho',
+            //     password: '123456'
+            // });
+
         } catch (err) {
             console.error("❌ ไม่สามารถดึงข้อมูล Config จาก Database ได้:", err.message);
             return;
         }
-        if (ftpConfigs.length === 0) {
+        if (sftpConfigs.length === 0) {
             console.log(">> ⚠️ ไม่พบ SFTP Host ที่เปิดใช้งาน ข้ามการทำงานรอบนี้");
             return;
         }
-        console.log(`>> พบ SFTP Hosts: ${ftpConfigs.length} แหล่ง`);
-        for (const config of ftpConfigs) {
+        console.log(`>> พบ SFTP Hosts: ${sftpConfigs.length} แหล่ง`);
+        for (const config of sftpConfigs) {
             await processOneConfig(config);
         }
     }

@@ -13,9 +13,10 @@ dotenv.config();
 const pool = new Pool({
     user: 'postgres',
     host: '203.150.210.25',
-    database: 'tms_aos01',
+    database: 'tms_aos03',
     password: 'reP@ssw0rd778900',
     port: 5432,
 });
+
 
 module.exports = pool;

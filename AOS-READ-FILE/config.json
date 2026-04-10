@@ -1,8 +1,8 @@
 {
     "environment": "production",
     "test": {
-        "baseSourceFolder": "/AOS",
-        "baseArchiveFolder": "/AOS-BACKUP"
+        "baseSourceFolder": "/Users/tanachai_ho/AOS",
+        "baseArchiveFolder": "/Users/tanachai_ho/AOS-BACKUP"
     },
     "production": {
         "baseSourceFolder": "/AOS",
