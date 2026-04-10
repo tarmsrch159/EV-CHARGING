@@ -14,7 +14,8 @@ const options = {
     cert: fs.readFileSync('/etc/letsencrypt/live/spd-demo.dtc.co.th/fullchain.pem'),
     ca: [
         fs.readFileSync('/etc/letsencrypt/live/spd-demo.dtc.co.th/chain.pem')
-    ]
+    ],
+    minVersion: 'TLSv1.2'
 };
 /**
  * Get port from environment and store in Express.
