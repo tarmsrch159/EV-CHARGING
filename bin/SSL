@@ -10,24 +10,24 @@ var https = require('https');
 const fs = require('fs');
 const options = {
 
-    key: fs.readFileSync('/root/ssl/private.key'),
-    cert: fs.readFileSync('/root/ssl/star_tmsthai_com.crt'),
+    key: fs.readFileSync('/etc/letsencrypt/live/spd-demo.dtc.co.th/privkey.pem'),
+    cert: fs.readFileSync('/etc/letsencrypt/live/spd-demo.dtc.co.th/fullchain.pem'),
     ca: [
-        fs.readFileSync('/root/ssl/CARootCertificate-ca.crt')
+        fs.readFileSync('/etc/letsencrypt/live/spd-demo.dtc.co.th/chain.pem')
     ]
 };
 /**
  * Get port from environment and store in Express.
  */
 
-var port = normalizePort(process.env.PORT || '9627');
+var port = normalizePort(process.env.PORT || '9100');
 app.set('port', port);
 console.log('API is start on port :', port)
-    /**
-     * Create HTTP server.
-     */
+/**
+ * Create HTTP server.
+ */
 
-var server = https.createServer(options,app);
+var server = https.createServer(options, app);
 
 
 /**
