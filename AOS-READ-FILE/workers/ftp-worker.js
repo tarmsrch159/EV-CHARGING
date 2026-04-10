@@ -86,14 +86,19 @@ async function processAllFiles() {
 }
 
 // ============================================================
-// Cron Job
+// Loop Timer (ครอบด้วย Timeout 10 วิ แทนการใช้ Schedule)
 // ============================================================
 console.log(`เริ่มต้น Service Background Process (mode: ${arg})...`);
 
-// ทำงานทุกๆ 1 ชั่วโมง
-cron.schedule('0 * * * *', () => {
-    processAllFiles();
-});
+async function startBackgroundWorker() {
+    while (true) {
+        // ประมวลผลแต่ละรอบ (ดึงข้อมูลทั้งหมด)
+        await processAllFiles();
 
-// รันทันที 1 ครั้งตอนเปิดโปรแกรม
-processAllFiles();
+        console.log(`\n⏳ พักประมวลผล 10 วินาที ก่อนเริ่มรอบต่อไป...`);
+        await new Promise(resolve => setTimeout(resolve, 10000));
+    }
+}
+
+// เริ่มการทำงานลูป
+startBackgroundWorker();

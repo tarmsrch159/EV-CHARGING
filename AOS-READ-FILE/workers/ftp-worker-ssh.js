@@ -115,15 +115,7 @@ if (require.main === module) {
             // กรองเอาตัวที่มีอยู่แล้ว (ถ้ามี)
             sftpConfigs = result.rows;
 
-            // Hardcode Fix: สำหรับ Test บน Mac
-            // sftpConfigs.push({
-            //     config_type: 'sftp-local',
-            //     config_name: 'sftp-local',
-            //     host_address: '127.0.0.1',
-            //     port: 22,
-            //     username: 'tanachai_ho',
-            //     password: '123456'
-            // });
+
 
         } catch (err) {
             console.error("❌ ไม่สามารถดึงข้อมูล Config จาก Database ได้:", err.message);
@@ -140,6 +132,20 @@ if (require.main === module) {
     }
 
     console.log("เริ่มต้น Service Background Process (SFTP)...");
-    cron.schedule('0 * * * *', () => { processFTPFiles(); });
-    processFTPFiles();
+
+
+    // ============================================================
+    // Loop Timer (ครอบด้วย Timeout 10 วิ แทนการใช้ Schedule)
+    // ============================================================
+    async function startBackgroundWorker() {
+        while (true) {
+            await processFTPFiles();
+            console.log(`\n⏳ พักประมวลผล 10 วินาที ก่อนเริ่มรอบต่อไป...`);
+            await new Promise(resolve => setTimeout(resolve, 10000));
+        }
+    }
+
+    // เริ่มการทำงานลูป
+    startBackgroundWorker();
+
 }
