@@ -261,6 +261,85 @@ exports.removeVehicleTypeCalendarInformation = async (req, res, next) => {
 }
 
 // Success
+exports.removeVehicleTypeCalendarExpireLogic = async (lic_code, action_id, action_value) => {
+    return (async () => {
+        let script = `update tbl_vehicle_type_calendar set flag = '0', rm_dt = '${moment().format('YYYY-MM-DD HH:mm:ss')}' 
+            where flag = '1' and unavailable_date < '${moment().format('YYYY-MM-DD')}';`
+
+        let tbl_temporary = await pgConn.execute(dbPrefix + lic_code, script, config.connectionString());
+        if (!tbl_temporary.code) {
+            await xglobal.action_logs(lic_code, action_id, 'ลบข้อมูลปฏิทินประเภทรถ (หมดอายุ)', 'System Cron Job', 'success', action_value);
+            return { status: 'success', message: 'Cleanup completed successfully' };
+        } else {
+            await xglobal.action_logs(lic_code, action_id, 'ลบข้อมูลปฏิทินประเภทรถ (หมดอายุ)', 'System Cron Job', 'ไม่สามารถลบข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ', action_value);
+            return { status: 'error', message: 'Cleanup failed' };
+        }
+    })().catch(async (err) => {
+        console.log(err);
+        if (lic_code && action_id) {
+            await xglobal.action_logs(lic_code, action_id, 'ลบข้อมูลปฏิทินประเภทรถ (หมดอายุ)', 'System Cron Job', 'ไม่สามารถลบข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ', action_value);
+        }
+        return { status: 'error', message: err.message };
+    });
+}
+
+// Success
+exports.removeVehicleTypeCalendarExpireInformation = async (req, res, next) => {
+    let lic_code = req.header('lic_code');
+    let action_data = req.body[0] ? req.body[0].action : undefined;
+
+    return (async () => {
+        if (!req.body[0] || lic_code == undefined || action_data == undefined) {
+            let response = [{
+                status: 'error',
+                invalid_code: '-1',
+                message: 'ไม่สามารถลบข้อมูล, เนื่องจากข้อมูลพารามิเตอร์ไม่ถูกต้อง',
+                data: [],
+                response_time: moment().format('YYYY-MM-DD HH:mm:ss')
+            }]
+
+            res.status(200).send(response);
+            return;
+        }
+
+        let result = await this.removeVehicleTypeCalendarExpireLogic(lic_code, action_data[0].id, action_data[0].value);
+
+        if (result.status == 'success') {
+            let response = [{
+                status: 'success',
+                invalid_code: '0',
+                message: '',
+                data: [],
+                response_time: moment().format('YYYY-MM-DD HH:mm:ss')
+            }]
+            res.status(200).send(response);
+        } else {
+            let response = [{
+                status: 'error',
+                invalid_code: '-3',
+                message: `ไม่สามารถลบข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ`,
+                data: [],
+                response_time: moment().format('YYYY-MM-DD HH:mm:ss')
+            }]
+            res.status(200).send(response);
+        }
+        return;
+
+    })().catch(async (err) => {
+        console.log(err);
+        let response = [{
+            status: 'error',
+            invalid_code: '-4',
+            message: `ไม่สามารถลบข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ`,
+            data: [],
+            response_time: moment().format('YYYY-MM-DD HH:mm:ss').toString()
+        }]
+        res.status(200).send(response);
+        return;
+    });
+}
+
+// Success
 exports.setVehicleTypeCalendarInformation = async (req, res, next) => {
     let lic_code = req.header('lic_code');
     let action_data = req.body[0] ? req.body[0].action : undefined;

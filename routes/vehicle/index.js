@@ -9,6 +9,18 @@ const vehicle_compartment = require('./vehicle-compartment')
 const vehicle_compartment_level = require('./vehicle-compartment-level')
 const vehicle_type = require('./vehicle-type')
 const vehicle_calendar_type = require('./vehicle-calendar-type')
+const cron = require('node-cron');
+const moment = require('moment');
+
+// Scheduled เคลียร์ ข้อมูลปฏิทินประเภทรถ (หมดอายุ) - ทุกๆ 1 ชั่วโมง
+cron.schedule('0 * * * *', async () => {
+    console.log('Running Vehicle Calendar Expiration Cleanup:', moment().format('YYYY-MM-DD HH:mm:ss'));
+    let lic_code = 'aos01';
+    let system_action_id = 'system-cron';
+    let system_action_value = 'system';
+
+    await vehicle_calendar_type.removeVehicleTypeCalendarExpireLogic(lic_code, system_action_id, system_action_value);
+});
 
 //vehicle
 router.post('/information', vehicle.getVehicleInformation);
@@ -71,6 +83,7 @@ router.put('/compartment/level/information', vehicle_compartment_level.addVehicl
 //calendar type
 router.post('/calendar/type/information', vehicle_calendar_type.getVehicleTypeCalendarInformation);
 router.delete('/calendar/type/information', vehicle_calendar_type.removeVehicleTypeCalendarInformation);
+router.delete('/calendar/type/expire/information', vehicle_calendar_type.removeVehicleTypeCalendarExpireInformation);
 router.patch('/calendar/type/information', vehicle_calendar_type.setVehicleTypeCalendarInformation);
 router.put('/calendar/type/information', vehicle_calendar_type.addVehicleTypeCalendarInformation);
 
