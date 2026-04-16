@@ -1,4 +1,4 @@
-const prod = true;
+const prod = false;
 
 const connectionStringOnProd = {
   user: "postgres",
