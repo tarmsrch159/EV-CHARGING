@@ -78,7 +78,7 @@ exports.getMasterTimeInformation = async (req, res, next) => {
                 tbl_master_time.ist_dt
             FROM tbl_master_time 
             ${whereClause}
-            ORDER BY tbl_master_time.ist_dt DESC 
+            ORDER BY tbl_master_time.time_value ASC 
             OFFSET ${offset} LIMIT ${page_limit};
         `;
 

@@ -280,7 +280,7 @@ exports.getReportStock = async (req, res, next) => {
                     JSONB_BUILD_OBJECT(
                         'tank_no', tpt.tnk_number,
                         'itm_material_number', tit.itm_material_number,
-                        'product_name', tit.itm_short_desc,
+                        'itm_desc', tit.itm_desc,
                         'un_pump', tpt.tnk_deadstock,
                         'max_stock', tpt.tnk_capacity,
                         'target_stock', tpt.tnk_target,

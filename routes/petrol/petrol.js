@@ -25,7 +25,7 @@ exports.getPetrolInformation = async (req, res, next) => {
 
     // ======== กำหนดค่าเริ่มต้น ========
     page_index = page_index === undefined ? 1 : page_index;
-    page_limit = page_limit === undefined ? 10 : page_limit;
+    page_limit = page_limit === undefined || page_limit === "" ? 10 : page_limit;
     off_code = off_code === undefined || off_code === "" ? "ALL" : off_code;
     auto_order =
       auto_order === undefined || auto_order === "" ? "ALL" : auto_order;
@@ -80,6 +80,8 @@ exports.getPetrolInformation = async (req, res, next) => {
       conditions.push(`tbl_petrol.off_code = '${off_code}'`);
     }
 
+
+
     // ดัก undefined ให้ Action
     let act_val = action?.[0]?.value?.toString().toUpperCase() || "ALL";
     let act_id = action?.[0]?.id || "";
@@ -109,6 +111,12 @@ exports.getPetrolInformation = async (req, res, next) => {
             )`);
     }
 
+    let paginationClause = "";
+    if (page_limit.toString().toUpperCase() !== "ALL") {
+      let limit = parseInt(page_limit);
+      paginationClause = `LIMIT ${limit} OFFSET (${page_index} * ${limit})`;
+    }
+
     let whereClause = "WHERE " + conditions.join(" AND ");
 
     // ======== SQL สำหรับดึงข้อมูล ========
@@ -131,7 +139,7 @@ exports.getPetrolInformation = async (req, res, next) => {
             ${baseSelectQuery}
             ${whereClause}
             ORDER BY tbl_petrol.ist_dt DESC 
-            LIMIT ${page_limit} OFFSET (${page_index} * ${page_limit});
+            ${paginationClause};
         `;
 
     console.log(dataScript);
