@@ -405,8 +405,11 @@ exports.getOrderInformationByID = async (req, res, next) => {
                 tank.recive_val::INT
             FROM tbl_order_item
             LEFT JOIN tbl_item ON tbl_order_item.item_no = tbl_item.itm_code
-            LEFT JOIN tbl_petrol_tank ON tbl_order_item.item_no = tbl_petrol_tank.itm_code 
-                AND tbl_petrol_tank.ptrl_code = '${orderData.ptrl_code}'
+          INNER JOIN tbl_petrol_tank ON tbl_order_item.item_no = tbl_petrol_tank.itm_code 
+                AND tbl_petrol_tank.ptrl_code = '${orderData.ptrl_code}' 
+                AND tbl_petrol_tank.ptrl_tank_flag = '1'
+                AND (tbl_order_item.tnk_number = '' OR tbl_order_item.tnk_number IS NULL OR tbl_order_item.tnk_number = tbl_petrol_tank.tnk_number)
+            
             LEFT JOIN tbl_order_eodtank tank ON (
                 tbl_petrol_tank.tnk_number = tank.tank_no 
                 AND tank.shipto_no = '${orderData.ptrl_number}'
