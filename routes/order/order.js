@@ -440,7 +440,7 @@ exports.getOrderInformationByID = async (req, res, next) => {
             )
             WHERE CAST(tbl_order_item.order_no AS TEXT) = '${id}'
             AND tbl_order_item.order_item_flag = '1'
-            ORDER BY tbl_order_item.id ASC`;
+            ORDER BY tbl_order_item.tnk_number ASC`;
 
     // ======== ยิง Query เพื่อดึงรายการสินค้า (Items) และจัดการข้อมูล null ========
     let itemResult = await pgConn.get(
