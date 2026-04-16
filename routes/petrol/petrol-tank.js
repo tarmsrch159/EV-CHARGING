@@ -64,11 +64,12 @@ exports.getPetrolTankInformation = async (req, res, next) => {
                 itm_icon,
                 itm_image,
                 itm_material_number,
+                tbl_petrol_tank.tnk_safety_factor,
                 tbl_petrol.off_code,
                 off_desc,
                 tbl_petrol_tank.ist_dt,
                 tbl_petrol_tank.mdf_dt,
-                tbl_petrol_tank.rm_dt 
+                tbl_petrol_tank.rm_dt
                 from tbl_petrol
                 left join tbl_office on tbl_petrol.off_code = tbl_office.off_code
                 left join tbl_petrol_tank on tbl_petrol.ptrl_code = tbl_petrol_tank.ptrl_code 
@@ -100,6 +101,7 @@ exports.getPetrolTankInformation = async (req, res, next) => {
                 itm_icon,
                 itm_image,
                 itm_material_number,
+                tbl_petrol_tank.tnk_safety_factor,
                 tbl_petrol.off_code,
                 off_desc,
                 tbl_petrol_tank.ist_dt,
@@ -312,11 +314,12 @@ exports.setPetrolTankInformation = async (req, res, next) => {
             tnk_capacity,
             tnk_target,
             tnk_deadstock,
+            tnk_safety_factor,
             action
         } = req.body[0];
         //เช็คเฉพาะส่วนที่สำคัญ
         if (ptrl_tank_code == undefined || ptrl_code == undefined || itm_code == undefined
-            || tnk_number == undefined || tnk_capacity == undefined || tnk_target == undefined || tnk_deadstock == undefined || action == undefined) {
+            || tnk_number == undefined || tnk_capacity == undefined || tnk_target == undefined || tnk_deadstock == undefined || tnk_safety_factor == undefined || action == undefined) {
             let response = [{
                 status: 'error',
                 invalid_code: '-1',
@@ -337,6 +340,7 @@ exports.setPetrolTankInformation = async (req, res, next) => {
             tnk_capacity = ${tnk_capacity},
             tnk_deadstock = ${tnk_deadstock},
             tnk_target = ${tnk_target},
+            tnk_safety_factor = ${tnk_safety_factor},
             mdf_dt = '${moment().format('YYYY-MM-DD HH:mm:ss')}' 
             where ptrl_tank_code = '${ptrl_tank_code}';`
 
@@ -396,12 +400,13 @@ exports.addPetrolTankInformation = async (req, res, next) => {
             tnk_capacity,
             tnk_target,
             tnk_deadstock,
+            tnk_safety_factor,
             action
         } = req.body[0];
 
         //เช็คเฉพาะส่วนที่สำคัญ
         if (ptrl_code == undefined || itm_code == undefined || tnk_number == undefined || tnk_capacity == undefined
-            || tnk_target == undefined || tnk_deadstock == undefined || action == undefined || lic_code == undefined) {
+            || tnk_target == undefined || tnk_deadstock == undefined || tnk_safety_factor == undefined || action == undefined || lic_code == undefined) {
             let response = [{
                 status: 'error',
                 invalid_code: '-1',
@@ -435,9 +440,9 @@ exports.addPetrolTankInformation = async (req, res, next) => {
 
             let ptrl_tank_code = 'ptnk-' + moment().format('x');
             script = `insert into tbl_petrol_tank 
-            (ptrl_tank_code, ptrl_code, tnk_number, itm_code, tnk_capacity, tnk_target, tnk_deadstock, ptrl_tank_flag, ist_dt) values 
+            (ptrl_tank_code, ptrl_code, tnk_number, itm_code, tnk_capacity, tnk_target, tnk_deadstock, tnk_safety_factor, ptrl_tank_flag, ist_dt) values 
             ('${ptrl_tank_code}', '${ptrl_code}', '${tnk_number}','${itm_code}', ${tnk_capacity}, 
-            ${tnk_target}, ${tnk_deadstock},'1', '${moment().format('YYYY-MM-DD HH:mm:ss')}');`
+            ${tnk_target}, ${tnk_deadstock}, ${tnk_safety_factor},'1', '${moment().format('YYYY-MM-DD HH:mm:ss')}');`
 
             let tbl_temporary = await pgConn.execute(dbPrefix + lic_code, script, config.connectionString());
             if (!tbl_temporary.code) {
