@@ -279,6 +279,7 @@ exports.getReportStock = async (req, res, next) => {
                 JSONB_AGG(
                     JSONB_BUILD_OBJECT(
                         'tank_no', tpt.tnk_number,
+                        'itm_code', tit.itm_code,
                         'itm_material_number', tit.itm_material_number,
                         'itm_desc', tit.itm_desc,
                         'un_pump', tpt.tnk_deadstock,
@@ -324,7 +325,7 @@ exports.getReportStock = async (req, res, next) => {
                 tpt.tnk_number = meter_summary.tank_no 
                 AND tpr.ptrl_number = meter_summary.shipto_no
             )
-            WHERE 1=1 ${wh}
+            WHERE tpt.ptrl_tank_flag = '1' ${wh}
             GROUP BY tpr.ptrl_number, tank.date_at
             ORDER BY tpr.ptrl_number ASC;
         `;
