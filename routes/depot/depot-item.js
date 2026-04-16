@@ -594,3 +594,162 @@ exports.addDepotItemInformation = async (req, res, next) => {
     return;
   });
 };
+
+
+exports.getDuplicateItemInDepot = async (req, res, next) => {
+  var xresult = [];
+
+  return (async () => {
+    let lic_code = req.header("lic_code");
+    let { itm_code, dpo_code, action } = req.body[0];
+
+    //เช็คเฉพาะส่วนที่สำคัญ
+    if (
+      itm_code == undefined ||
+      dpo_code == undefined ||
+      lic_code == undefined ||
+      action == undefined
+    ) {
+      let response = [
+        {
+          status: "error",
+          invalid_code: "-1",
+          message:
+            "ไม่สามารถดึงข้อมูลได้, เนื่องจากข้อมูลพารามิเตอร์ไม่ถูกต้อง",
+          data: xresult,
+          response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+        },
+      ];
+
+      res.status(200).send(response);
+      return;
+    } else {
+
+      let itmCodesArr = Array.isArray(itm_code) ? itm_code : [itm_code];
+
+      if (itmCodesArr.length === 0) {
+        let response = [
+          {
+            status: "success",
+            invalid_code: "0",
+            message: "ไม่พบข้อมูลซ้ำ (ไม่มีรหัสสินค้าส่งมา)",
+            data: [],
+            response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+          },
+        ];
+        res.status(200).send(response);
+        return;
+      }
+
+      let itmCodesIn = itmCodesArr.map(code => `'${code}'`).join(", ");
+
+      // =========== Script เช็คน้ำมันว่าตัวไหนบ้างที่มีในคลัง ===========
+      let script = `select
+                tbl_item.itm_code,
+                itm_desc,
+                itm_short_desc,
+                itm_material_number,
+                tbl_depot_item.dpo_item_code
+                from tbl_item
+                left join tbl_depot_item on tbl_item.itm_code = tbl_depot_item.itm_code 
+                    and tbl_depot_item.dpo_code = '${dpo_code}' 
+                    and tbl_depot_item.dpo_item_flag = '1'
+                where tbl_item.itm_code IN (${itmCodesIn})`;
+
+      let tbl_temporary = await pgConn.get(
+        dbPrefix + lic_code,
+        script,
+        config.connectionString(),
+      );
+
+
+      if (!tbl_temporary.code) {
+        let missingItems = [];
+
+        // =========== Loop หาน้ำมันที่ไม่มีในคลัง ===========
+        for (let code of itmCodesArr) {
+          // ============ เช็คน้ำมันว่าตัวไหนบ้างที่มีในคลัง ===========
+          let foundInSystem = tbl_temporary.data.find(item => item.itm_code === code);
+
+          if (!foundInSystem || !foundInSystem.dpo_item_code) {
+            // =========== Push น้ำมันที่ไม่มีในคลัง ===========
+            missingItems.push({
+              itm_code: code,
+              itm_desc: foundInSystem ? foundInSystem.itm_desc : "ไม่พบข้อมูลผลิตภัณฑ์ในระบบ"
+            });
+          }
+        }
+
+        if (missingItems.length > 0) {
+          let response = [
+            {
+              status: "success",
+              invalid_code: "1",
+              message: "พบรายการน้ำมันที่ไม่มีข้อมูลในคลัง",
+              data: missingItems,
+              response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+            },
+          ];
+
+          res.status(200).send(response);
+          return;
+        } else {
+          let response = [
+            {
+              status: "success",
+              invalid_code: "0",
+              message: "รายการน้ำมันทั้งหมดมีข้อมูลอยู่ในคลังแล้ว สามารถดำเนินการต่อได้",
+              data: [],
+              response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+            },
+          ];
+
+          res.status(200).send(response);
+          return;
+        }
+      } else {
+        let response = [
+          {
+            status: "error",
+            invalid_code: "-3",
+            message: `ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ`,
+            data: xresult,
+            response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+          },
+        ];
+        res.status(200).send(response);
+        await xglobal.action_logs(
+          lic_code,
+          action[0].id,
+          "ตรวจสอบข้อมูลสินค้าซ้ำในคลังสินค้า",
+          JSON.stringify(req.body[0]),
+          "ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ",
+          action[0].value,
+        );
+        return;
+      }
+    }
+  })().catch(async (err) => {
+    console.log(err);
+    let response = [
+      {
+        status: "error",
+        invalid_code: "-4",
+        message: `ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ`,
+        data: xresult,
+        response_time: moment().format("YYYY-MM-DD HH:mm:ss").toString(),
+      },
+    ];
+    res.status(200).send(response);
+    await xglobal.action_logs(
+      lic_code,
+      action[0].id,
+      "ตรวจสอบข้อมูลสินค้าซ้ำในคลังสินค้า",
+      JSON.stringify(req.body[0]),
+      "ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ",
+      action[0].value,
+    );
+    return;
+  });
+};
+

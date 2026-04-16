@@ -23,6 +23,7 @@ router.post('/item/information', depot_item.getDepotItemInformation);
 router.delete('/item/information', depot_item.removeDepotItem);
 router.patch('/item/information', depot_item.setDepotItemInformation);
 router.put('/item/information', depot_item.addDepotItemInformation);
+router.post('/item/duplicate', depot_item.getDuplicateItemInDepot);
 
 //Depot worked
 router.post('/worked/information', depot_worked.getDepotWorkedDateInformation);
