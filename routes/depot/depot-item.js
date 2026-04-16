@@ -625,14 +625,15 @@ exports.getDuplicateItemInDepot = async (req, res, next) => {
       return;
     } else {
 
+      // ====== ตรวจสอบ Array itm_code ======
       let itmCodesArr = Array.isArray(itm_code) ? itm_code : [itm_code];
-
+      // ====== ตรวจสอบว่ามีการเลือก น้ำมันหรือไม่ ======
       if (itmCodesArr.length === 0) {
         let response = [
           {
             status: "success",
             invalid_code: "0",
-            message: "ไม่พบข้อมูลซ้ำ (ไม่มีรหัสสินค้าส่งมา)",
+            message: "กรุณาเลือกรายการน้ำมัน",
             data: [],
             response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
           },
@@ -641,6 +642,7 @@ exports.getDuplicateItemInDepot = async (req, res, next) => {
         return;
       }
 
+      // ====== แปลง Array itm_code เป็น String สำหรับ SQL Query ======
       let itmCodesIn = itmCodesArr.map(code => `'${code}'`).join(", ");
 
       // =========== Script เช็คน้ำมันว่าตัวไหนบ้างที่มีในคลัง ===========
@@ -671,8 +673,8 @@ exports.getDuplicateItemInDepot = async (req, res, next) => {
           // ============ เช็คน้ำมันว่าตัวไหนบ้างที่มีในคลัง ===========
           let foundInSystem = tbl_temporary.data.find(item => item.itm_code === code);
 
+          // =========== ถ้าไม่พบข้อมูลในระบบ หรือไม่พบ dpo_item_code ให้ push น้ำมันที่ไม่มีในคลัง ===========
           if (!foundInSystem || !foundInSystem.dpo_item_code) {
-            // =========== Push น้ำมันที่ไม่มีในคลัง ===========
             missingItems.push({
               itm_code: code,
               itm_desc: foundInSystem ? foundInSystem.itm_desc : "ไม่พบข้อมูลผลิตภัณฑ์ในระบบ"

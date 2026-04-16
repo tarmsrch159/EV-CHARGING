@@ -1782,13 +1782,13 @@ const getConfirmOrder = async (lic_code, order_id, action) => {
             // ===== Convert SAP Date to SQL Date =====
             let deli_date_req = sap_order?.RequestedDeliveryDate
               ? moment(sap_order?.RequestedDeliveryDate, "YYYYMMDD").format(
-                  "YYYY-MM-DD",
-                )
+                "YYYY-MM-DD",
+              )
               : null;
             let cus_date_ref = sap_order?.CustomerReferenceDate
               ? moment(sap_order?.CustomerReferenceDate, "YYYYMMDD").format(
-                  "YYYY-MM-DD",
-                )
+                "YYYY-MM-DD",
+              )
               : null;
 
             if (!checkResult.code && checkResult.data.length > 0) {
@@ -2139,7 +2139,7 @@ exports.getOrderInformationHana = async (req, res, next) => {
             // ================ กรณีไม่เจอ Order ในระบบ → เพื่ม Order ใหม่จาก SAP ==================
             console.log(
               "ไม่เจอ SHCustomerReference ในระบบ → กำลังสร้าง Order ใหม่: " +
-                salesOrder.SHCustomerReference,
+              salesOrder.SHCustomerReference,
             );
             console.log(`   ➡️  ไม่เจอออเดอร์ในระบบ (Insert Mode)`);
             console.log(`   ➕  กำลังสร้าง Order ใหม่จากข้อมูล SAP...`);
@@ -2211,7 +2211,7 @@ exports.getOrderInformationHana = async (req, res, next) => {
             } else {
               console.error(
                 "เกิดข้อผิดพลาดในการสร้าง Order ใหม่จาก SAP: " +
-                  (res_new_order.message || "Unknown Error"),
+                (res_new_order.message || "Unknown Error"),
               );
             }
           }
@@ -2496,7 +2496,7 @@ exports.getOrderInformationHanaBackUp = async (req, res, next) => {
             // ================ กรณีไม่เจอ Order ในระบบ → เพื่ม Order ใหม่จาก SAP ==================
             console.log(
               "ไม่เจอ SHCustomerReference ในระบบ → กำลังสร้าง Order ใหม่: " +
-                salesOrder.SHCustomerReference,
+              salesOrder.SHCustomerReference,
             );
             console.log(`   ➡️  ไม่เจอออเดอร์ในระบบ (Insert Mode)`);
             console.log(`   ➕  กำลังสร้าง Order ใหม่จากข้อมูล SAP...`);
@@ -2719,7 +2719,7 @@ exports.getOrderInformationHanaBackUp = async (req, res, next) => {
             } else {
               console.error(
                 "เกิดข้อผิดพลาดในการสร้าง Order ใหม่จาก SAP: " +
-                  (res_new_order.message || "Unknown Error"),
+                (res_new_order.message || "Unknown Error"),
               );
             }
           }
@@ -3347,6 +3347,7 @@ exports.addOrderInformation = async (req, res, next) => {
         ).trim();
         var deli_plant = order_item[i].deli_plant;
         var remark = order_item[i].remark;
+        var tnk_number = order_item[i].tnk_number
 
         console.log(
           `ตรวจสอบ Item [${i}]: Material=${itm_material_number}, Code=${itm_code}`,
@@ -3377,9 +3378,9 @@ exports.addOrderInformation = async (req, res, next) => {
             for (var k = 0; k < order_item[i].item_text.length; k++) {
               var item_text = order_item[i].item_text[k];
               let script_item = `INSERT INTO public.tbl_order_item
-                        (order_no, item_no, item_qty, long_text_id, long_text, ist_dt, order_item_flag, auto_order, deli_plant, sales_order_item, remark)
+                        (order_no, item_no, item_qty, long_text_id, long_text, ist_dt, order_item_flag, auto_order, deli_plant, sales_order_item, remark, tnk_number)
                         VALUES(${order_id}, '${itm_code}', ${item_quantity}, '${(item_text.long_text_id || "").replace(/'/g, "''")}', '${(item_text.long_text || "").replace(/'/g, "''")}',
-                        '${moment().format("YYYY-MM-DD HH:mm:ss")}', '1', 0, '${deli_plant || ""}', '${sales_order_item}', '${remark || ""}')`;
+                        '${moment().format("YYYY-MM-DD HH:mm:ss")}', '1', 0, '${deli_plant || ""}', '${sales_order_item}', '${remark || ""}', '${tnk_number || ""}')`;
 
               console.log(
                 `กำลัง Insert Item [${itm_code}] (with text) สำหรับ Order ${order_id}`,
@@ -3398,9 +3399,9 @@ exports.addOrderInformation = async (req, res, next) => {
           } else {
             // กรณีที่ไม่มี item_text
             let script_item = `INSERT INTO public.tbl_order_item
-                            (order_no, item_no, item_qty, long_text_id, long_text, ist_dt, order_item_flag, auto_order, deli_plant, sales_order_item, remark)
+                            (order_no, item_no, item_qty, long_text_id, long_text, ist_dt, order_item_flag, auto_order, deli_plant, sales_order_item, remark, tnk_number)
                         VALUES(${order_id}, '${itm_code}', ${item_quantity}, '', '',
-                            '${moment().format("YYYY-MM-DD HH:mm:ss")}', '1', 0, '${deli_plant || ""}', '${sales_order_item}', '${remark || ""}')`;
+                            '${moment().format("YYYY-MM-DD HH:mm:ss")}', '1', 0, '${deli_plant || ""}', '${sales_order_item}', '${remark || ""}', '${tnk_number || ""}')`;
 
             console.log(
               `กำลัง Insert Item [${itm_code}] (no text) สำหรับ Order ${order_id}`,
