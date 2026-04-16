@@ -3962,17 +3962,18 @@ exports.editOrderItem = async (req, res, next) => {
         let item_quantity = item.item_quantity;
         let item_no = item.item_no;
         let remark = item.remark;
+        let tnk_number = item.tnk_number;
         let itemChanges = [];
 
         // ========== Audit Log: ดึงค่าเก่าของ item ==========
         let getOldItemScript = `SELECT oi.item_qty, oi.remark, itm.itm_desc 
                     FROM public.tbl_order_item oi 
                     LEFT JOIN tbl_item itm ON oi.item_no = itm.itm_code
-                    WHERE oi.order_no = $1 AND oi.item_no = $2 ORDER BY oi.id DESC LIMIT 1`;
+                    WHERE oi.order_no = $1 AND oi.item_no = $2 AND oi.tnk_number = $3 ORDER BY oi.id DESC LIMIT 1`;
         let oldItemRes = await pgConn.getWithParams(
           dbPrefix + lic_code,
           getOldItemScript,
-          [order_no, item_no],
+          [order_no, item_no, tnk_number],
           config.connectionString(),
         );
 
@@ -4002,11 +4003,10 @@ exports.editOrderItem = async (req, res, next) => {
                     UPDATE tbl_order_item 
                     SET item_qty = $1, remark = $2
                     WHERE item_no = $3
-                        AND order_no = $4
+                        AND order_no = $4 AND tnk_number = $5
                 `;
-        let params = [item_quantity, remark, item_no, order_no];
+        let params = [item_quantity, remark, item_no, order_no, tnk_number];
         await pgConn.execute2params(update, params, config.connectionString());
-
         let updateOrder = `
                     UPDATE tbl_order 
                     SET auto_order = $1 
