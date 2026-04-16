@@ -142,7 +142,6 @@ exports.getPetrolInformation = async (req, res, next) => {
             ${paginationClause};
         `;
 
-    console.log(dataScript);
 
     let tbl_temporary = await pgConn.get(
       dbPrefix + lic_code,
@@ -160,14 +159,28 @@ exports.getPetrolInformation = async (req, res, next) => {
 
         // ======== นับจำนวนแถวทั้งหมด ========
         let countScript = `
-                    SELECT 
-                        CEIL(COUNT(tbl_petrol.ptrl_code)::float / ${page_limit}) as page_total, 
-                        COUNT(tbl_petrol.ptrl_code) as rows_total 
-                    FROM tbl_petrol 
-                    LEFT JOIN tbl_office ON tbl_petrol.off_code = tbl_office.off_code 
-                    LEFT JOIN tbl_petrol_group ON tbl_petrol.ptrl_group_code = tbl_petrol_group.ptrl_group_code 
-                    ${whereClause};
+                    
                 `;
+
+        if (page_limit.toString().toUpperCase() === "ALL") {
+          countScript = `
+                        SELECT 
+                            1 as page_total, 
+                            COUNT(tbl_petrol.ptrl_code) as rows_total 
+                        FROM tbl_petrol 
+                        ${whereClause};
+                    `;
+        } else {
+          countScript = `
+                        SELECT 
+                            CEIL(COUNT(tbl_petrol.ptrl_code)::float / ${parseInt(page_limit)}) as page_total, 
+                            COUNT(tbl_petrol.ptrl_code) as rows_total 
+                        FROM tbl_petrol 
+                        LEFT JOIN tbl_office ON tbl_petrol.off_code = tbl_office.off_code 
+                        LEFT JOIN tbl_petrol_group ON tbl_petrol.ptrl_group_code = tbl_petrol_group.ptrl_group_code 
+                        ${whereClause};
+                    `;
+        }
 
         let tbl_temporary0 = await pgConn.get(
           dbPrefix + lic_code,

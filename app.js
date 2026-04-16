@@ -31,6 +31,7 @@ var jobRouter = require('./routes/job/index');
 var trackingRouter = require('./routes/tracking/index');
 var reportRouter = require('./routes/report/index');
 var masterTimeRouter = require('./routes/master-time/index');
+var reasonRouter = require('./routes/reason/index');
 const orderController = require('./routes/order/order');
 var app = express();
 var cors = require('cors');
@@ -313,6 +314,8 @@ app.use('/api-tms-v2/tracking', trackingRouter);
 app.use('/api-tms-v2/report', reportRouter);
 //MasterTime
 app.use('/api-tms-v2/master-time', masterTimeRouter);
+//Reason
+app.use('/api-tms-v2/reason', reasonRouter);
 
 // ตั้งเวลาทำงานทุก 1 ชั่วโมง
 // cron.schedule('0 * * * *', async () => {
