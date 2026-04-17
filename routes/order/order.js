@@ -403,7 +403,8 @@ exports.getOrderInformationByID = async (req, res, next) => {
                 tank.tank_end,
                 meter_summary.total_sales,
                 meter_summary.total_sales + tbl_petrol_tank.tnk_deadstock AS min_stock,
-                tank.recive_val::INT
+                tank.recive_val::INT,
+                tbl_order_item.remark
             FROM tbl_order_item
             LEFT JOIN tbl_item ON tbl_order_item.item_no = tbl_item.itm_code
           INNER JOIN tbl_petrol_tank ON tbl_order_item.ptrl_tank_code = tbl_petrol_tank.ptrl_tank_code 
