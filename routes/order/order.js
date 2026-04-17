@@ -386,6 +386,7 @@ exports.getOrderInformationByID = async (req, res, next) => {
     // ======== คำสั่ง SQL สำหรับดึงรายการสินค้า (Items) ที่อยู่ในออเดอร์นี้ ========
     let itemScript = `SELECT 
                 tbl_order_item.id, tbl_order_item.order_no, tbl_order_item.item_no,
+                tbl_order_item.ptrl_tank_code,
                 tbl_petrol_tank.tnk_number as tank_number,
                 tbl_petrol_tank.tnk_capacity as tank_capacity,
                 tbl_order_item.item_qty, tbl_order_item.deli_plant, 
