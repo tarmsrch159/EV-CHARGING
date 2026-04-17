@@ -208,11 +208,11 @@ exports.addReasonInformation = async (req, res, next) => {
         let script = `
             INSERT INTO tbl_reason 
             (reason_desc, reason_flag, ist_dt) 
-            VALUES ($1, $2, $3)
+            VALUES ('${reason_desc}', 1, '${now}')
             RETURNING reason_id
         `;
 
-        let tbl_temporary = await pgConn.execute2params(script, [reason_desc, 1, now]);
+        let tbl_temporary = await pgConn.execute(dbPrefix + lic_code, script, config.connectionString());
 
         if (tbl_temporary.code) {
             let response = [{
@@ -232,7 +232,7 @@ exports.addReasonInformation = async (req, res, next) => {
             status: 'success',
             invalid_code: '0',
             message: 'บันทึกข้อมูลสำเร็จ',
-            data: [{ reason_id: tbl_temporary.rows[0]?.reason_id || "", reason_desc: reason_desc }],
+            data: [{ reason_desc: reason_desc || "" }],
             response_time: moment().format('YYYY-MM-DD HH:mm:ss')
         }];
 
