@@ -2954,7 +2954,7 @@ exports.cancelOrderInformationHana = async (req, res, next) => {
 };
 
 // Mockup: กำหนดเวลา runout (นาที)
-const RUNOUT_TIMEOUT_MINUTES = 5;
+const RUNOUT_TIMEOUT_MINUTES = 1;
 
 // =========== ดึงข้อมูลรายการสั่งซื้อ Order Runout ===========
 exports.getOrderRunout = async (req, res, next) => {
@@ -2988,6 +2988,8 @@ exports.getOrderRunout = async (req, res, next) => {
             AND rm_dt IS NULL 
             AND ist_dt <= NOW() - INTERVAL '${RUNOUT_TIMEOUT_MINUTES} minutes'
             ORDER BY ist_dt ASC`;
+
+    console.log(script)
 
     let tbl_temporary = await pgConn.get(
       dbPrefix + lic_code,
@@ -4006,7 +4008,12 @@ exports.editOrderItem = async (req, res, next) => {
                         AND order_no = $4 AND ptrl_tank_code = $5
                 `;
         let params = [item_quantity, remark, item_no, order_no, ptrl_tank_code];
-        await pgConn.execute2params(update, params, config.connectionString());
+        await pgConn.execute2params(
+          dbPrefix + lic_code,
+          update,
+          params,
+          config.connectionString(),
+        );
         let updateOrder = `
                     UPDATE tbl_order 
                     SET auto_order = $1 
@@ -4014,6 +4021,7 @@ exports.editOrderItem = async (req, res, next) => {
                 `;
         let paramsOrder = [0, order_no];
         await pgConn.execute2params(
+          dbPrefix + lic_code,
           updateOrder,
           paramsOrder,
           config.connectionString(),
@@ -4117,8 +4125,10 @@ exports.setStatusDeli = async (req, res, next) => {
 
     let updateOrderScript = `UPDATE tbl_order SET status_deli = $1, mdf_dt = $2 WHERE order_no = $3`;
     let tbl_temporary_update_order = await pgConn.execute2params(
+      dbPrefix + lic_code,
       updateOrderScript,
       [status_deli, moment().format("YYYY-MM-DD HH:mm:ss"), order_no],
+      config.connectionString(),
     );
 
     if (tbl_temporary_update_order.code) {
@@ -4700,8 +4710,10 @@ exports.reCreateOrderInformation = async (req, res, next) => {
       ];
 
       const resNewOrder = await pgConn.execute2params(
+        dbPrefix + lic_code,
         insertOrderScript,
         paramsOrder,
+        config.connectionString(),
       );
 
       if (resNewOrder.code) {
@@ -4729,16 +4741,21 @@ exports.reCreateOrderInformation = async (req, res, next) => {
       if (order_items.length > 0) {
         for (const oldItem of order_items) {
           const insertItemScript = `INSERT INTO tbl_order_item (order_no, item_no, item_qty, ist_dt, order_item_flag, auto_order, deli_plant, sales_order_item) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`;
-          await pgConn.execute2params(insertItemScript, [
-            newOrderId,
-            oldItem.item_no || "",
-            parseFloat(oldItem.item_qty) || 0,
-            currentDateTime,
-            "1",
-            "0",
-            oldItem.deli_plant || "",
-            oldItem.sales_order_item || "",
-          ]);
+          await pgConn.execute2params(
+            dbPrefix + lic_code,
+            insertItemScript,
+            [
+              newOrderId,
+              oldItem.item_no || "",
+              parseFloat(oldItem.item_qty) || 0,
+              currentDateTime,
+              "1",
+              "0",
+              oldItem.deli_plant || "",
+              oldItem.sales_order_item || "",
+            ],
+            config.connectionString(),
+          );
         }
       }
 

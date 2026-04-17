@@ -5,8 +5,14 @@ exports.link = async (connectionstring) => {
   pool = new Pool(temporary);
 };
 
-exports.execute2params = async (script, params = []) => {
+exports.execute2params = async (dbname, script, params = [], connectionstring) => {
+  let temporary = JSON.parse(JSON.stringify(connectionstring));
+  if (dbname != null) {
+    temporary.database = dbname;
+  }
+  let pool;
   try {
+    pool = new Pool(temporary);
     const client = await pool.connect();
     try {
       const res = await client.query(script, params);
@@ -40,6 +46,10 @@ exports.execute2params = async (script, params = []) => {
       code: true,
       message: error.message,
     };
+  } finally {
+    if (pool) {
+      await pool.end();
+    }
   }
 };
 
@@ -84,14 +94,15 @@ exports.execute = async (dbname, script, connectionstring) => {
       }
     } finally {
       client.release();
+      await pool.end();
     }
   } catch (error) {
     console.log(
       script +
-        " : error code : " +
-        error.code +
-        " err.message : " +
-        error.message,
+      " : error code : " +
+      error.code +
+      " err.message : " +
+      error.message,
     );
     return {
       code: true,
@@ -126,6 +137,7 @@ exports.get = async (dbname, script, connectionstring) => {
       };
     } finally {
       client.release();
+      await pool.end();
     }
   } catch (error) {
     if (error.code != "3D000") {
@@ -171,8 +183,6 @@ exports.getWithParams = async (
       return { code: true, message: e.message };
     } finally {
       client.release();
-      // แนะนำให้จบการทำงานของ pool ถ้าสร้างใหม่ทุกครั้ง (หรือใช้ Global Pool แทนจะดีกว่า)
-      await pool.end();
     }
   } catch (error) {
     if (error.code != "3D000") {
@@ -182,6 +192,10 @@ exports.getWithParams = async (
       );
     }
     return { code: true, message: error.message };
+  } finally {
+    if (pool) {
+      await pool.end();
+    }
   }
 };
 
