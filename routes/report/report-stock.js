@@ -278,6 +278,7 @@ exports.getReportStock = async (req, res, next) => {
                 tank.date_at,
                 JSONB_AGG(
                     JSONB_BUILD_OBJECT(
+                        'ptrl_tank_code', tpt.ptrl_tank_code,
                         'tank_no', tpt.tnk_number,
                         'itm_code', tit.itm_code,
                         'itm_material_number', tit.itm_material_number,
