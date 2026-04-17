@@ -67,7 +67,7 @@ exports.getVehicleTypeInformationWithDetail = async (req, res, next) => {
                     cl.veh_compartment_type_level_number,
                     cl.veh_compartment_type_level
                 from tbl_vehicle_type v
-                left join tbl_compartment_item c on v.veh_type_code = c.veh_type_code and (c.flag = '1' or c.flag is null)
+                left join tbl_vehicle_compartment c on v.veh_type_code = c.veh_type_code and (c.flag = '1' or c.flag is null)
                 left join tbl_vehicle_type_compartment_level cl on c.id = cl.compartment_item_id and cl.veh_compartment_type_level_flag = '1'
                 where v.veh_type_flag = '1'`;
 
@@ -95,14 +95,14 @@ exports.getVehicleTypeInformationWithDetail = async (req, res, next) => {
                         count(*) as rows_total,
                         ceil(count(v.veh_type_code) / ${page_limit}) as page_total
                         from tbl_vehicle_type v
-                        left join tbl_compartment_item c on v.veh_type_code = c.veh_type_code and (c.flag = '1' or c.flag is null)
+                        left join tbl_vehicle_compartment c on v.veh_type_code = c.veh_type_code and (c.flag = '1' or c.flag is null)
                         where v.veh_type_flag = '1' and v.veh_type_code = '${veh_type_code}'`;
           } else {
             script = `select 
                         count(*) as rows_total,
                         ceil(count(v.veh_type_code) / ${page_limit}) as page_total
                         from tbl_vehicle_type v
-                        left join tbl_compartment_item c on v.veh_type_code = c.veh_type_code and (c.flag = '1' or c.flag is null)
+                        left join tbl_vehicle_compartment c on v.veh_type_code = c.veh_type_code and (c.flag = '1' or c.flag is null)
                         where v.veh_type_flag = '1'`;
           }
 
@@ -317,7 +317,7 @@ exports.getVehicleTypeCompartmentInformationWithDetail = async (
                     cl.veh_compartment_level_type_code,
                     cl.veh_compartment_type_level_number,
                     cl.veh_compartment_type_level
-                from tbl_compartment_item ci
+                from tbl_vehicle_compartment ci
                 left join tbl_vehicle_type_compartment_level cl on ci.id = cl.compartment_item_id and cl.veh_compartment_type_level_flag = '1'
                 where ci.flag = '1'`;
 
@@ -344,13 +344,13 @@ exports.getVehicleTypeCompartmentInformationWithDetail = async (
             script = `select 
                         count(*) as rows_total,
                         ceil(count(ci.id) / ${page_limit}) as page_total
-                        from tbl_compartment_item ci
+                        from tbl_vehicle_compartment ci
                         where ci.flag = '1' and ci.id = '${compartment_id}'`;
           } else {
             script = `select 
                         count(*) as rows_total,
                         ceil(count(ci.id) / ${page_limit}) as page_total
-                        from tbl_compartment_item ci
+                        from tbl_vehicle_compartment ci
                         where ci.flag = '1'`;
           }
 
@@ -715,7 +715,7 @@ exports.getCompartmentItem = async (req, res, next) => {
                     ci.ist_dt, 
                     ci.mdf_dt, 
                     ci.rm_dt
-                from tbl_compartment_item ci
+                from tbl_vehicle_compartment ci
                 where ci.flag = '1'`;
 
       if (compartment_id.toString().toUpperCase() != "ALL") {
@@ -742,7 +742,7 @@ exports.getCompartmentItem = async (req, res, next) => {
           let script_count = `select 
                     count(*) as rows_total,
                     ceil(count(ci.id) / ${page_limit}) as page_total
-                    from tbl_compartment_item ci
+                    from tbl_vehicle_compartment ci
                     where ci.flag = '1'`;
 
           if (compartment_id.toString().toUpperCase() != "ALL") {
@@ -1138,7 +1138,7 @@ exports.addVehicleTypeInformation = async (req, res, next) => {
       }
 
       let existingCompartments = [];
-      // วนลูป compartment_item เพื่อ Insert เข้า tbl_compartment_item
+      // วนลูป compartment_item เพื่อ Insert เข้า tbl_vehicle_compartment
       if (
         !isError &&
         Array.isArray(compartment_item) &&
@@ -1156,7 +1156,7 @@ exports.addVehicleTypeInformation = async (req, res, next) => {
           let level_data = item.level_data || [];
 
           // เช็คว่า compartment_no นี้มีอยู่แล้วหรือยัง
-          let scriptCheckExist = `SELECT id FROM tbl_compartment_item 
+          let scriptCheckExist = `SELECT id FROM tbl_vehicle_compartment 
                         WHERE veh_type_code = '${veh_type_code}' AND compartment_no = '${current_compartment_no}';`;
 
           let tbl_checkExist = await pgConn.get(
@@ -1179,7 +1179,7 @@ exports.addVehicleTypeInformation = async (req, res, next) => {
           }
 
           //เพิ่มข้อมูลช่องน้ำมัน
-          let scriptInsertItem = `INSERT INTO tbl_compartment_item 
+          let scriptInsertItem = `INSERT INTO tbl_vehicle_compartment 
                         (veh_type_code, compartment_no, compartment_total, compartment_max, compartment_min, ist_dt) VALUES 
                         ('${veh_type_code}', '${current_compartment_no}', ${current_compartment_total}, ${current_compartment_max}, ${current_compartment_min}, '${moment().format("YYYY-MM-DD HH:mm:ss")}') RETURNING id;`;
 
@@ -1350,13 +1350,13 @@ exports.addVehicleTypeCompartmentInformation = async (req, res, next) => {
         // มีอยู่แล้ว → ดึง veh_type_code เดิมมาใช้
         veh_type_code = tbl_check.data[0].veh_type_code;
 
-        // เพิ่ม compartment_item เข้า tbl_compartment_item
+        // เพิ่ม compartment_item เข้า tbl_vehicle_compartment
         for (let i = 0; i < compartment_item.length; i++) {
           let level_data = compartment_item[i].level_data || [];
           let current_compartment_no = compartment_item[i].compartment_no || "";
 
           // เช็คว่า compartment_no นี้มีอยู่แล้วหรือยัง
-          let scriptCheckExist = `SELECT id FROM tbl_compartment_item 
+          let scriptCheckExist = `SELECT id FROM tbl_vehicle_compartment 
                         WHERE veh_type_code = '${veh_type_code}' AND compartment_no = '${current_compartment_no}';`;
           let tbl_checkExist = await pgConn.get(
             dbPrefix + lic_code,
@@ -1376,7 +1376,7 @@ exports.addVehicleTypeCompartmentInformation = async (req, res, next) => {
             continue;
           }
 
-          let scriptInsertItem = `INSERT INTO tbl_compartment_item 
+          let scriptInsertItem = `INSERT INTO tbl_vehicle_compartment 
                         (veh_type_code, compartment_no, compartment_total, compartment_max, compartment_min, ist_dt) VALUES 
                         ('${veh_type_code}', '${current_compartment_no}', '${compartment_item[i].compartment_total}', '${compartment_item[i].compartment_max}', '${compartment_item[i].compartment_min}', '${moment().format("YYYY-MM-DD HH:mm:ss")}') RETURNING id;`;
 
@@ -1522,8 +1522,8 @@ exports.addVehicleTypeCompartmentLevelInformation = async (req, res, next) => {
       let insertedCompartments = [];
       let isError = false;
 
-      // เช็คว่า compartment_no มีอยู่ใน tbl_compartment_item หรือยัง
-      let scriptCheck = `SELECT compartment_no FROM tbl_compartment_item 
+      // เช็คว่า compartment_no มีอยู่ใน tbl_vehicle_compartment หรือยัง
+      let scriptCheck = `SELECT compartment_no FROM tbl_vehicle_compartment 
                 WHERE id = '${compartment_id}';`;
       let tbl_check = await pgConn.get(
         dbPrefix + lic_code,
@@ -1716,7 +1716,7 @@ exports.setVehicleTypeInformation = async (req, res, next) => {
         // ========== Delete and Insert Compartment Items (ตามคำสั่ง: ลบของเก่าแล้ว insert ของใหม่ มาแทน) ==========
         if (!isError) {
           // ลบ level เก่าออกก่อน
-          let scriptDeleteLevel = `DELETE FROM tbl_vehicle_type_compartment_level WHERE compartment_item_id IN (SELECT id FROM tbl_compartment_item WHERE veh_type_code = '${veh_type_code}');`;
+          let scriptDeleteLevel = `DELETE FROM tbl_vehicle_type_compartment_level WHERE compartment_item_id IN (SELECT id FROM tbl_vehicle_compartment WHERE veh_type_code = '${veh_type_code}');`;
           await pgConn.execute(
             dbPrefix + lic_code,
             scriptDeleteLevel,
@@ -1724,7 +1724,7 @@ exports.setVehicleTypeInformation = async (req, res, next) => {
           );
 
           // ลบ compartment เก่าออก
-          let scriptDeleteCompartment = `DELETE FROM tbl_compartment_item WHERE veh_type_code = '${veh_type_code}';`;
+          let scriptDeleteCompartment = `DELETE FROM tbl_vehicle_compartment WHERE veh_type_code = '${veh_type_code}';`;
           await pgConn.execute(
             dbPrefix + lic_code,
             scriptDeleteCompartment,
@@ -1746,7 +1746,7 @@ exports.setVehicleTypeInformation = async (req, res, next) => {
                 item.compartment_min != undefined ? item.compartment_min : 0;
               let level_data = item.level_data || [];
 
-              let scriptInsertItem = `INSERT INTO tbl_compartment_item 
+              let scriptInsertItem = `INSERT INTO tbl_vehicle_compartment 
                               (veh_type_code, compartment_no, compartment_total, compartment_max, compartment_min, ist_dt) VALUES 
                               ('${veh_type_code}', '${current_compartment_no}', ${current_compartment_total}, ${current_compartment_max}, ${current_compartment_min}, '${moment().format("YYYY-MM-DD HH:mm:ss")}') RETURNING id;`;
 
@@ -2013,7 +2013,7 @@ exports.removeCompartmentItemById = async (req, res, next) => {
         ? compartment_id
         : [compartment_id];
       let compartment_idIn = compartment_idArr.map((c) => `'${c}'`).join(", ");
-      script = `update tbl_compartment_item set flag = '0', rm_dt = '${moment().format("YYYY - MM - DD HH: mm:ss")}' 
+      script = `update tbl_vehicle_compartment set flag = '0', rm_dt = '${moment().format("YYYY - MM - DD HH: mm:ss")}' 
             where id in (${compartment_idIn}); `;
 
       let tbl_temporary = await pgConn.execute(
