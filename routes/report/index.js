@@ -24,12 +24,15 @@ router.post('/pos/omi', reportPos.getReportPosOmi); //ยอดขายรา�
 //สต็อก
 router.post('/stock', reportStock.getReportStock);
 
+// ============= Update POS =============
+router.post('/manual/pos-tank', reportPos.addPosTank); // อัปเดตยอดขายรายแทงค์
+router.post('/manual/pos-meter', reportPos.addPosMeter); // อัปเดตยอดขายรายหัวจ่าย
 
 // คำนวณยอดขาย
 const runSyncSalesTask = () => {
     console.log('Running sync sales task:', moment().format('YYYY-MM-DD HH:mm:ss'));
-    let lic_code = 'aos01';
-    let ptrl_number = '12269';
+    let lic_code = 'aos02';
+    let ptrl_number = '';
     let date_at = moment().format('YYYY-MM-DD');
     // let date_at = '2026-04-01';
     reportStock.syncSalesInfo(date_at, ptrl_number, lic_code);

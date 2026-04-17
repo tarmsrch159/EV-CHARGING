@@ -302,3 +302,32 @@ exports.getReportPosOmi = async (req, res, next) => {
     }
 }
 
+exports.addPosTank = async (req, res) => {
+    try {
+        const { date_at, ptrl_number, lic_code } = req.body;
+        const result = await pgConn.executePg(
+            `SELECT * FROM ${dbPrefix}add_pos_tank($1, $2, $3)`,
+            [date_at, ptrl_number, lic_code]
+        );
+        res.json(result);
+    } catch (error) {
+        console.error('Error in addPosTank:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+}
+
+exports.addPosMeter = async (req, res) => {
+    try {
+        const { date_at, ptrl_number, lic_code } = req.body;
+        const result = await pgConn.executePg(
+            `SELECT * FROM ${dbPrefix}add_pos_meter($1, $2, $3)`,
+            [date_at, ptrl_number, lic_code]
+        );
+        res.json(result);
+    } catch (error) {
+        console.error('Error in addPosMeter:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+}
+
+
