@@ -410,8 +410,7 @@ exports.getOrderInformationByID = async (req, res, next) => {
                 tbl_depot.dpo_code, tbl_depot.dpo_desc, tbl_depot.dpo_short_desc
             FROM tbl_order_item
             LEFT JOIN tbl_item ON tbl_order_item.item_no = tbl_item.itm_code
-            LEFT JOIN tbl_petrol_depot ON tbl_petrol_depot.ptrl_code = '${orderData.ptrl_code}' AND tbl_petrol_depot.ptrl_depot_flag = '1'
-            LEFT JOIN tbl_depot ON tbl_petrol_depot.dpo_code = tbl_depot.dpo_code AND tbl_depot.dpo_flag = '1'
+            LEFT JOIN tbl_depot ON tbl_order_item.deli_plant = tbl_depot.dpo_code AND tbl_depot.dpo_flag = '1'
           INNER JOIN tbl_petrol_tank ON tbl_order_item.ptrl_tank_code = tbl_petrol_tank.ptrl_tank_code 
                 AND tbl_petrol_tank.ptrl_tank_flag = '1'
             
