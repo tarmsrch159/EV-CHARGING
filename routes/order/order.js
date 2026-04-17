@@ -335,18 +335,13 @@ exports.getOrderInformationByID = async (req, res, next) => {
                 tbl_order.hana_created, tbl_order.hana_time, tbl_order.created_by, 
                 tbl_order.ist_dt, tbl_order.mdf_dt, tbl_order.rm_dt,
                 tbl_order.auto_order,
-                tbl_province.prov_code,
-                tbl_amphure.amph_code,
-                tbl_tambon.tamb_code,
-                tbl_province.prov_desc, tbl_amphure.amph_desc, tbl_tambon.tamb_desc
+                tbl_petrol.ptrl_address,
+                tbl_petrol.ptrl_zip_code
             FROM tbl_order  
             
             LEFT JOIN tbl_order_type ON tbl_order.order_type = tbl_order_type.ord_type_code
             LEFT JOIN tbl_petrol_group ON tbl_petrol_group.ptrl_group_code = tbl_order.order_group
             LEFT JOIN tbl_petrol ON tbl_order.ship_to = tbl_petrol.ptrl_number
-            LEFT JOIN tbl_province ON tbl_petrol.prov_code = tbl_province.prov_code 
-            LEFT JOIN tbl_amphure ON tbl_petrol.amph_code = tbl_amphure.amph_code 
-            LEFT JOIN tbl_tambon ON tbl_petrol.tamb_code = tbl_tambon.tamb_code 
             LEFT JOIN tbl_master_time ON tbl_order.deli_time_req = tbl_master_time.time_code
             WHERE tbl_order.rm_dt IS NULL AND tbl_order.id = ${id}`;
 
