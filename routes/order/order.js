@@ -386,6 +386,7 @@ exports.getOrderInformationByID = async (req, res, next) => {
     // ======== คำสั่ง SQL สำหรับดึงรายการสินค้า (Items) ที่อยู่ในออเดอร์นี้ ========
     let itemScript = `SELECT 
                 tbl_order_item.id, tbl_order_item.order_no, tbl_order_item.item_no,
+                tbl_order_item.ptrl_tank_code,
                 tbl_petrol_tank.tnk_number as tank_number,
                 tbl_petrol_tank.tnk_capacity as tank_capacity,
                 tbl_order_item.item_qty, tbl_order_item.deli_plant, 
@@ -405,10 +406,8 @@ exports.getOrderInformationByID = async (req, res, next) => {
                 tank.recive_val::INT
             FROM tbl_order_item
             LEFT JOIN tbl_item ON tbl_order_item.item_no = tbl_item.itm_code
-          INNER JOIN tbl_petrol_tank ON tbl_order_item.item_no = tbl_petrol_tank.itm_code 
-                AND tbl_petrol_tank.ptrl_code = '${orderData.ptrl_code}' 
+          INNER JOIN tbl_petrol_tank ON tbl_order_item.ptrl_tank_code = tbl_petrol_tank.ptrl_tank_code 
                 AND tbl_petrol_tank.ptrl_tank_flag = '1'
-                AND (tbl_order_item.tnk_number = '' OR tbl_order_item.tnk_number IS NULL OR tbl_order_item.tnk_number = tbl_petrol_tank.tnk_number)
             
             LEFT JOIN tbl_order_eodtank tank ON (
                 tbl_petrol_tank.tnk_number = tank.tank_no 
@@ -440,7 +439,7 @@ exports.getOrderInformationByID = async (req, res, next) => {
             )
             WHERE CAST(tbl_order_item.order_no AS TEXT) = '${id}'
             AND tbl_order_item.order_item_flag = '1'
-            ORDER BY tbl_order_item.tnk_number ASC`;
+            ORDER BY tbl_order_item.ptrl_tank_code ASC`;
 
     // ======== ยิง Query เพื่อดึงรายการสินค้า (Items) และจัดการข้อมูล null ========
     let itemResult = await pgConn.get(
@@ -3350,7 +3349,7 @@ exports.addOrderInformation = async (req, res, next) => {
         ).trim();
         var deli_plant = order_item[i].deli_plant;
         var remark = order_item[i].remark;
-        var tnk_number = order_item[i].tnk_number
+        var ptrl_tank_code = order_item[i].ptrl_tank_code
 
         console.log(
           `ตรวจสอบ Item [${i}]: Material=${itm_material_number}, Code=${itm_code}`,
@@ -3381,9 +3380,9 @@ exports.addOrderInformation = async (req, res, next) => {
             for (var k = 0; k < order_item[i].item_text.length; k++) {
               var item_text = order_item[i].item_text[k];
               let script_item = `INSERT INTO public.tbl_order_item
-                        (order_no, item_no, item_qty, long_text_id, long_text, ist_dt, order_item_flag, auto_order, deli_plant, sales_order_item, remark, tnk_number)
+                        (order_no, item_no, item_qty, long_text_id, long_text, ist_dt, order_item_flag, auto_order, deli_plant, sales_order_item, remark, ptrl_tank_code)
                         VALUES(${order_id}, '${itm_code}', ${item_quantity}, '${(item_text.long_text_id || "").replace(/'/g, "''")}', '${(item_text.long_text || "").replace(/'/g, "''")}',
-                        '${moment().format("YYYY-MM-DD HH:mm:ss")}', '1', 0, '${deli_plant || ""}', '${sales_order_item}', '${remark || ""}', '${tnk_number || ""}')`;
+                        '${moment().format("YYYY-MM-DD HH:mm:ss")}', '1', 0, '${deli_plant || ""}', '${sales_order_item}', '${remark || ""}', '${ptrl_tank_code || ""}')`;
 
               console.log(
                 `กำลัง Insert Item [${itm_code}] (with text) สำหรับ Order ${order_id}`,
@@ -3402,9 +3401,9 @@ exports.addOrderInformation = async (req, res, next) => {
           } else {
             // กรณีที่ไม่มี item_text
             let script_item = `INSERT INTO public.tbl_order_item
-                            (order_no, item_no, item_qty, long_text_id, long_text, ist_dt, order_item_flag, auto_order, deli_plant, sales_order_item, remark, tnk_number)
+                            (order_no, item_no, item_qty, long_text_id, long_text, ist_dt, order_item_flag, auto_order, deli_plant, sales_order_item, remark, ptrl_tank_code)
                         VALUES(${order_id}, '${itm_code}', ${item_quantity}, '', '',
-                            '${moment().format("YYYY-MM-DD HH:mm:ss")}', '1', 0, '${deli_plant || ""}', '${sales_order_item}', '${remark || ""}', '${tnk_number || ""}')`;
+                            '${moment().format("YYYY-MM-DD HH:mm:ss")}', '1', 0, '${deli_plant || ""}', '${sales_order_item}', '${remark || ""}', '${ptrl_tank_code || ""}')`;
 
             console.log(
               `กำลัง Insert Item [${itm_code}] (no text) สำหรับ Order ${order_id}`,
@@ -3962,20 +3961,21 @@ exports.editOrderItem = async (req, res, next) => {
         let item_quantity = item.item_quantity;
         let item_no = item.item_no;
         let remark = item.remark;
-        let tnk_number = item.tnk_number;
+        let ptrl_tank_code = item.ptrl_tank_code;
         let itemChanges = [];
 
         // ========== Audit Log: ดึงค่าเก่าของ item ==========
         let getOldItemScript = `SELECT oi.item_qty, oi.remark, itm.itm_desc 
                     FROM public.tbl_order_item oi 
                     LEFT JOIN tbl_item itm ON oi.item_no = itm.itm_code
-                    WHERE oi.order_no = $1 AND oi.item_no = $2 AND oi.tnk_number = $3 ORDER BY oi.id DESC LIMIT 1`;
+                    WHERE oi.order_no = $1 AND oi.item_no = $2 AND oi.ptrl_tank_code = $3 ORDER BY oi.id DESC LIMIT 1`;
         let oldItemRes = await pgConn.getWithParams(
           dbPrefix + lic_code,
           getOldItemScript,
-          [order_no, item_no, tnk_number],
+          [order_no, item_no, ptrl_tank_code],
           config.connectionString(),
         );
+
 
         if (!oldItemRes.code && oldItemRes.data.length > 0) {
           let oldItem = oldItemRes.data[0];
@@ -4003,9 +4003,9 @@ exports.editOrderItem = async (req, res, next) => {
                     UPDATE tbl_order_item 
                     SET item_qty = $1, remark = $2
                     WHERE item_no = $3
-                        AND order_no = $4 AND tnk_number = $5
+                        AND order_no = $4 AND ptrl_tank_code = $5
                 `;
-        let params = [item_quantity, remark, item_no, order_no, tnk_number];
+        let params = [item_quantity, remark, item_no, order_no, ptrl_tank_code];
         await pgConn.execute2params(update, params, config.connectionString());
         let updateOrder = `
                     UPDATE tbl_order 
