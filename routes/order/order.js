@@ -319,7 +319,7 @@ exports.getOrderInformationByID = async (req, res, next) => {
       return;
     }
 
-    // ======== คำสั่ง SQL สำหรับดึงข้อมูลของออเดอร์ พร้อม Join ข้อมูลพื้นฐานที่เกี่ยวข้อง ========
+    // ======== คำสั่ง SQL สำหรับดึงข้อมูลของออเดอร์ และ Join ข้อมูลพื้นฐานที่เกี่ยวข้อง ========
     let orderScript = `SELECT 
                 tbl_order.id, tbl_order.order_no, tbl_order.sh_cus_ref as aos_order_no, tbl_order.order_type, tbl_order.order_group, 
                 tbl_order_type.ord_type_desc,
@@ -334,11 +334,19 @@ exports.getOrderInformationByID = async (req, res, next) => {
                 tbl_order.status_check, tbl_order.sd_doc_reject, tbl_order.cus_group, 
                 tbl_order.hana_created, tbl_order.hana_time, tbl_order.created_by, 
                 tbl_order.ist_dt, tbl_order.mdf_dt, tbl_order.rm_dt,
-                tbl_order.auto_order
+                tbl_order.auto_order,
+                tbl_province.prov_code,
+                tbl_amphure.amph_code,
+                tbl_tambon.tamb_code,
+                tbl_province.prov_desc, tbl_amphure.amph_desc, tbl_tambon.tamb_desc
             FROM tbl_order  
+            
             LEFT JOIN tbl_order_type ON tbl_order.order_type = tbl_order_type.ord_type_code
             LEFT JOIN tbl_petrol_group ON tbl_petrol_group.ptrl_group_code = tbl_order.order_group
             LEFT JOIN tbl_petrol ON tbl_order.ship_to = tbl_petrol.ptrl_number
+            LEFT JOIN tbl_province ON tbl_petrol.prov_code = tbl_province.prov_code 
+            LEFT JOIN tbl_amphure ON tbl_petrol.amph_code = tbl_amphure.amph_code 
+            LEFT JOIN tbl_tambon ON tbl_petrol.tamb_code = tbl_tambon.tamb_code 
             LEFT JOIN tbl_master_time ON tbl_order.deli_time_req = tbl_master_time.time_code
             WHERE tbl_order.rm_dt IS NULL AND tbl_order.id = ${id}`;
 
@@ -382,7 +390,6 @@ exports.getOrderInformationByID = async (req, res, next) => {
     let orderData = JSON.parse(
       JSON.stringify(orderResult.data[0]).replace(/\:null/gi, '\:""'),
     );
-
     // ======== คำสั่ง SQL สำหรับดึงรายการสินค้า (Items) ที่อยู่ในออเดอร์นี้ ========
     let itemScript = `SELECT 
                 tbl_order_item.id, tbl_order_item.order_no, tbl_order_item.item_no,
@@ -404,9 +411,12 @@ exports.getOrderInformationByID = async (req, res, next) => {
                 meter_summary.total_sales,
                 meter_summary.total_sales + tbl_petrol_tank.tnk_deadstock AS min_stock,
                 tank.recive_val::INT,
-                tbl_order_item.remark
+                tbl_order_item.remark,
+                tbl_depot.dpo_code, tbl_depot.dpo_desc, tbl_depot.dpo_short_desc
             FROM tbl_order_item
             LEFT JOIN tbl_item ON tbl_order_item.item_no = tbl_item.itm_code
+            LEFT JOIN tbl_petrol_depot ON tbl_petrol_depot.ptrl_code = '${orderData.ptrl_code}' AND tbl_petrol_depot.ptrl_depot_flag = '1'
+            LEFT JOIN tbl_depot ON tbl_petrol_depot.dpo_code = tbl_depot.dpo_code AND tbl_depot.dpo_flag = '1'
           INNER JOIN tbl_petrol_tank ON tbl_order_item.ptrl_tank_code = tbl_petrol_tank.ptrl_tank_code 
                 AND tbl_petrol_tank.ptrl_tank_flag = '1'
             
