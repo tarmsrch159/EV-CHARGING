@@ -276,12 +276,12 @@ exports.setReasonInformation = async (req, res, next) => {
         let script = `
             UPDATE tbl_reason 
             SET 
-                reason_desc = $1,
-                mdf_dt = $2
-            WHERE reason_id = $3 AND rm_dt IS NULL
+                reason_desc = '${reason_desc}',
+                mdf_dt = '${moment().format('YYYY-MM-DD HH:mm:ss')}'
+            WHERE reason_id = ${reason_id} AND rm_dt IS NULL
         `;
 
-        let temporary = await pgConn.execute2params(script, [reason_desc, moment().format('YYYY-MM-DD HH:mm:ss'), reason_id]);
+        let temporary = await pgConn.execute(dbPrefix + lic_code, script, config.connectionString());
 
         if (temporary.code) {
             let response = [{
