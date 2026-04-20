@@ -182,7 +182,7 @@ exports.getReportStock = async (req, res, next) => {
         let scriptSql = `
             SELECT
                 tpr.ptrl_sitecode AS shipto,
-                tank.date_at,
+                $1::date AS date_at,
                 JSONB_AGG(
                     JSONB_BUILD_OBJECT(
                         'ptrl_tank_code', tpt.ptrl_tank_code,
@@ -196,9 +196,9 @@ exports.getReportStock = async (req, res, next) => {
                         'tank_start', tank.tank_start,
                         'tank_end', tank.tank_end,
                         'total_sales', COALESCE(CAST(meter_summary.total_sales AS NUMERIC(18,2)), 0),
-                        'min_stock', CAST(meter_summary.total_sales AS NUMERIC(18,2)) + tpt.tnk_deadstock,
-                        'recive_val', tank.recive_val::INT,
-                        'current_stock', tank.tank_end + COALESCE(tank.recive_val::INT, 0)
+                        'min_stock', COALESCE(CAST(meter_summary.total_sales AS NUMERIC(18,2)), 0) + tpt.tnk_deadstock,
+                        'recive_val', COALESCE(tank.recive_val::INT, 0),
+                        'current_stock', COALESCE(tank.tank_end, 0) + COALESCE(tank.recive_val::NUMERIC, 0)
                     )
                     ORDER BY tpt.tnk_number ASC
                 ) AS data
@@ -233,13 +233,18 @@ exports.getReportStock = async (req, res, next) => {
                 tpt.tnk_number = meter_summary.tank_no 
                 AND tpr.ptrl_sitecode = meter_summary.shipto_no
             )
-            WHERE tpt.ptrl_tank_flag = '1' AND tank.date_at IS NOT NULL ${wh}
-            GROUP BY tpr.ptrl_sitecode, tank.date_at
+            WHERE tpt.ptrl_tank_flag = '1' ${wh}
+            GROUP BY tpr.ptrl_sitecode
             ORDER BY tpr.ptrl_sitecode ASC;
         `;
 
         let result = await pgConn.getWithParams(dbPrefix + lic_code, scriptSql, param, config.connectionString());
-        res.status(200).json(result);
+        console.log(result);
+        if (result.code) {
+            res.status(200).json(result);
+        } else {
+            res.status(200).json(result);
+        }
 
     } catch (error) {
         let response = [{
