@@ -33,6 +33,7 @@ var reportRouter = require('./routes/report/index');
 var masterTimeRouter = require('./routes/master-time/index');
 var reasonRouter = require('./routes/reason/index');
 var runoutConfigRouter = require('./routes/runout-config/index');
+var sapAlertConfigRouter = require('./routes/sap-alert-config/index');
 const orderController = require('./routes/order/order');
 var app = express();
 var cors = require('cors');
@@ -319,6 +320,8 @@ app.use('/api-tms-v2/master-time', masterTimeRouter);
 app.use('/api-tms-v2/reason', reasonRouter);
 //Runout Config
 app.use('/api-tms-v2/runout-config', runoutConfigRouter);
+//SAP Alert Config
+app.use('/api-tms-v2/sap-alert-config', sapAlertConfigRouter);
 
 // ตั้งเวลาทำงานทุก 1 ชั่วโมง
 // cron.schedule('0 * * * *', async () => {
