@@ -87,10 +87,10 @@ exports.getItemInformation = async (req, res, next) => {
 
             if (search != '') {
                 script += ` and (tbl_item.itm_material_number like '%${search}%' 
-                or tbl_item.itm_desc like '%${search}%' 
-                or tbl_item.itm_short_desc like '%${search}%' 
-                or tbl_item_type.itm_type_desc like '%${search}%' 
-                or tbl_item_unit.itm_unit_desc like '%${search}%')`
+                or tbl_item.itm_desc ILIKE '%${search}%' 
+                or tbl_item.itm_short_desc ILIKE '%${search}%' 
+                or tbl_item_type.itm_type_desc ILIKE '%${search}%' 
+                or tbl_item_unit.itm_unit_desc ILIKE '%${search}%')`
             }
 
             script += ` order by tbl_item.ist_dt desc, tbl_item.itm_desc asc `
@@ -126,10 +126,10 @@ exports.getItemInformation = async (req, res, next) => {
 
                     if (search != '') {
                         script += ` and (tbl_item.itm_material_number like '%${search}%' 
-                        or tbl_item.itm_desc like '%${search}%' 
-                        or tbl_item.itm_short_desc like '%${search}%' 
-                        or tbl_item_type.itm_type_desc like '%${search}%' 
-                        or tbl_item_unit.itm_unit_desc like '%${search}%')`
+                        or tbl_item.itm_desc ILIKE '%${search}%' 
+                        or tbl_item.itm_short_desc ILIKE '%${search}%' 
+                        or tbl_item_type.itm_type_desc ILIKE '%${search}%' 
+                        or tbl_item_unit.itm_unit_desc ILIKE '%${search}%')`
                     }
 
                     let tbl_temporary0 = await pgConn.get(dbPrefix + lic_code, script, config.connectionString());

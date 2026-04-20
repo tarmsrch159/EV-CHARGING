@@ -67,7 +67,7 @@ exports.getVehicleTypeInformationWithDetail = async (req, res, next) => {
                     cl.veh_compartment_type_level_number,
                     cl.veh_compartment_type_level
                 from tbl_vehicle_type v
-                left join tbl_vehicle_compartment c on v.veh_type_code = c.veh_type_code and (c.flag = '1' or c.flag is null)
+                left join tbl_vehicle_type_compartment c on v.veh_type_code = c.veh_type_code and (c.flag = '1' or c.flag is null)
                 left join tbl_vehicle_type_compartment_level cl on c.id = cl.compartment_item_id and cl.veh_compartment_type_level_flag = '1'
                 where v.veh_type_flag = '1'`;
 
@@ -95,14 +95,14 @@ exports.getVehicleTypeInformationWithDetail = async (req, res, next) => {
                         count(*) as rows_total,
                         ceil(count(v.veh_type_code) / ${page_limit}) as page_total
                         from tbl_vehicle_type v
-                        left join tbl_vehicle_compartment c on v.veh_type_code = c.veh_type_code and (c.flag = '1' or c.flag is null)
+                        left join tbl_vehicle_type_compartment c on v.veh_type_code = c.veh_type_code and (c.flag = '1' or c.flag is null)
                         where v.veh_type_flag = '1' and v.veh_type_code = '${veh_type_code}'`;
           } else {
             script = `select 
                         count(*) as rows_total,
                         ceil(count(v.veh_type_code) / ${page_limit}) as page_total
                         from tbl_vehicle_type v
-                        left join tbl_vehicle_compartment c on v.veh_type_code = c.veh_type_code and (c.flag = '1' or c.flag is null)
+                        left join tbl_vehicle_type_compartment c on v.veh_type_code = c.veh_type_code and (c.flag = '1' or c.flag is null)
                         where v.veh_type_flag = '1'`;
           }
 
@@ -194,7 +194,7 @@ exports.getVehicleTypeInformationWithDetail = async (req, res, next) => {
               invalid_code: "0",
               message: "",
               data: groupedData, // <--- เปลี่ยนให้ส่ง groupedData แทน tbl_temporary.data
-              page_total: page_total,
+              page_total: page_total < 1 ? 1 : page_total,
               rows_total: rows_total,
               response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
             },
