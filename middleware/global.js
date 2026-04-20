@@ -5465,7 +5465,7 @@ exports.sendResponse = (res, status, invalid_code, message, data = [], extras = 
     invalid_code,
     message,
     data,
+    ...extras,
     response_time: moment().format('YYYY-MM-DD HH:mm:ss'),
-    ...extras
   }]);
 };
