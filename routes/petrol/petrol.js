@@ -103,8 +103,7 @@ exports.getPetrolInformation = async (req, res, next) => {
       conditions.push(`(
                 tbl_petrol.ptrl_number LIKE '%${search}%' 
                 OR tbl_petrol.ptrl_sitecode LIKE '%${search}%' 
-                OR tbl_petrol_group.ptrl_group_desc LIKE '%${search}%' 
-                OR tbl_petrol.ptrl_desc LIKE '%${search}%' 
+               OR tbl_petrol.ptrl_desc ILIKE '%${search}%'
                 OR tbl_petrol.ptrl_short_desc LIKE '%${search}%' 
                 OR tbl_petrol.ptrl_address LIKE '%${search}%' 
                 OR tbl_petrol.ptrl_zip_code LIKE '%${search}%'
