@@ -73,17 +73,14 @@ exports.getDepotInformation = async (req, res, next) => {
 
             if (search != '') {
                 script += ` and (dpo_number like '%${search}%' 
-                or dpo_group_desc like '%${search}%' 
-                or dpo_desc like '%${search}%' 
+                or dpo_desc like UPPER('%${search}%')
                 or dpo_short_desc like '%${search}%' 
-                or dpo_address like '%${search}%' 
-                or dpo_city like '%${search}%' 
-                or dpo_zip_code like '%${search}%')`
+                or dpo_address like '%${search}%')`
             }
 
             script += ` order by ist_dt desc `
             script += ` offset (${page_index}*${page_limit}) limit ${page_limit};`
-
+            console.log(script)
             let tbl_temporary = await pgConn.get(dbPrefix + lic_code, script, config.connectionString());
             if (!tbl_temporary.code) {
                 //debugger
