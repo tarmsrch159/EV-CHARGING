@@ -393,11 +393,19 @@ exports.getPetrolInformationFilter = async (req, res, next) => {
             LEFT JOIN tbl_petrol_group ON tbl_petrol.ptrl_group_code = tbl_petrol_group.ptrl_group_code 
         `;
 
+    let paginationClause = "";
+    if (page_limit.toString().trim().toUpperCase() === "ALL") {
+      paginationClause = "";
+    } else {
+      let offset = parseInt(page_index) * parseInt(page_limit);
+      paginationClause = `LIMIT ${page_limit} OFFSET ${offset}`;
+    }
+
     let dataScript = `
             ${baseSelectQuery}
             ${whereClause}
             ORDER BY tbl_petrol.ist_dt DESC 
-            LIMIT ${page_limit} OFFSET (${page_index} * ${page_limit});
+            ${paginationClause};
         `;
 
     let tbl_temporary = await pgConn.get(
@@ -415,12 +423,12 @@ exports.getPetrolInformationFilter = async (req, res, next) => {
         let rows_total = 0;
 
         // ======== นับจำนวนแถวทั้งหมด ========
+        let pageLimitForCount = page_limit.toString().trim().toUpperCase() === "ALL" ? "COUNT(tbl_petrol.ptrl_code)" : parseInt(page_limit);
         let countScript = `
                     SELECT 
-                        CEIL(COUNT(tbl_petrol.ptrl_code)::float / ${page_limit}) as page_total, 
-                        COUNT(tbl_petrol.ptrl_code) as rows_total 
+                        CEIL(COUNT(DISTINCT tbl_petrol.ptrl_code)::float / ${pageLimitForCount}) as page_total, 
+                        COUNT(DISTINCT tbl_petrol.ptrl_code) as rows_total 
                     FROM tbl_petrol 
-                    LEFT JOIN tbl_office ON tbl_petrol.off_code = tbl_office.off_code 
                     LEFT JOIN tbl_petrol_group ON tbl_petrol.ptrl_group_code = tbl_petrol_group.ptrl_group_code 
                     ${whereClause};
                 `;

@@ -130,7 +130,7 @@ exports.getOrderInformation = async (req, res, next) => {
       conditions.push(`tbl_petrol.ptrl_flag = '1'`);
     } else if (act_val !== "ALL") {
       // สิทธิ์พนักงานทั่วไป: มองเห็นเฉพาะ Order ที่ตัวเองเป็นคนสร้าง
-      conditions.push(`tbl_order.created_by_tms = '${act_id}'`);
+      conditions.push(`tbl_order.ship_to IN (SELECT ptrl_number FROM tbl_petrol WHERE ptrl_code IN (SELECT ptrl_code FROM tbl_employee WHERE emp_code = '${act_id}' AND emp_flag = '1'))`);
     }
 
     if (search !== "") {
