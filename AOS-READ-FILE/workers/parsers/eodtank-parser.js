@@ -25,7 +25,7 @@ async function parseAndInsertEODTANK(fileContent, fileName) {
         const productName = cols[4].trim();
         const tankStart = parseFloat(cols[5]);
         const tankEnd = parseFloat(cols[6]);
-        const reciveVal = cols[7].trim();                    // varchar(50)
+        const reciveVal = parseFloat(cols[7]);
         const closeAt = convertDateDMY(cols[8].trim());      // DD/MM/YYYY → YYYY-MM-DD
 
         const query = `

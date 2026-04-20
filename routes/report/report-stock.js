@@ -197,7 +197,7 @@ exports.getReportStock = async (req, res, next) => {
                         'tank_end', tank.tank_end,
                         'total_sales', COALESCE(CAST(meter_summary.total_sales AS NUMERIC(18,2)), 0),
                         'min_stock', COALESCE(CAST(meter_summary.total_sales AS NUMERIC(18,2)), 0) + tpt.tnk_deadstock,
-                        'recive_val', COALESCE(tank.recive_val::INT, 0),
+                        'recive_val', COALESCE(tank.recive_val, 0),
                         'current_stock', COALESCE(tank.tank_end, 0) + COALESCE(tank.recive_val::NUMERIC, 0)
                     )
                     ORDER BY tpt.tnk_number ASC

@@ -2041,8 +2041,8 @@ exports.postSyncNonVMIOrder = async (lic_code) => {
                                 .format("YYYY-MM-DD HH:mm:ss");
                               let req_dt = moment(
                                 response.data.transport[xshipment].end_date +
-                                  " " +
-                                  response.data.transport[xshipment].end_time,
+                                " " +
+                                response.data.transport[xshipment].end_time,
                               )
                                 .add("Hours", 0)
                                 .format("YYYY-MM-DD HH:mm:ss");
@@ -2258,8 +2258,8 @@ exports.postSyncNonVMIOrder = async (lic_code) => {
                         .format("YYYY-MM-DD HH:mm:ss");
                       let req_dt = moment(
                         response.data.transport[xshipment].end_date +
-                          " " +
-                          response.data.transport[xshipment].end_time,
+                        " " +
+                        response.data.transport[xshipment].end_time,
                       )
                         .add("Hours", 0)
                         .format("YYYY-MM-DD HH:mm:ss");
@@ -4665,7 +4665,7 @@ exports.postBeforeCloseDischargedJob2Tmp = async (lic_code, job_code) => {
                       var xitemfilter = xitemuse.filter((xxx) => {
                         xxx.itm_code.toString() == xitm_code &&
                           xxx.compartment_number.toString() ==
-                            xcompartment_number;
+                          xcompartment_number;
                       });
 
                       if (xitemfilter.length == 0) {
@@ -5456,4 +5456,16 @@ exports.formatAuditLogs = (dbData) => {
   }
 
   return { processedData, allShipTos };
+};
+
+// Helper สำหรับส่ง Response กลับไปให้ Client เพื่อลดความซ้ำซ้อน
+exports.sendResponse = (res, status, invalid_code, message, data = [], extras = {}) => {
+  return res.status(200).send([{
+    status,
+    invalid_code,
+    message,
+    data,
+    response_time: moment().format('YYYY-MM-DD HH:mm:ss'),
+    ...extras
+  }]);
 };
