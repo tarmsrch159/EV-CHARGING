@@ -153,8 +153,8 @@ exports.getOrderInformation = async (req, res, next) => {
             SELECT 
                 tbl_order.id, tbl_order.order_no, tbl_order.sh_cus_ref as aos_order_no, tbl_order.order_type, tbl_order.order_group, 
                 tbl_order_type.ord_type_desc, tbl_petrol_group.ptrl_group_desc, tbl_order.order_status,
-                tbl_order.chanel, tbl_order.division, tbl_order.sold_to, tbl_order.ship_to, 
-                tbl_petrol.ptrl_desc as station, tbl_order.cus_ref, tbl_order.cus_date_ref, tbl_order.po_name, tbl_order.order_by, 
+                tbl_order.chanel, tbl_order.division, tbl_order.sold_to, tbl_order.ship_to, tbl_petrol.ptrl_code,
+                tbl_petrol.ptrl_desc, tbl_order.cus_ref, tbl_order.cus_date_ref, tbl_order.po_name, tbl_order.order_by, 
                 tbl_order.ship_cond, tbl_order.pay_term, tbl_order.deli_date_req as request_date, tbl_master_time.time_value as RequestTime, 
                 tbl_order.description, tbl_order.sh_cus_date_ref, tbl_order.status_deli, tbl_order.status_block, tbl_order.status_sd_process, 
                 tbl_order.status_check, tbl_order.sd_doc_reject, tbl_order.cus_group, 
