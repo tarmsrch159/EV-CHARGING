@@ -44,7 +44,7 @@ exports.getOfficeInformation = async (req, res, next) => {
                 off_amph_code,amph_desc as off_amph_desc,amph_desc_en as off_amph_desc_en,
                 off_prov_code,prov_desc as off_prov_desc,prov_desc_en as off_prov_desc_en,
                 tbl_tambon.post_code as off_post_code,off_latitude, off_longitude, off_area, 
-                off_flag, tbl_office.ist_dt, tbl_office.mdf_dt, tbl_office.rm_dt
+                off_flag, tbl_office.ist_dt, tbl_office.mdf_dt, tbl_office.rm_dt, tbl_office.order_cutoff_time, tbl_office.cutoff_status, tbl_office.start_calculate_auto_order, tbl_office.end_calculate_auto_order
                 from tbl_office 
                 left join tbl_province on tbl_office.off_prov_code = tbl_province.prov_code
                 left join tbl_amphure on tbl_office.off_prov_code = tbl_amphure.prov_code
@@ -59,7 +59,7 @@ exports.getOfficeInformation = async (req, res, next) => {
                 off_amph_code,amph_desc as off_amph_desc,amph_desc_en as off_amph_desc_en,
                 off_prov_code,prov_desc as off_prov_desc,prov_desc_en as off_prov_desc_en,
                 tbl_tambon.post_code as off_post_code,off_latitude, off_longitude, off_area, 
-                off_flag, tbl_office.ist_dt, tbl_office.mdf_dt, tbl_office.rm_dt
+                off_flag, tbl_office.ist_dt, tbl_office.mdf_dt, tbl_office.rm_dt, tbl_office.order_cutoff_time, tbl_office.cutoff_status, tbl_office.start_calculate_auto_order, tbl_office.end_calculate_auto_order
                 from tbl_office 
                 left join tbl_province on tbl_office.off_prov_code = tbl_province.prov_code
                 left join tbl_amphure on tbl_office.off_prov_code = tbl_amphure.prov_code
@@ -241,6 +241,10 @@ exports.setOfficeInformation = async (req, res, next) => {
             off_latitude,
             off_longitude,
             off_area,
+            order_cutoff_time,
+            cutoff_status,
+            start_calculate_auto_order,
+            end_calculate_auto_order,
             action
         } = req.body[0];
 
@@ -271,7 +275,11 @@ exports.setOfficeInformation = async (req, res, next) => {
             off_latitude = ${off_latitude},
             off_longitude = ${off_longitude},
             off_area = ${off_area},
-            mdf_dt = '${moment().format('YYYY-MM-DD HH:mm:ss')}' 
+            mdf_dt = '${moment().format('YYYY-MM-DD HH:mm:ss')}',
+            order_cutoff_time = '${order_cutoff_time}',
+            cutoff_status = '${cutoff_status}',
+            start_calculate_auto_order = '${start_calculate_auto_order}',
+            end_calculate_auto_order = '${end_calculate_auto_order}'
             where off_code = '${off_code}';`
 
             let tbl_temporary = await pgConn.execute(dbPrefix + lic_code, script, config.connectionString());
@@ -334,6 +342,10 @@ exports.addOfficeInformation = async (req, res, next) => {
             off_latitude,
             off_longitude,
             off_area,
+            order_cutoff_time,
+            cutoff_status,
+            start_calculate_auto_order,
+            end_calculate_auto_order,
             action
         } = req.body[0];
 
@@ -374,10 +386,10 @@ exports.addOfficeInformation = async (req, res, next) => {
 
             let off_code = 'off-' + moment().format('x');
             script = `insert into tbl_office (off_code, off_desc, off_desc_en, off_number, off_address, 
-            off_tamb_code, off_amph_code, off_prov_code, off_latitude, off_longitude, off_area, off_flag, ist_dt)
+            off_tamb_code, off_amph_code, off_prov_code, off_latitude, off_longitude, off_area, off_flag, ist_dt, order_cutoff_time, cutoff_status, start_calculate_auto_order, end_calculate_auto_order)
             values ('${off_code}', '${off_desc}', '${off_desc_en}', '${off_number}', '${off_address}', '${off_tamb_code}', 
             '${off_amph_code}', '${off_prov_code}', ${off_latitude}, ${off_longitude}, ${off_area}, 
-            '1', '${moment().format('YYYY-MM-DD HH:mm:ss')}');`
+            '1', '${moment().format('YYYY-MM-DD HH:mm:ss')}', '${order_cutoff_time}', '${cutoff_status}', '${start_calculate_auto_order}', '${end_calculate_auto_order}');`
 
             let tbl_temporary = await pgConn.execute(dbPrefix + lic_code, script, config.connectionString());
             if (!tbl_temporary.code) {
