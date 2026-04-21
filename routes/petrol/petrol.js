@@ -125,7 +125,7 @@ exports.getPetrolInformation = async (req, res, next) => {
             tbl_petrol.off_code, off_desc, tbl_petrol.ptrl_group_code, ptrl_group_desc,
             ptrl_flag, ptrl_remark, ptrl_sales_group, ptrl_sales_type, auto_order, 
             tbl_petrol.prov_code, tbl_petrol.amph_code, tbl_petrol.tamb_code, 
-            tbl_province.prov_desc, tbl_amphure.amph_desc, tbl_tambon.tamb_desc, tbl_petrol.coverage_days, tbl_petrol.waiting_days
+            tbl_province.prov_desc, tbl_amphure.amph_desc, tbl_tambon.tamb_desc, tbl_petrol.coverage_days, tbl_petrol.waiting_days, tbl_petrol.stock_provious_days
             FROM tbl_petrol 
             LEFT JOIN tbl_office ON tbl_petrol.off_code = tbl_office.off_code 
             LEFT JOIN tbl_petrol_group ON tbl_petrol.ptrl_group_code = tbl_petrol_group.ptrl_group_code 
@@ -660,7 +660,8 @@ exports.setPetrolInformation = async (req, res, next) => {
       amph_code,
       tamb_code,
       coverage_days,
-      waiting_days
+      waiting_days,
+      stock_provious_days
     } = payload;
 
     //เช็คเฉพาะส่วนที่สำคัญ
@@ -734,7 +735,8 @@ exports.setPetrolInformation = async (req, res, next) => {
                 amph_code = '${amph_code}',
                 tamb_code = '${tamb_code}',
                 coverage_days = ${coverage_days},
-                waiting_days = ${waiting_days}
+                waiting_days = ${waiting_days},
+                stock_provious_days = ${stock_provious_days}
             where ptrl_code = '${ptrl_code}';`;
 
       script = script.replace(/'NULL'/gi, "NULL");
@@ -846,6 +848,8 @@ exports.addPetrolInformation = async (req, res, next) => {
       amph_code,
       tamb_code,
       waiting_days,
+      coverage_days,
+      stock_provious_days
     } = payload;
 
     //เช็คเฉพาะส่วนที่สำคัญ
@@ -930,12 +934,12 @@ exports.addPetrolInformation = async (req, res, next) => {
       script = `insert into tbl_petrol 
             (ptrl_code, ptrl_number, ptrl_sitecode, ptrl_desc, ptrl_short_desc, ptrl_address, ptrl_zip_code, ptrl_country_code, ptrl_unloading_minute,
             ptrl_expenses_per_km, ptrl_area, ptrl_option_pump, ptrl_option_mrge_orders,
-            ptrl_lat, ptrl_lon, off_code, ptrl_group_code, ptrl_flag, ist_dt, ptrl_remark, ptrl_sales_group, ptrl_sales_type, auto_order, prov_code, amph_code, tamb_code, waiting_days) 
+            ptrl_lat, ptrl_lon, off_code, ptrl_group_code, ptrl_flag, ist_dt, ptrl_remark, ptrl_sales_group, ptrl_sales_type, auto_order, prov_code, amph_code, tamb_code, waiting_days, coverage_days, stock_provious_days) 
             values 
             ('${ptrl_code}', '${ptrl_number}', '${ptrl_sitecode}', '${ptrl_desc}', '${ptrl_short_desc}', '${ptrl_address}', '${ptrl_zip_code}', 
             '${ptrl_country_code}', ${ptrl_unloading_minute}, ${ptrl_expenses_per_km}, 
             ${ptrl_area}, '${ptrl_option_pump}', '${ptrl_option_mrge_orders}', ${ptrl_lat}, ${ptrl_lon}, '${off_code}', '${ptrl_group_code}',
-            '1', '${moment().format("YYYY-MM-DD HH:mm:ss")}', '${ptrl_remark}', '${ptrl_sales_group}', '${ptrl_sales_type}', '${auto_order}', '${prov_code}', '${amph_code}', '${tamb_code}', '${waiting_days}');`;
+            '1', '${moment().format("YYYY-MM-DD HH:mm:ss")}', '${ptrl_remark}', '${ptrl_sales_group}', '${ptrl_sales_type}', '${auto_order}', '${prov_code}', '${amph_code}', '${tamb_code}', '${waiting_days}', '${coverage_days}', '${stock_provious_days}');`;
 
       script = script.replace(/'NULL'/gi, "NULL");
       let tbl_temporary = await pgConn.execute(
