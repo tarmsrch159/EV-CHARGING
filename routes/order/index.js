@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const order = require('./order')
 const order_type = require('./order-type');
+const auto_order = require('./auto-order');
 
 // ============= Order =============
 router.post('/information', order.getOrderInformation);
@@ -27,5 +28,10 @@ router.post('/type/information', order_type.getOrderTypeInformation);
 router.put('/type/information', order_type.addOrderType);
 router.patch('/type/information', order_type.setOrderType);
 router.delete('/type/remove', order_type.removeOrderType);
+
+
+// ========= Auto Order ==========
+router.post('/auto-order/stock/information', auto_order.getStockAutoOrderInformation);
+router.post('/auto-order/sales/information', auto_order.getSalesAutoOrderInformation);
 
 module.exports = router;
