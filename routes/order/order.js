@@ -239,7 +239,7 @@ exports.getOrderInformation = async (req, res, next) => {
             data: tbl_temporary.data,
             response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
             page_total: page_total <= 0 ? 1 : page_total,
-            rows_total: tbl_temporary.data.length,
+            rows_total: rows_total,
           },
         ];
         res.status(200).send(response);
