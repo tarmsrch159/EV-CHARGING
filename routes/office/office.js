@@ -51,7 +51,7 @@ exports.getOfficeInformation = async (req, res, next) => {
                 and tbl_office.off_amph_code = tbl_amphure.amph_code
                 left join tbl_tambon on tbl_office.off_amph_code = tbl_tambon.amph_code
                 and tbl_office.off_tamb_code = tbl_tambon.tamb_code 
-                where off_flag = '1' and off_code = '${off_code}' order by off_code asc`;
+                where off_flag = '1' and off_code = '${off_code}'`;
             }
             else {
                 script = `select off_code, off_desc, off_desc_en, off_number, off_address, 
