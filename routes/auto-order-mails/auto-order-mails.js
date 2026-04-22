@@ -12,17 +12,53 @@ const dbPrefix = config.dbPrefix();
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 // =========================================================
-//  Helpers: AES-256-CBC Encryption
+//  Helpers: AES-256-CBC Encryption & Decryption
 // =========================================================
 const SECRET_KEY = 'AOS_BangChak_SecretKey_2026!!@#$'; // 32 characters
 const IV_LENGTH = 16;
+const ALGORITHM = 'aes-256-cbc';
 
+/**
+ * เข้ารหัสข้อมูลเป็น Token
+ */
 const encryptPayload = (text) => {
-    const iv = crypto.randomBytes(IV_LENGTH);
-    const cipher = crypto.createCipheriv('aes-256-cbc', Buffer.from(SECRET_KEY, 'utf8'), iv);
-    let encrypted = cipher.update(text, 'utf8');
-    encrypted = Buffer.concat([encrypted, cipher.final()]);
-    return iv.toString('hex') + ':' + encrypted.toString('hex');
+    try {
+        const iv = crypto.randomBytes(IV_LENGTH);
+        const cipher = crypto.createCipheriv(ALGORITHM, Buffer.from(SECRET_KEY, 'utf8'), iv);
+        let encrypted = cipher.update(text, 'utf8');
+        encrypted = Buffer.concat([encrypted, cipher.final()]);
+        return iv.toString('hex') + ':' + encrypted.toString('hex');
+    } catch (err) {
+        console.error('   ❌ [encryptPayload Error]:', err.message);
+        return null;
+    }
+};
+
+/**
+ * ถอดรหัส Token เป็นข้อมูลดิบ
+ */
+const decryptPayload = (text) => {
+    try {
+        if (!text) return null;
+        console.log(`   🔍 กำลังถอดรหัส Token: ${text.substring(0, 20)}...`);
+
+        const parts = text.split(':');
+        if (parts.length !== 2) {
+            console.error('   ❌ Token Format ผิด (ไม่มีเครื่องหมาย :)');
+            return null;
+        }
+
+        const iv = Buffer.from(parts[0], 'hex');
+        const encryptedText = Buffer.from(parts[1], 'hex');
+        const decipher = crypto.createDecipheriv(ALGORITHM, Buffer.from(SECRET_KEY, 'utf8'), iv);
+
+        let decrypted = decipher.update(encryptedText);
+        decrypted = Buffer.concat([decrypted, decipher.final()]);
+        return decrypted.toString('utf8');
+    } catch (err) {
+        console.error('   ❌ [decryptPayload Error]:', err.message);
+        return null;
+    }
 };
 
 // =========================================================
@@ -226,7 +262,7 @@ const sendAutoOrderEmail = async (stationData) => {
         const reportBaseUrlTest = 'http://localhost:5173/main/order/order-report';
 
         // สลับ URL ที่นี่ (ตอนนี้ใช้ตัว Test ตามที่พี่แจ้งครับ)
-        const reportBaseUrl = reportBaseUrlTest;
+        const reportBaseUrl = reportBaseUrlProd;
 
         const firstOrder = stationData.orders[0] || {};
         const orderId = firstOrder.order_id || '';
@@ -366,7 +402,8 @@ exports.processAutoOrderMails = processAutoOrderMails;
 // =========================================================
 //  Decrypt Token API (สำหรับ Frontend ถอดรหัส)
 // =========================================================
-const decryptPayload = (text) => {
+// redundant function removed
+/*
     try {
         console.log(`   🔍 กำลังถอดรหัส Token: ${text ? text.substring(0, 20) : ''}...`);
         const parts = text.split(':');
@@ -379,7 +416,7 @@ const decryptPayload = (text) => {
     } catch (err) {
         return null;
     }
-};
+};*/
 
 exports.decryptToken = async (req, res) => {
     try {
