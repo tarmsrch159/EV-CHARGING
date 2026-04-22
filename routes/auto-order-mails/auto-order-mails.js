@@ -196,8 +196,8 @@ const getDataForStation = async (lic_code, autoItem) => {
         // ====== ดึงข้อมูลผู้จัดการปั๊ม (emp_code) จาก tbl_employee ======
         const manager = await getManagerByPtrlCode(lic_code, autoItem.ptrl_code);
         console.log(`   👤 ผู้จัดการปั๊ม: ${manager ? manager.emp_code : 'ไม่พบ'}`);
-
         return {
+            lic_code: lic_code,
             automatic_code: autoItem.automatic_code,
             ptrl_code: autoItem.ptrl_code,
             ptrl_number: autoItem.ptrl_number,
@@ -226,9 +226,9 @@ const sendAutoOrderEmail = async (stationData) => {
 
         const firstOrder = stationData.orders[0] || {};
         const orderId = firstOrder.order_id || '';
-
         // ====== สร้าง Encrypted Token สำหรับ Auto Signin ======
         const payload = JSON.stringify({
+            lic_code: stationData.lic_code,
             order_id: orderId,
             emp_id: stationData.manager_emp_code || '',
             u: stationData.manager_username || '',
@@ -404,6 +404,7 @@ exports.decryptToken = async (req, res) => {
         }
 
         return sendResponse(res, 'success', '0', 'ถอดรหัสสำเร็จ', [{
+            lic_code: payload.lic_code || '',
             order_id: payload.order_id || '',
             emp_id: payload.emp_id || '',
             emp_username: payload.u || '',
