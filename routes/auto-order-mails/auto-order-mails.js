@@ -222,7 +222,11 @@ const sendAutoOrderEmail = async (stationData) => {
     try {
         const toEmail = stationData.manager_email || 'test@example.com';
         const stationName = `${stationData.ptrl_desc} (${stationData.ptrl_number})`;
-        const reportBaseUrl = 'https://spd-demo.dtc.co.th:9101/main/order/order-report';
+        const reportBaseUrlProd = 'https://spd-demo.dtc.co.th:9101/main/order/order-report';
+        const reportBaseUrlTest = 'http://localhost:5173/main/order/order-report';
+
+        // สลับ URL ที่นี่ (ตอนนี้ใช้ตัว Test ตามที่พี่แจ้งครับ)
+        const reportBaseUrl = reportBaseUrlTest;
 
         const firstOrder = stationData.orders[0] || {};
         const orderId = firstOrder.order_id || '';

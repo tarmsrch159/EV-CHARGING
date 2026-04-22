@@ -392,6 +392,6 @@ app.use(function (err, req, res, next) {
 // =========================================================
 // autoOrderMailsScheduler.startAutoOrderMailLoop(); // ตัวจริง รันทุกๆ 10 นาที
 // autoOrderMailsScheduler.startAutoOrderMailLoopTest(); // ตัวทดสอบ รันทุกๆ 10 วินาที
-autoOrderMailsScheduler.startAutoOrderMailLoopCustom("15:25", "17:00", 1); // ตัวทดสอบ Custom เวลาได้
+// autoOrderMailsScheduler.startAutoOrderMailLoopCustom("15:25", "17:00", 1); // ตัวทดสอบ Custom เวลาได้
 
 module.exports = app;
