@@ -16,6 +16,7 @@ exports.getOrderInformation = async (req, res, next) => {
     // =========================================================================
     let lic_code = req.header("lic_code");
     let {
+      order_id,
       order_no,
       start_date,
       end_date,
@@ -90,6 +91,8 @@ exports.getOrderInformation = async (req, res, next) => {
       conditions.push(`tbl_order.auto_order = '${auto_order}'`);
     if (order_status.toString().toUpperCase() !== "ALL")
       conditions.push(`tbl_order.order_status = '${order_status}'`);
+    if (order_id.toString().toUpperCase() !== "ALL")
+      conditions.push(`tbl_order.id = '${order_id}'`);
 
     if (
       original_start_date.toString().toUpperCase() !== "ALL" &&

@@ -120,7 +120,7 @@ exports.authEmployeeInformation = async (req, res, next) => {
 }
 
 exports.resetEmployeeInformation = async (req, res, next) => {
-
+    var xresult = [];
     return (async () => {
 
         debugger

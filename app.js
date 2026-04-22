@@ -34,6 +34,9 @@ var masterTimeRouter = require('./routes/master-time/index');
 var reasonRouter = require('./routes/reason/index');
 var runoutConfigRouter = require('./routes/runout-config/index');
 var sapAlertConfigRouter = require('./routes/sap-alert-config/index');
+var autoOrderMailsRouter = require('./routes/auto-order-mails/index');
+const autoOrderMailsController = require('./routes/auto-order-mails/auto-order-mails');
+const autoOrderMailsScheduler = require('./routes/auto-order-mails/auto-order-mail-scheduler');
 const orderController = require('./routes/order/order');
 var app = express();
 var cors = require('cors');
@@ -322,6 +325,9 @@ app.use('/api-tms-v2/reason', reasonRouter);
 app.use('/api-tms-v2/runout-config', runoutConfigRouter);
 //SAP Alert Config
 app.use('/api-tms-v2/sap-alert-config', sapAlertConfigRouter);
+//Auto Order Mails
+app.use('/api-tms-v2/auto-order-mails', autoOrderMailsRouter);
+
 
 // ตั้งเวลาทำงานทุก 1 ชั่วโมง
 // cron.schedule('0 * * * *', async () => {
@@ -380,5 +386,12 @@ app.use(function (err, req, res, next) {
     res.status(err.status || 500);
     res.render('error');
 });
+
+// =========================================================
+//  เริ่มระบบ Auto Order Mail Background Loop
+// =========================================================
+// autoOrderMailsScheduler.startAutoOrderMailLoop(); // ตัวจริง รันทุกๆ 10 นาที
+// autoOrderMailsScheduler.startAutoOrderMailLoopTest(); // ตัวทดสอบ รันทุกๆ 10 วินาที
+autoOrderMailsScheduler.startAutoOrderMailLoopCustom("15:25", "17:00", 1); // ตัวทดสอบ Custom เวลาได้
 
 module.exports = app;

@@ -1,0 +1,67 @@
+const nodemailer = require('nodemailer');
+
+const ENV = {
+  PROD: false
+};
+
+// ======= Config SMTP (Production & SIT) =======
+const MAIL_CONFIGS = {
+  production: {
+    host: "smtp.gmail.com",
+    port: 587,
+    secure: false,
+    auth: {
+      user: "your-email@gmail.com",
+      pass: "your-app-password"
+    },
+    from: '"AOS System" <noreply@bangchak.co.th>'
+  },
+  sit: {
+    host: "smtp.gmail.com",
+    port: 587,
+    secure: false,
+    auth: {
+      user: "mrxon2486@gmail.com",
+      pass: "iwvmuthdeksfpsed"
+    },
+    from: '"AOS System (SIT)" <noreply@bangchak.co.th>'
+  }
+};
+
+// เลือก Config ตาม ENV
+const currentConfig = ENV.PROD ? MAIL_CONFIGS.production : MAIL_CONFIGS.sit;
+
+const transporter = nodemailer.createTransport({
+  host: currentConfig.host,
+  port: currentConfig.port,
+  secure: currentConfig.secure,
+  auth: {
+    user: currentConfig.auth.user,
+    pass: currentConfig.auth.pass
+  }
+});
+
+/**
+ *  ฟังก์ชันส่งอีเมล
+ * @param {string} to - อีเมลผู้รับ
+ * @param {string} subject - หัวข้อ
+ * @param {string} html - เนื้อหา HTML
+ */
+exports.sendMail = async (to, subject, html) => {
+  try {
+    const info = await transporter.sendMail({
+      from: currentConfig.from,
+      to,
+      subject,
+      html
+    });
+
+    console.log(`   ✅ [MAIL SENT] Message ID: ${info.messageId}`);
+    return { success: true, messageId: info.messageId };
+  } catch (error) {
+    console.error(`   ❌ [MAIL ERROR]:`, error.message);
+    return { success: false, error: error.message };
+  }
+};
+
+exports.mailConfig = () => currentConfig;
