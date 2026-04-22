@@ -265,3 +265,38 @@ exports.setEmailAlertInformation = async (req, res, next) => {
 };
 
 
+// =========================================================
+//            ลบข้อมูลอีเมลแจ้งเตือน (Remove Email Alert)
+// =========================================================
+exports.removeEmailAlert = async (req, res, next) => {
+    try {
+        const lic_code = req.header('lic_code');
+        const { ptrl_mail_code, action } = req.body[0] || {};
+
+        if (!lic_code || !ptrl_mail_code || !action) {
+            return sendResponse(res, 'error', '-1', 'ข้อมูลพารามิเตอร์ไม่ถูกต้อง', []);
+        }
+
+        const now = moment().format('YYYY-MM-DD HH:mm:ss');
+        const script = `
+            UPDATE tbl_petrol_mail_alert
+            SET rm_dt = $1, mail_alert_flag = '0'
+            WHERE ptrl_mail_code = $2 AND rm_dt IS NULL
+        `;
+
+        const params = [now, ptrl_mail_code];
+        const result = await pgConn.execute2params(dbPrefix + lic_code, script, params, config.connectionString());
+
+        if (result.code) {
+            await xglobal.action_logs(lic_code, action[0].id, 'ลบอีเมลแจ้งเตือน', JSON.stringify(req.body[0]), 'ไม่สามารถลบข้อมูลได้', action[0].value);
+            return sendResponse(res, 'error', '-3', 'ไม่สามารถลบข้อมูลได้, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ', []);
+        }
+
+        await xglobal.action_logs(lic_code, action[0].id, 'ลบอีเมลแจ้งเตือน', JSON.stringify(req.body[0]), 'success', action[0].value);
+        return sendResponse(res, 'success', '0', 'ลบข้อมูลสำเร็จ', []);
+
+    } catch (err) {
+        console.error(err);
+        return sendResponse(res, 'error', '-4', 'เกิดข้อผิดพลาดภายในระบบ', []);
+    }
+};
