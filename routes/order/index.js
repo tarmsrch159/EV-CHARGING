@@ -13,6 +13,9 @@ router.post('/auto-email/information', order.getOrderReport);
 router.post('/order-logs/information', order.getLoggingOrderInformation);
 router.post('/re-order/information', order.reCreateOrderInformation);
 router.put('/information', order.addOrderInformation);
+router.put('/linked-order/information', order.addLinkedOrderInformation);
+router.delete('/unlinked-order/information', order.unlinkOrderInformation);
+router.post('/linked-order/list', order.getLinkedOrderList);
 router.patch('/information', order.setOrderInformation);
 router.patch('/status-deli/information', order.setStatusDeli);
 router.patch('/edit-item/information', order.editOrderItem);
@@ -33,5 +36,9 @@ router.delete('/type/remove', order_type.removeOrderType);
 // ========= Auto Order ==========
 router.post('/auto-order/stock/information', auto_order.getStockAutoOrderInformation);
 router.post('/auto-order/sales/information', auto_order.getSalesAutoOrderInformation);
+
+// ========= Child Order ==========
+router.post('/child-order/information', order.getChildOrderInformation);
+
 
 module.exports = router;

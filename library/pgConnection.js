@@ -228,3 +228,26 @@ exports.upsert = async (dbname, insert, update, connectionString) => {
     return { code: true, message: ex };
   }
 };
+
+exports.runTransaction = async (dbname, callback, connectionstring) => {
+  let temporary = JSON.parse(JSON.stringify(connectionstring));
+  if (dbname != null) {
+    temporary.database = dbname;
+  }
+  const pool = new Pool(temporary);
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const result = await callback(client);
+    await client.query("COMMIT");
+    return { code: false, data: result };
+  } catch (e) {
+    await client.query("ROLLBACK");
+    console.error("Transaction Error:", e.message);
+    return { code: true, message: e.message };
+  } finally {
+    client.release();
+    await pool.end();
+  }
+};
+
