@@ -5531,11 +5531,11 @@ exports.getLinkedOrderList = async (req, res, next) => {
 
     const listRes = await pgConn.getWithParams(dbPrefix + lic_code, listScript, [consignment_no], config.connectionString());
 
-    return sendResponse(res, 'success', '0', 'ดึงข้อมูลออเดอร์พ่วงสำเร็จ', listRes.data);
+    return sendResponse(res, 'success', '0', 'ดึงข้อมูลออเดอร์ที่พ่วงกับออเดอร์หลักสำเร็จ', listRes.data);
 
   } catch (err) {
     console.error(err);
-    return sendResponse(res, 'error', '-4', 'เกิดข้อผิดพลาดภายในระบบในการดึงข้อมูลออเดอร์พ่วง', []);
+    return sendResponse(res, 'error', '-4', 'เกิดข้อผิดพลาดภายในระบบในการดึงข้อมูลออเดอร์ที่พ่วงกับออเดอร์หลัก', []);
   }
 };
 
