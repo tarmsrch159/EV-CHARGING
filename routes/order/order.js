@@ -5493,24 +5493,33 @@ exports.getLinkedOrderList = async (req, res, next) => {
     const lic_code = req.header('lic_code');
     const { consignment_no, order_id, master_order_id } = req.body[0] || {};
 
-    // ======= ตรวจสอบพารามิเตอร์ =======
-    if (!lic_code || !consignment_no || !order_id) {
-      return sendResponse(res, 'error', '-1', 'ข้อมูลพารามิเตอร์ไม่ถูกต้อง (ขาด lic_code, consignment_no หรือ order_id)', []);
+    // ======= 1. ตรวจสอบพารามิเตอร์ขาเข้า =======
+    const missing = [];
+    if (!lic_code) missing.push('lic_code');
+    if (!consignment_no) missing.push('consignment_no');
+    if (!order_id) missing.push('order_id');
+
+    if (missing.length > 0) {
+      return sendResponse(res, 'error', '-1', `ข้อมูลพารามิเตอร์ไม่ถูกต้อง (ขาด: ${missing.join(', ')})`, []);
     }
 
-    // ======= เช็คว่าผู้เรียกเป็น ออเดอร์หลัก หรือ ออเดอร์พ่วง =======
+    // ======= 2. ตรวจสอบ Role ของผู้เรียก =======
     let requesterRole = master_order_id;
-
-    // ถ้าหน้าบ้านไม่ได้ส่ง master_order_id มา ให้ไปหาเองใน DB
     if (requesterRole === undefined) {
       const checkRoleScript = `SELECT master_order_id FROM public.tbl_order WHERE id = $1 AND rm_dt IS NULL`;
       const roleRes = await pgConn.getWithParams(dbPrefix + lic_code, checkRoleScript, [order_id], config.connectionString());
-      if (roleRes.data.length > 0) {
-        requesterRole = roleRes.data[0].master_order_id;
+
+      if (roleRes.data.length === 0) {
+        return sendResponse(res, 'error', '-2', 'ไม่พบข้อมูลออเดอร์ของผู้เรียกในระบบ', []);
       }
+      requesterRole = roleRes.data[0].master_order_id;
     }
 
-    // ======= ดึงข้อมูลตามสิทธิ์ ออเดอร์หลักเห็น ออเดอร์พ่วงทั้งหมด =======
+    if (requesterRole === null || requesterRole === undefined) {
+      return sendResponse(res, 'error', '-2', 'ไม่สามารถระบุสถานะ (Master/Child) ของออเดอร์นี้ได้', []);
+    }
+
+    // ======= 3. ดึงข้อมูลรายการในกลุ่มพ่วง =======
     let listScript = `
       SELECT 
         tbl_order.id, tbl_order.order_no, tbl_order.order_type, tbl_order.sh_cus_ref, tbl_order.sold_to, tbl_order.ship_to, 
@@ -5518,9 +5527,8 @@ exports.getLinkedOrderList = async (req, res, next) => {
         tbl_petrol.ptrl_desc
       FROM public.tbl_order 
       LEFT JOIN tbl_petrol ON tbl_order.ship_to = ptrl_number
-      WHERE tbl_order.consignment_no = $1 AND tbl_order.master_order_id = 2 AND tbl_order.rm_dt IS NULL 
+      WHERE tbl_order.consignment_no = $1 AND tbl_order.rm_dt IS NULL 
     `;
-
 
     // ถ้าเป็น Child (2) ให้เห็นแค่ออเดอร์หลัก (1) และตัวเอง
     if (requesterRole == 2) {
@@ -5531,12 +5539,35 @@ exports.getLinkedOrderList = async (req, res, next) => {
 
     const listRes = await pgConn.getWithParams(dbPrefix + lic_code, listScript, [consignment_no], config.connectionString());
 
-    return sendResponse(res, 'success', '0', 'ดึงข้อมูลออเดอร์ที่พ่วงกับออเดอร์หลักสำเร็จ', listRes.data);
+    if (listRes.data.length === 0) {
+      return sendResponse(res, 'error', '-3', `ไม่พบรายการออเดอร์ที่พ่วงกันด้วยเลข ${consignment_no} ในระบบ`, []);
+    }
+
+    // ======= 4. แยกชุดข้อมูลเป็น Master และ Children =======
+    const master_order = listRes.data.find(item => item.master_order_id == 1) || null;
+    const child_orders = listRes.data.filter(item => item.master_order_id != 1);
+
+    // ตรวจสอบกรณีเป็นปั๊มลูกแต่หาปั๊มหลักไม่เจอ (Data inconsistency)
+    if (requesterRole == 2 && !master_order) {
+      return sendResponse(res, 'error', '-3', 'ไม่พบข้อมูลออเดอร์หลักที่พ่วงอยู่ กรุณาติดต่อผู้ดูแลระบบ', []);
+    }
+
+    // จัดโครงสร้าง Data ตาม Role
+    let finalData = {};
+    if (requesterRole == 1) {
+      finalData = { child_orders };
+    } else {
+      finalData = { master_order, child_orders };
+    }
+
+    return sendResponse(res, 'success', '0', 'ดึงข้อมูลออเดอร์พ่วงสำเร็จ', finalData);
 
   } catch (err) {
     console.error(err);
-    return sendResponse(res, 'error', '-4', 'เกิดข้อผิดพลาดภายในระบบในการดึงข้อมูลออเดอร์ที่พ่วงกับออเดอร์หลัก', []);
+    return sendResponse(res, 'error', '-4', 'เกิดข้อผิดพลาดภายในระบบในการดึงข้อมูลออเดอร์พ่วง', []);
   }
 };
+
+
 
 
