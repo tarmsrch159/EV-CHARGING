@@ -610,7 +610,7 @@ exports.getChildOrderInformation = async (req, res, next) => {
 // =========== ดึงข้อมูลรายละเอียดของออเดอร์ตาม ID ที่ระบุ ========
 exports.getOrderInformationByID = async (req, res, next) => {
   var xresult = [];
-  let date_at = moment().format("YYYY-MM-DD");
+  let date_at = moment().subtract(1, "days").format("YYYY-MM-DD");
   return (async () => {
     let lic_code = req.header("lic_code");
     let { id, action } = req.body[0];
@@ -638,7 +638,7 @@ exports.getOrderInformationByID = async (req, res, next) => {
                 tbl_petrol_group.ptrl_group_desc,
                 tbl_order.order_status,
                 tbl_order.chanel, tbl_order.division, tbl_order.sold_to, tbl_order.ship_to, 
-                tbl_petrol.ptrl_desc as station, tbl_petrol.ptrl_code, tbl_petrol.ptrl_number,
+                tbl_petrol.ptrl_desc as station, tbl_petrol.ptrl_code, tbl_petrol.ptrl_number, tbl_petrol.ptrl_sitecode,
                 tbl_order.cus_ref, tbl_order.cus_date_ref, tbl_order.po_name, tbl_order.order_by, 
                 tbl_order.ship_cond, tbl_order.pay_term, tbl_order.deli_date_req as request_date, tbl_master_time.time_value as RequestTime, 
                 tbl_order.description, tbl_order.sh_cus_date_ref, 
@@ -697,6 +697,7 @@ exports.getOrderInformationByID = async (req, res, next) => {
     let orderData = JSON.parse(
       JSON.stringify(orderResult.data[0]).replace(/\:null/gi, '\:""'),
     );
+
     // ======== คำสั่ง SQL สำหรับดึงรายการสินค้า (Items) ที่อยู่ในออเดอร์นี้ ========
     let itemScript = `SELECT 
                 tbl_order_item.id, tbl_order_item.order_no, tbl_order_item.item_no,
@@ -728,7 +729,7 @@ exports.getOrderInformationByID = async (req, res, next) => {
             
             LEFT JOIN tbl_order_eodtank tank ON (
                 tbl_petrol_tank.tnk_number = tank.tank_no 
-                AND tank.shipto_no = '${orderData.ptrl_number}'
+                AND tank.shipto_no = '${orderData.ptrl_sitecode || orderData.ptrl_number}'
                 AND tank.date_at = '${date_at}'
             )
             LEFT JOIN (
@@ -739,7 +740,7 @@ exports.getOrderInformationByID = async (req, res, next) => {
                     buy_date,
                     SUM(meter_diff) AS total_sales
                 FROM (
-                    SELECT DISTINCT ON (product_name, shipto_no, tank_no, buy_date, meter_start, meter_start)
+                    SELECT DISTINCT ON (product_name, shipto_no, tank_no, buy_date, meter_start)
                         product_name,
                         shipto_no,
                         tank_no,
@@ -747,7 +748,8 @@ exports.getOrderInformationByID = async (req, res, next) => {
                         (meter_end - meter_start) AS meter_diff
                     FROM tbl_order_eodmeter
                     WHERE buy_date = '${date_at}'
-                    ORDER BY product_name, shipto_no, tank_no, buy_date, meter_start, meter_start, id DESC
+                    AND shipto_no = '${orderData.ptrl_sitecode || orderData.ptrl_number}'
+                    ORDER BY product_name, shipto_no, tank_no, buy_date, meter_start, id DESC
                 ) AS latest_meters
                 GROUP BY product_name, tank_no, shipto_no, buy_date
             ) meter_summary ON (
