@@ -5526,10 +5526,13 @@ exports.getLinkedOrderList = async (req, res, next) => {
       SELECT 
         tbl_order.id, tbl_order.order_no, tbl_order.order_type, tbl_order.sh_cus_ref, tbl_order.sold_to, tbl_order.ship_to, 
         tbl_order.deli_date_req, tbl_order.deli_time_req, tbl_order.master_order_id, tbl_order.consignment_no,
+        tbl_order.order_status,
         tbl_petrol.ptrl_desc
       FROM public.tbl_order 
       LEFT JOIN tbl_petrol ON tbl_order.ship_to = ptrl_number
-      WHERE tbl_order.consignment_no = $1 AND tbl_order.rm_dt IS NULL 
+      WHERE tbl_order.consignment_no = $1 
+        AND tbl_order.order_status = 0
+        AND tbl_order.rm_dt IS NULL 
     `;
 
     // ถ้าเป็น Child (2) ให้เห็นแค่ออเดอร์หลัก (1) และตัวเอง
@@ -5541,8 +5544,10 @@ exports.getLinkedOrderList = async (req, res, next) => {
 
     const listRes = await pgConn.getWithParams(dbPrefix + lic_code, listScript, [consignment_no], config.connectionString());
 
+    console.log(`DEBUG getLinkedOrderList Data (Count: ${listRes.data.length}):`, listRes.data);
+
     if (listRes.data.length === 0) {
-      return sendResponse(res, 'error', '-3', `ไม่พบรายการออเดอร์ที่พ่วงกันด้วยเลข ${consignment_no} ในระบบ`, []);
+      return sendResponse(res, 'error', '-3', `ไม่พบรายการออเดอร์ที่พ่วงกันด้วยเลข ${consignment_no} ในระบบ (หรือสถานะไม่ใช่ 0)`, []);
     }
 
     // ======= 4. แยกชุดข้อมูลเป็น Master และ Children =======
@@ -5555,13 +5560,14 @@ exports.getLinkedOrderList = async (req, res, next) => {
     }
 
     // จัดโครงสร้าง Data ตาม Role
-    let finalData = {};
-    if (requesterRole == 1) {
-      finalData = { child_orders };
-    } else {
-      finalData = { master_order, child_orders };
-    }
+    // let finalData = {};
+    // if (requesterRole == 1) {
+    //   finalData = { child_orders };
+    // } else {
+    //   finalData = { master_order, child_orders };
+    // }
 
+    let finalData = { master_order, child_orders }
     return sendResponse(res, 'success', '0', 'ดึงข้อมูลออเดอร์พ่วงสำเร็จ', finalData);
 
   } catch (err) {
