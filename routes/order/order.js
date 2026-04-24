@@ -509,9 +509,53 @@ exports.getChildOrderInformation = async (req, res, next) => {
     // ตรวจสอบว่า Query สำเร็จหรือไม่
     if (!tbl_temporary.code) {
       if (tbl_temporary.data.length > 0) {
-        tbl_temporary.data = JSON.parse(
-          JSON.stringify(tbl_temporary.data).replace(/\:null/gi, '\:""'),
-        );
+        // =========================================================================
+        // 4. ดึงข้อมูลรายการสินค้า (Items) และสต็อกน้ำมันของแต่ละออเดอร์ (จากตาราง Automatics)
+        // =========================================================================
+        let validOrders = [];
+        for (let i = 0; i < tbl_temporary.data.length; i++) {
+          let order = tbl_temporary.data[i];
+          let itemScript = `
+            SELECT 
+              tbl_order_item.id, tbl_order_item.order_no, tbl_order_item.item_no,
+              tbl_order_item.ptrl_tank_code,
+              COALESCE(tbl_petrol_tank.tnk_number, '0') as tank_number,
+              COALESCE(auto_tank.tnk_capacity::text, tbl_petrol_tank.tnk_capacity::text) as tank_capacity,
+              COALESCE(auto_tank.tnk_deadstock::text, tbl_petrol_tank.tnk_deadstock::text) as un_pump,
+              tbl_item.itm_desc, tbl_item.itm_material_number,
+              tbl_order_item.item_qty,
+              COALESCE(auto_tank.stock, 0) as current_stock,
+              COALESCE(auto_sales.sale_previous, 0) as day_sales,
+              tbl_depot.dpo_desc
+            FROM tbl_order_item
+            LEFT JOIN tbl_item ON tbl_order_item.item_no = tbl_item.itm_code
+            LEFT JOIN tbl_depot ON tbl_order_item.deli_plant = tbl_depot.dpo_code
+            LEFT JOIN tbl_petrol_tank ON tbl_order_item.ptrl_tank_code = tbl_petrol_tank.ptrl_tank_code
+            LEFT JOIN tbl_petrol ON tbl_petrol_tank.ptrl_code = tbl_petrol.ptrl_code
+            LEFT JOIN tbl_automatics_tanks_information auto_tank ON tbl_petrol.ptrl_code = auto_tank.ptrl_code 
+                 AND tbl_petrol_tank.ptrl_tank_code = auto_tank.tank_code
+            LEFT JOIN tbl_automatics_sales_previous_information auto_sales ON tbl_petrol.ptrl_code = auto_sales.ptrl_code 
+                 AND tbl_petrol_tank.ptrl_tank_code = auto_sales.tank_code
+            WHERE tbl_order_item.order_no = '${order.id}' AND tbl_order_item.rm_dt IS NULL
+            ORDER BY tbl_order_item.item_no ASC
+          `;
+
+          let itemResult = await pgConn.get(dbPrefix + lic_code, itemScript, config.connectionString());
+
+          // ======== ตรวจสอบว่ามีข้อมูล Stock หรือยอดขายหรือไม่ ========
+          let hasData = false;
+          if (itemResult.data && itemResult.data.length > 0) {
+            hasData = itemResult.data.some(item => parseFloat(item.current_stock) > 0 || parseFloat(item.day_sales) > 0);
+          }
+
+          if (hasData) {
+            order.items = itemResult.code ? [] : itemResult.data;
+            validOrders.push(order);
+          }
+        }
+
+        // ใช้เฉพาะข้อมูลที่ Valid
+        tbl_temporary.data = validOrders;
 
         // =========================================================================
         // นับจำนวน Record ทั้งหมด (สำหรับทำ Total Pages ในระบบ Pagination)
@@ -610,7 +654,8 @@ exports.getChildOrderInformation = async (req, res, next) => {
 // =========== ดึงข้อมูลรายละเอียดของออเดอร์ตาม ID ที่ระบุ ========
 exports.getOrderInformationByID = async (req, res, next) => {
   var xresult = [];
-  let date_at = moment().subtract(1, "days").format("YYYY-MM-DD");
+  // let date_at = moment().subtract(1, "days").format("YYYY-MM-DD");
+  let date_at = moment().format("YYYY-MM-DD");
   return (async () => {
     let lic_code = req.header("lic_code");
     let { id, action } = req.body[0];
