@@ -38,6 +38,8 @@ var autoOrderMailsRouter = require('./routes/auto-order-mails/index');
 const autoOrderMailsController = require('./routes/auto-order-mails/auto-order-mails');
 const autoOrderMailsScheduler = require('./routes/auto-order-mails/auto-order-mail-scheduler');
 const orderController = require('./routes/order/order');
+var lowStockAlertRouter = require('./routes/low-stock-alert/index');
+const lowStockAlertScheduler = require('./routes/low-stock-alert/low-stock-scheduler');
 var app = express();
 var cors = require('cors');
 var config = require('./configuration/connection');
@@ -327,6 +329,8 @@ app.use('/api-tms-v2/runout-config', runoutConfigRouter);
 app.use('/api-tms-v2/sap-alert-config', sapAlertConfigRouter);
 //Auto Order Mails
 app.use('/api-tms-v2/auto-order-mails', autoOrderMailsRouter);
+//Low Stock Alert
+app.use('/api-tms-v2/low-stock-alert', lowStockAlertRouter);
 
 
 // ตั้งเวลาทำงานทุก 1 ชั่วโมง
@@ -393,5 +397,8 @@ app.use(function (err, req, res, next) {
 // autoOrderMailsScheduler.startAutoOrderMailLoop(); // ตัวจริง รันทุกๆ 10 นาที
 // autoOrderMailsScheduler.startAutoOrderMailLoopTest(); // ตัวทดสอบ รันทุกๆ 10 วินาที
 // autoOrderMailsScheduler.startAutoOrderMailLoopCustom("15:25", "17:00", 1); // ตัวทดสอบ Custom เวลาได้
+
+// เริ่มต้น Background Scheduler สำหรับแจ้งเตือน Low Stock
+// lowStockAlertScheduler.startLowStockLoop();
 
 module.exports = app;

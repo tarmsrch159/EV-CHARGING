@@ -5,7 +5,6 @@ const axios = require("axios");
 const { sapApiClient } = require("./sap-api-config");
 const xglobal = require("../../middleware/global");
 const dbPrefix = config.dbPrefix();
-const sendResponse = xglobal.sendResponse;
 
 // =========== ดึงข้อมูลรายการสั่งซื้อ ===========
 exports.getOrderInformation = async (req, res, next) => {
@@ -17,7 +16,6 @@ exports.getOrderInformation = async (req, res, next) => {
     // =========================================================================
     let lic_code = req.header("lic_code");
     let {
-      order_id,
       order_no,
       start_date,
       end_date,
@@ -92,8 +90,6 @@ exports.getOrderInformation = async (req, res, next) => {
       conditions.push(`tbl_order.auto_order = '${auto_order}'`);
     if (order_status.toString().toUpperCase() !== "ALL")
       conditions.push(`tbl_order.order_status = '${order_status}'`);
-    if (order_id.toString().toUpperCase() !== "ALL")
-      conditions.push(`tbl_order.id = '${order_id}'`);
 
     if (
       original_start_date.toString().toUpperCase() !== "ALL" &&
@@ -134,7 +130,7 @@ exports.getOrderInformation = async (req, res, next) => {
       conditions.push(`tbl_petrol.ptrl_flag = '1'`);
     } else if (act_val !== "ALL") {
       // สิทธิ์พนักงานทั่วไป: มองเห็นเฉพาะ Order ที่ตัวเองเป็นคนสร้าง
-      conditions.push(`tbl_order.ship_to IN (SELECT ptrl_number FROM tbl_petrol WHERE ptrl_code IN (SELECT ptrl_code FROM tbl_employee WHERE emp_code = '${act_id}' AND emp_flag = '1'))`);
+      conditions.push(`tbl_order.created_by_tms = '${act_id}'`);
     }
 
     if (search !== "") {
@@ -157,316 +153,8 @@ exports.getOrderInformation = async (req, res, next) => {
             SELECT 
                 tbl_order.id, tbl_order.order_no, tbl_order.sh_cus_ref as aos_order_no, tbl_order.order_type, tbl_order.order_group, 
                 tbl_order_type.ord_type_desc, tbl_petrol_group.ptrl_group_desc, tbl_order.order_status,
-                tbl_order.chanel, tbl_order.division, tbl_order.sold_to, tbl_order.ship_to, tbl_petrol.ptrl_code,
-                tbl_petrol.ptrl_desc, tbl_order.cus_ref, tbl_order.cus_date_ref, tbl_order.po_name, tbl_order.order_by, 
-                tbl_order.ship_cond, tbl_order.pay_term, tbl_order.deli_date_req as request_date, tbl_master_time.time_value as RequestTime, 
-                tbl_order.description, tbl_order.sh_cus_date_ref, tbl_order.status_deli, tbl_order.status_block, tbl_order.status_sd_process, 
-                tbl_order.status_check, tbl_order.sd_doc_reject, tbl_order.cus_group, 
-                tbl_order.hana_created, tbl_order.hana_time, tbl_order.created_by, 
-                tbl_order.ist_dt, tbl_order.mdf_dt, tbl_order.rm_dt, tbl_order.auto_order,
-                COALESCE(tbl_sum_item.total_qty, 0) as total_item_qty,
-                tbl_employee.emp_name,
-                tbl_order.consignment_no,
-                tbl_order.master_order_id
-            FROM tbl_order  
-            LEFT JOIN tbl_order_type ON tbl_order.order_type = tbl_order_type.ord_type_code
-            LEFT JOIN tbl_petrol_group ON tbl_petrol_group.ptrl_group_code = tbl_order.order_group
-            LEFT JOIN tbl_petrol ON tbl_order.ship_to = tbl_petrol.ptrl_number
-            LEFT JOIN tbl_master_time ON tbl_order.deli_time_req = tbl_master_time.time_code
-            LEFT JOIN tbl_employee ON tbl_order.created_by_tms = tbl_employee.emp_code
-            LEFT JOIN (
-                SELECT 
-                    TRIM(CAST(order_no AS TEXT)) as order_no_text, 
-                    SUM(NULLIF(TRIM(CAST(item_qty AS TEXT)), '')::numeric) as total_qty 
-                FROM tbl_order_item 
-                WHERE rm_dt IS NULL 
-                GROUP BY TRIM(CAST(order_no AS TEXT))
-            ) tbl_sum_item ON TRIM(CAST(tbl_order.id AS TEXT)) = tbl_sum_item.order_no_text
-        `;
-
-    let dataScript = `
-            ${baseSelectQuery}
-            ${whereClause}
-            ORDER BY tbl_order.ist_dt DESC 
-            OFFSET (${page_index} * ${page_limit}) LIMIT ${page_limit};
-        `;
-
-    // =========================================================================
-    // Execute Query หลัก และประมวลผลผลลัพธ์เพื่อส่ง Response
-    // =========================================================================
-    let tbl_temporary = await pgConn.get(
-      dbPrefix + lic_code,
-      dataScript,
-      config.connectionString(),
-    );
-
-    // ตรวจสอบว่า Query สำเร็จหรือไม่
-    if (!tbl_temporary.code) {
-      if (tbl_temporary.data.length > 0) {
-        tbl_temporary.data = JSON.parse(
-          JSON.stringify(tbl_temporary.data).replace(/\:null/gi, '\:""'),
-        );
-
-        // =========================================================================
-        // นับจำนวน Record ทั้งหมด (สำหรับทำ Total Pages ในระบบ Pagination)
-        // =========================================================================
-        let countScript = `
-                    SELECT 
-                        CEIL((CEIL(SUM(rows_total)) / ${page_limit})) as page_total, 
-                        SUM(rows_total) as rows_total  
-                    FROM (
-                        SELECT 1 as rows_total FROM tbl_order 
-                        LEFT JOIN tbl_petrol ON tbl_order.ship_to = tbl_petrol.ptrl_number
-                        ${whereClause}
-                        ORDER BY tbl_order.ist_dt DESC 
-                    ) xtbl_master;
-                `;
-
-        let tbl_temporary0 = await pgConn.get(
-          dbPrefix + lic_code,
-          countScript,
-          config.connectionString(),
-        );
-
-        let page_total = 0;
-        let rows_total = 0;
-
-        if (!tbl_temporary0.code && tbl_temporary0.data.length > 0) {
-          page_total = parseInt(tbl_temporary0.data[0].page_total);
-          rows_total = parseInt(tbl_temporary0.data[0].rows_total);
-        }
-
-        // ส่ง Response กรณีสำเร็จ (มีข้อมูล) พร้อมแนบ Summary Report
-        let response = [
-          {
-            status: "success",
-            invalid_code: "0",
-            message: "",
-            data: tbl_temporary.data,
-            response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
-            page_total: page_total <= 0 ? 1 : page_total,
-            rows_total: rows_total,
-          },
-        ];
-        res.status(200).send(response);
-        return;
-      } else {
-        let response = [
-          {
-            status: "success",
-            invalid_code: "0",
-            message: "",
-            data: xresult,
-            response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
-          },
-        ];
-        res.status(200).send(response);
-        return;
-      }
-    } else {
-      let response = [
-        {
-          status: "error",
-          invalid_code: "-3",
-          message: `ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ`,
-          data: xresult,
-          response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
-        },
-      ];
-      res.status(200).send(response);
-
-      // บันทึก Log เมื่อเกิดข้อผิดพลาด
-      await xglobal.action_logs(
-        lic_code,
-        action[0].id,
-        "ดึงข้อมูล Order",
-        JSON.stringify(req.body[0]),
-        "ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ",
-        action[0].value,
-      );
-      return;
-    }
-  })().catch(async (err) => {
-    console.error(err);
-    let response = [
-      {
-        status: "error",
-        invalid_code: "-4",
-        message: `ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ`,
-        data: xresult,
-        response_time: moment().format("YYYY-MM-DD HH:mm:ss").toString(),
-      },
-    ];
-    res.status(200).send(response);
-  });
-};
-
-
-exports.getChildOrderInformation = async (req, res, next) => {
-  var xresult = [];
-
-  return (async () => {
-    // =========================================================================
-    // รับค่า Request Parameters และกำหนดค่าเริ่มต้น
-    // =========================================================================
-    let lic_code = req.header("lic_code");
-    let {
-      order_id,
-      order_no,
-      start_date,
-      end_date,
-      order_type,
-      order_status,
-      auto_order,
-      status_deli,
-      ptrl_number,
-      ptrl_group_code,
-      search,
-      page_index,
-      page_limit,
-      action, is_consignment,
-    } = req.body[0] || {};
-
-    // กำหนด Default Values ให้กับตัวแปรสำคัญที่ไม่ได้ส่งมา
-    page_index = page_index === undefined ? 1 : page_index;
-    page_limit = page_limit === undefined ? 10 : page_limit;
-    auto_order = auto_order === undefined ? "ALL" : auto_order;
-    status_deli = status_deli === undefined ? "ALL" : status_deli;
-    ptrl_number = ptrl_number === undefined ? "ALL" : ptrl_number;
-    ptrl_group_code = ptrl_group_code === undefined ? "ALL" : ptrl_group_code;
-    is_consignment = is_consignment === undefined ? "N" : is_consignment;
-
-    // =========================================================================
-    // (ตรวจสอบความครบถ้วนของข้อมูลสำคัญ)
-    // =========================================================================
-    if (
-      ptrl_number === undefined ||
-      start_date === undefined ||
-      end_date === undefined ||
-      order_type === undefined ||
-      order_status === undefined ||
-      search === undefined ||
-      action === undefined
-    ) {
-      let response = [
-        {
-          status: "error",
-          invalid_code: "-1",
-          message:
-            "ไม่สามารถดึงข้อมูลได้, เนื่องจากข้อมูลพารามิเตอร์ไม่ถูกต้อง",
-          data: xresult,
-          response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
-        },
-      ];
-      res.status(200).send(response);
-      return;
-    }
-
-    // =========================================================================
-    // จัดการ Data Type และ Format สำหรับ Pagination และ Date
-    // =========================================================================
-    if (page_index > 0) page_index -= 1;
-
-    let original_start_date = start_date;
-    let original_end_date = end_date;
-
-    if (start_date.length === 10) start_date += " 00:00:00";
-    if (end_date.length === 10) end_date += " 23:59:59";
-
-    // =========================================================================
-    // สร้าง Dynamic WHERE Clause สำหรับ Query หลัก (ดึงข้อมูล Order)
-    // =========================================================================
-    let conditions = ["tbl_order.rm_dt IS NULL", "tbl_order.order_flag = '1'"];
-
-    // ======== N = ไม่แสดงข้อมูลออเดอร์ที่ยังไม่ถูกพ่วง , Y = แสดงข้อมูลออเดอร์ที่ถูกพ่วง  ========
-    if (is_consignment.toString().toUpperCase() === "N") {
-      conditions.push("tbl_order.consignment_no IS NULL");
-    } else if (is_consignment.toString().toUpperCase() === "Y") {
-      conditions.push("tbl_order.consignment_no IS NOT NULL");
-    }
-
-    if (order_id.toString().toUpperCase() !== "ALL")
-      conditions.push(`tbl_order.id = '${order_id}'`);
-
-    if (order_no.toString().toUpperCase() !== "ALL")
-      conditions.push(`tbl_order.order_no = '${order_no}'`);
-    if (status_deli.toString().toUpperCase() !== "ALL")
-      conditions.push(`tbl_order.status_deli = '${status_deli}'`);
-    if (order_type.toString().toUpperCase() !== "ALL")
-      conditions.push(`tbl_order.order_type = '${order_type}'`);
-    if (auto_order.toString().toUpperCase() !== "ALL")
-      conditions.push(`tbl_order.auto_order = '${auto_order}'`);
-    if (order_status.toString().toUpperCase() !== "ALL")
-      conditions.push(`tbl_order.order_status = '${order_status}'`);
-
-    if (
-      original_start_date.toString().toUpperCase() !== "ALL" &&
-      original_end_date.toString().toUpperCase() !== "ALL" &&
-      original_start_date !== "" &&
-      original_end_date !== ""
-    ) {
-      conditions.push(
-        `tbl_order.ist_dt >= '${start_date}' AND tbl_order.ist_dt <= '${end_date}'`,
-      );
-    }
-
-    // รองรับ ptrl_number ทั้งแบบ String และ Array
-    if (Array.isArray(ptrl_number) && ptrl_number.length > 0) {
-      const sites = ptrl_number.map((s) => `'${s}'`).join(",");
-      conditions.push(`tbl_order.ship_to IN (${sites})`);
-    } else if (
-      ptrl_number !== undefined &&
-      ptrl_number.toString().toUpperCase() !== "ALL"
-    ) {
-      conditions.push(`tbl_order.ship_to = '${ptrl_number}'`);
-    }
-
-    if (
-      ptrl_group_code !== undefined &&
-      ptrl_group_code.toString().toUpperCase() !== "ALL"
-    ) {
-      conditions.push(`tbl_petrol.ptrl_group_code = '${ptrl_group_code}'`);
-    }
-
-    // =========================================================================
-    // กรองข้อมูลตามสิทธิ์การเข้าถึง (Role Authorization)
-    // =========================================================================
-    let act_val = action[0].value.toString().toUpperCase();
-    let act_id = action[0].id;
-
-    if (act_val === "GROUP") {
-      // สิทธิ์ GROUP (เช่น Planner/CS): มองเห็นเฉพาะ Order ของปั๊มที่อยู่ในความดูแลของตัวเอง
-      conditions.push(
-        `tbl_petrol.ptrl_group_code IN (SELECT ptrl_group_code FROM tbl_employee_petrol_group WHERE emp_code = '${act_id}' AND emp_pgrp_flag = 1)`,
-      );
-      conditions.push(`tbl_petrol.ptrl_flag = '1'`);
-    } else if (act_val !== "ALL") {
-      // สิทธิ์พนักงานทั่วไป: มองเห็นเฉพาะ Order ที่ตัวเองเป็นคนสร้าง
-      conditions.push(`tbl_order.ship_to IN (SELECT ptrl_number FROM tbl_petrol WHERE ptrl_code IN (SELECT ptrl_code FROM tbl_employee WHERE emp_code = '${act_id}' AND emp_flag = '1'))`);
-    }
-
-    if (search !== "") {
-      conditions.push(`(
-                tbl_order.order_no LIKE '%${search}%' 
-                OR tbl_order.sh_cus_ref LIKE '%${search}%' 
-                OR tbl_order.cus_ref LIKE '%${search}%' 
-                OR tbl_order.po_name LIKE '%${search}%' 
-                OR tbl_order.description LIKE '%${search}%'
-            )`);
-    }
-
-    let whereClause = "WHERE " + conditions.join(" AND ");
-
-    // =========================================================================
-    // SQL Query หลักสำหรับดึงข้อมูลออเดอร์ (พร้อม JOIN ข้อมูลที่เกี่ยวข้อง)
-    // =========================================================================
-    // *มีการ Sub-query tbl_sum_item เพื่อหาผลรวมจำนวนสินค้า (total_qty) ของแต่ละ order_no
-    let baseSelectQuery = `
-            SELECT 
-                tbl_order.id, tbl_order.order_no, tbl_order.sh_cus_ref as aos_order_no, tbl_order.order_type, tbl_order.order_group, 
-                tbl_order_type.ord_type_desc, tbl_petrol_group.ptrl_group_desc, tbl_order.order_status::TEXT,
-                tbl_order.chanel, tbl_order.division, tbl_order.sold_to, tbl_order.ship_to, tbl_petrol.ptrl_code,
-                tbl_petrol.ptrl_desc, tbl_order.cus_ref, tbl_order.cus_date_ref, tbl_order.po_name, tbl_order.order_by, 
+                tbl_order.chanel, tbl_order.division, tbl_order.sold_to, tbl_order.ship_to, 
+                tbl_petrol.ptrl_desc as station, tbl_order.cus_ref, tbl_order.cus_date_ref, tbl_order.po_name, tbl_order.order_by, 
                 tbl_order.ship_cond, tbl_order.pay_term, tbl_order.deli_date_req as request_date, tbl_master_time.time_value as RequestTime, 
                 tbl_order.description, tbl_order.sh_cus_date_ref, tbl_order.status_deli, tbl_order.status_block, tbl_order.status_sd_process, 
                 tbl_order.status_check, tbl_order.sd_doc_reject, tbl_order.cus_group, 
@@ -610,7 +298,7 @@ exports.getChildOrderInformation = async (req, res, next) => {
 // =========== ดึงข้อมูลรายละเอียดของออเดอร์ตาม ID ที่ระบุ ========
 exports.getOrderInformationByID = async (req, res, next) => {
   var xresult = [];
-  let date_at = moment().subtract(1, "days").format("YYYY-MM-DD");
+  let date_at = moment().format("YYYY-MM-DD");
   return (async () => {
     let lic_code = req.header("lic_code");
     let { id, action } = req.body[0];
@@ -631,14 +319,14 @@ exports.getOrderInformationByID = async (req, res, next) => {
       return;
     }
 
-    // ======== คำสั่ง SQL สำหรับดึงข้อมูลของออเดอร์ และ Join ข้อมูลพื้นฐานที่เกี่ยวข้อง ========
+    // ======== คำสั่ง SQL สำหรับดึงข้อมูลของออเดอร์ พร้อม Join ข้อมูลพื้นฐานที่เกี่ยวข้อง ========
     let orderScript = `SELECT 
                 tbl_order.id, tbl_order.order_no, tbl_order.sh_cus_ref as aos_order_no, tbl_order.order_type, tbl_order.order_group, 
                 tbl_order_type.ord_type_desc,
                 tbl_petrol_group.ptrl_group_desc,
                 tbl_order.order_status,
                 tbl_order.chanel, tbl_order.division, tbl_order.sold_to, tbl_order.ship_to, 
-                tbl_petrol.ptrl_desc as station, tbl_petrol.ptrl_code, tbl_petrol.ptrl_number, tbl_petrol.ptrl_sitecode,
+                tbl_petrol.ptrl_desc as station, tbl_petrol.ptrl_code, tbl_petrol.ptrl_number,
                 tbl_order.cus_ref, tbl_order.cus_date_ref, tbl_order.po_name, tbl_order.order_by, 
                 tbl_order.ship_cond, tbl_order.pay_term, tbl_order.deli_date_req as request_date, tbl_master_time.time_value as RequestTime, 
                 tbl_order.description, tbl_order.sh_cus_date_ref, 
@@ -646,11 +334,8 @@ exports.getOrderInformationByID = async (req, res, next) => {
                 tbl_order.status_check, tbl_order.sd_doc_reject, tbl_order.cus_group, 
                 tbl_order.hana_created, tbl_order.hana_time, tbl_order.created_by, 
                 tbl_order.ist_dt, tbl_order.mdf_dt, tbl_order.rm_dt,
-                tbl_order.auto_order,
-                tbl_petrol.ptrl_address,
-                tbl_petrol.ptrl_zip_code
+                tbl_order.auto_order
             FROM tbl_order  
-            
             LEFT JOIN tbl_order_type ON tbl_order.order_type = tbl_order_type.ord_type_code
             LEFT JOIN tbl_petrol_group ON tbl_petrol_group.ptrl_group_code = tbl_order.order_group
             LEFT JOIN tbl_petrol ON tbl_order.ship_to = tbl_petrol.ptrl_number
@@ -718,18 +403,15 @@ exports.getOrderInformationByID = async (req, res, next) => {
                 tank.tank_end,
                 meter_summary.total_sales,
                 meter_summary.total_sales + tbl_petrol_tank.tnk_deadstock AS min_stock,
-                tank.recive_val::INT,
-                tbl_order_item.remark,
-                tbl_depot.dpo_code, tbl_depot.dpo_desc, tbl_depot.dpo_short_desc
+                tank.recive_val::INT
             FROM tbl_order_item
             LEFT JOIN tbl_item ON tbl_order_item.item_no = tbl_item.itm_code
-            LEFT JOIN tbl_depot ON tbl_order_item.deli_plant = tbl_depot.dpo_code AND tbl_depot.dpo_flag = '1'
           INNER JOIN tbl_petrol_tank ON tbl_order_item.ptrl_tank_code = tbl_petrol_tank.ptrl_tank_code 
                 AND tbl_petrol_tank.ptrl_tank_flag = '1'
             
             LEFT JOIN tbl_order_eodtank tank ON (
                 tbl_petrol_tank.tnk_number = tank.tank_no 
-                AND tank.shipto_no = '${orderData.ptrl_sitecode || orderData.ptrl_number}'
+                AND tank.shipto_no = '${orderData.ptrl_number}'
                 AND tank.date_at = '${date_at}'
             )
             LEFT JOIN (
@@ -740,7 +422,7 @@ exports.getOrderInformationByID = async (req, res, next) => {
                     buy_date,
                     SUM(meter_diff) AS total_sales
                 FROM (
-                    SELECT DISTINCT ON (product_name, shipto_no, tank_no, buy_date, meter_start)
+                    SELECT DISTINCT ON (product_name, shipto_no, tank_no, buy_date, meter_start, meter_start)
                         product_name,
                         shipto_no,
                         tank_no,
@@ -748,8 +430,7 @@ exports.getOrderInformationByID = async (req, res, next) => {
                         (meter_end - meter_start) AS meter_diff
                     FROM tbl_order_eodmeter
                     WHERE buy_date = '${date_at}'
-                    AND shipto_no = '${orderData.ptrl_sitecode || orderData.ptrl_number}'
-                    ORDER BY product_name, shipto_no, tank_no, buy_date, meter_start, id DESC
+                    ORDER BY product_name, shipto_no, tank_no, buy_date, meter_start, meter_start, id DESC
                 ) AS latest_meters
                 GROUP BY product_name, tank_no, shipto_no, buy_date
             ) meter_summary ON (
@@ -4327,12 +4008,7 @@ exports.editOrderItem = async (req, res, next) => {
                         AND order_no = $4 AND ptrl_tank_code = $5
                 `;
         let params = [item_quantity, remark, item_no, order_no, ptrl_tank_code];
-        await pgConn.execute2params(
-          dbPrefix + lic_code,
-          update,
-          params,
-          config.connectionString(),
-        );
+        await pgConn.execute2params(update, params, config.connectionString());
         let updateOrder = `
                     UPDATE tbl_order 
                     SET auto_order = $1 
@@ -4340,7 +4016,6 @@ exports.editOrderItem = async (req, res, next) => {
                 `;
         let paramsOrder = [0, order_no];
         await pgConn.execute2params(
-          dbPrefix + lic_code,
           updateOrder,
           paramsOrder,
           config.connectionString(),
@@ -4444,10 +4119,8 @@ exports.setStatusDeli = async (req, res, next) => {
 
     let updateOrderScript = `UPDATE tbl_order SET status_deli = $1, mdf_dt = $2 WHERE order_no = $3`;
     let tbl_temporary_update_order = await pgConn.execute2params(
-      dbPrefix + lic_code,
       updateOrderScript,
       [status_deli, moment().format("YYYY-MM-DD HH:mm:ss"), order_no],
-      config.connectionString(),
     );
 
     if (tbl_temporary_update_order.code) {
@@ -4790,21 +4463,6 @@ exports.removeOrderInformationById = async (req, res, next) => {
     let order_idArr = Array.isArray(order_id) ? order_id : [order_id];
     let order_idIn = order_idArr.map((c) => `${c}`).join(", ");
 
-    // --- Start Unlink Logic (AOS-Linked Order) ---
-    try {
-      let scriptCheckMaster = `SELECT id, master_order_id, consignment_no FROM public.tbl_order WHERE id IN (${order_idIn})`;
-      let masterCheckResult = await pgConn.get(dbPrefix + lic_code, scriptCheckMaster, config.connectionString());
-      if (!masterCheckResult.code && masterCheckResult.data.length > 0) {
-        for (let orderRow of masterCheckResult.data) {
-          if (orderRow.master_order_id == 1 && orderRow.consignment_no) {
-            let unlinkScript = `UPDATE public.tbl_order SET master_order_id = NULL, consignment_no = NULL WHERE consignment_no = $1 AND master_order_id = 2`;
-            await pgConn.executeWithParams(dbPrefix + lic_code, unlinkScript, [orderRow.consignment_no], config.connectionString());
-          }
-        }
-      }
-    } catch (e) { console.error("Unlink Error:", e); }
-    // --- End Unlink Logic ---
-
     // ========== Audit Log: ดึงข้อมูล order ก่อนลบ ==========
     let scriptGetOrders = `SELECT id, order_no, sh_cus_ref, ship_to, status_deli FROM tbl_order WHERE id IN (${order_idIn});`;
     let rs = await pgConn.get(
@@ -5044,10 +4702,8 @@ exports.reCreateOrderInformation = async (req, res, next) => {
       ];
 
       const resNewOrder = await pgConn.execute2params(
-        dbPrefix + lic_code,
         insertOrderScript,
         paramsOrder,
-        config.connectionString(),
       );
 
       if (resNewOrder.code) {
@@ -5075,21 +4731,16 @@ exports.reCreateOrderInformation = async (req, res, next) => {
       if (order_items.length > 0) {
         for (const oldItem of order_items) {
           const insertItemScript = `INSERT INTO tbl_order_item (order_no, item_no, item_qty, ist_dt, order_item_flag, auto_order, deli_plant, sales_order_item) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`;
-          await pgConn.execute2params(
-            dbPrefix + lic_code,
-            insertItemScript,
-            [
-              newOrderId,
-              oldItem.item_no || "",
-              parseFloat(oldItem.item_qty) || 0,
-              currentDateTime,
-              "1",
-              "0",
-              oldItem.deli_plant || "",
-              oldItem.sales_order_item || "",
-            ],
-            config.connectionString(),
-          );
+          await pgConn.execute2params(insertItemScript, [
+            newOrderId,
+            oldItem.item_no || "",
+            parseFloat(oldItem.item_qty) || 0,
+            currentDateTime,
+            "1",
+            "0",
+            oldItem.deli_plant || "",
+            oldItem.sales_order_item || "",
+          ]);
         }
       }
 
@@ -5136,8 +4787,6 @@ exports.reCreateOrderInformation = async (req, res, next) => {
     ]);
   }
 };
-
-
 
 // exports.reCreateOrderInformation = async (req, res, next) => {
 
@@ -5303,279 +4952,3 @@ exports.reCreateOrderInformation = async (req, res, next) => {
 //     });
 
 // }
-
-// ====================== สร้าง Order แบบพ่วง (Linked Order) ======================
-exports.addLinkedOrderInformation = async (req, res, next) => {
-  try {
-    const lic_code = req.header('lic_code');
-    const {
-      order_type, order_group, chanel, division, sold_to, ship_to,
-      cus_ref, cus_date_ref, po_name, order_by, ship_cond, pay_term,
-      deli_date_req, deli_time_req, description, sh_cus_ref, sh_cus_date_ref,
-      order_item, action, child_order_id
-    } = req.body[0] || {};
-
-    // ======= 1. ตรวจสอบพารามิเตอร์ที่จำเป็น =======
-    const missing = [];
-    if (!lic_code) missing.push('lic_code');
-    if (!order_type) missing.push('order_type');
-    if (!order_group) missing.push('order_group');
-    if (!sold_to) missing.push('sold_to');
-    if (!ship_to) missing.push('ship_to');
-    if (!deli_date_req) missing.push('deli_date_req');
-    if (!deli_time_req) missing.push('deli_time_req');
-    if (!order_item || !Array.isArray(order_item)) missing.push('order_item (Array)');
-    if (!action) missing.push('action');
-    if (!child_order_id || !Array.isArray(child_order_id)) missing.push('child_order_id (Array)');
-
-    if (missing.length > 0) {
-      return sendResponse(res, 'error', '-1', `ข้อมูลพารามิเตอร์ไม่ถูกต้อง (ขาด: ${missing.join(', ')})`, []);
-    }
-
-    const now = moment().format('YYYY-MM-DD HH:mm:ss');
-
-
-    // ======= 2. รัน Transaction =======
-    const transactionResult = await pgConn.runTransaction(dbPrefix + lic_code, async (client) => {
-      const consignment_no = 'CSMN-' + moment().format('YYYYMMDD') + Math.floor(100000 + Math.random() * 900000);
-
-      // (2.1) จัดการ sh_cus_ref และ sh_cus_date_ref (เหมือน addOrderInformation)
-      let final_sh_cus_ref = sh_cus_ref;
-      let req_date_str = moment(deli_date_req).format("YYYYMMDD");
-
-      if (!final_sh_cus_ref) {
-        let scriptCheckShCusRef = `
-          SELECT MAX(CAST(SUBSTRING(sh_cus_ref FROM 12) AS INTEGER)) as last_running 
-          FROM public.tbl_order 
-          WHERE sh_cus_ref LIKE 'AOS${req_date_str}%' AND sh_cus_ref ~ '^AOS[0-9]{8}[0-9]+$'
-        `;
-        let checkRes = await client.query(scriptCheckShCusRef);
-        let running_number = 1;
-        if (checkRes.rows.length > 0 && checkRes.rows[0].last_running !== null) {
-          running_number = parseInt(checkRes.rows[0].last_running) + 1;
-        }
-        final_sh_cus_ref = "AOS" + req_date_str + String(running_number).padStart(4, "0");
-      }
-
-      // (2.2) บันทึกออเดอร์หลัก
-      const mainOrderScript = `
-        INSERT INTO public.tbl_order
-        (order_type, order_group, chanel, division, sold_to, ship_to,
-            cus_ref, cus_date_ref, po_name, order_by, ship_cond, pay_term,
-            deli_date_req, deli_time_req, description, sh_cus_ref, sh_cus_date_ref,
-            status_deli, ist_dt, order_flag, auto_order, order_status, created_by_tms,
-            master_order_id, consignment_no)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)
-        RETURNING id
-      `;
-      const mainParams = [
-        order_type, order_group, chanel || '01', division || '04',
-        sold_to, ship_to, cus_ref || "",
-        cus_date_ref ? moment(cus_date_ref).format("YYYY-MM-DD HH:mm:ss") : null,
-        po_name || "AOS", order_by || "AOS", ship_cond || "T1", pay_term || "",
-        deli_date_req ? moment(deli_date_req).format("YYYY-MM-DD HH:mm:ss") : null,
-        deli_time_req, description || "", final_sh_cus_ref,
-        sh_cus_date_ref ? moment(sh_cus_date_ref).format("YYYY-MM-DD HH:mm:ss") : (deli_date_req ? moment(deli_date_req).format("YYYY-MM-DD HH:mm:ss") : null),
-        'A', now, '1', 0, 0, action[0].id, 1, consignment_no
-      ];
-
-      const mainRes = await client.query(mainOrderScript, mainParams);
-      const master_id = mainRes.rows[0].id;
-
-      // (2.2) อัปเดตออเดอร์พ่วง
-      if (child_order_id.length > 0) {
-        const updateChildScript = `
-          UPDATE public.tbl_order 
-          SET master_order_id = 2, consignment_no = $1
-          WHERE id = ANY($2) AND rm_dt IS NULL AND order_status = 0
-        `;
-        await client.query(updateChildScript, [consignment_no, child_order_id]);
-      }
-
-      // (2.3) บันทึกรายการสินค้า
-      let invalid_material_item = [];
-      for (const itm of order_item) {
-        const getItmRes = await client.query(`SELECT itm_code FROM tbl_item WHERE itm_material_number = $1 LIMIT 1`, [itm.itm_material_number]);
-        if (getItmRes.rows.length > 0) {
-          const itm_code = getItmRes.rows[0].itm_code;
-          const maxRes = await client.query(`SELECT MAX(CAST(sales_order_item AS INTEGER)) as last_running FROM public.tbl_order_item`);
-          const nextRunning = (maxRes.rows[0].last_running ? parseInt(maxRes.rows[0].last_running) : 0) + 1;
-
-          const insertItemScript = `
-            INSERT INTO public.tbl_order_item(order_no, item_no, item_qty, ist_dt, order_item_flag, auto_order, deli_plant, sales_order_item, remark, ptrl_tank_code)
-            VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-          `;
-          const itemParams = [master_id, itm_code, itm.item_quantity, now, '1', 0, itm.deli_plant || "", nextRunning, itm.remark || "", itm.ptrl_tank_code || ""];
-          await client.query(insertItemScript, itemParams);
-        } else {
-          invalid_material_item.push(itm.itm_material_number);
-        }
-      }
-
-      return { master_id, consignment_no, invalid_material_item };
-    }, config.connectionString());
-
-    // ======= 3. ตรวจสอบผลลัพธ์ Transaction =======
-    if (transactionResult.code) {
-      return sendResponse(res, 'error', '-3', `ไม่สามารถบันทึกข้อมูลได้: ${transactionResult.message}`, []);
-    }
-
-    const { master_id, consignment_no, invalid_material_item } = transactionResult.data;
-
-    // ======= 4. บันทึก Log และส่งคำตอบกลับ =======
-    await xglobal.action_logs(lic_code, action[0].id, 'สร้างออเดอร์พ่วง', JSON.stringify(req.body[0]), 'success', action[0].value);
-    return sendResponse(res, 'success', '0', 'สร้างออเดอร์พ่วงสำเร็จ', [{
-      order_id: master_id,
-      consignment_no: consignment_no,
-      invalid_material_item: invalid_material_item
-    }]);
-
-  } catch (err) {
-    console.error(err);
-    return sendResponse(res, 'error', '-4', 'เกิดข้อผิดพลาดภายในระบบในการสร้างออเดอร์พ่วง', []);
-  }
-};
-
-
-// ====================== ปลดออเดอร์ออกจากกลุ่มพ่วง (Unlink) ======================
-exports.unlinkOrderInformation = async (req, res, next) => {
-  try {
-    const lic_code = req.header('lic_code');
-    const { order_id, action } = req.body[0] || {};
-
-    // ======= 1. ตรวจสอบพารามิเตอร์ที่จำเป็น =======
-    const missing = [];
-    if (!lic_code) missing.push('lic_code');
-    if (!order_id) missing.push('order_id');
-    if (!action) missing.push('action');
-
-    if (missing.length > 0) {
-      return sendResponse(res, 'error', '-1', `ข้อมูลพารามิเตอร์ไม่ถูกต้อง (ขาด: ${missing.join(', ')})`, []);
-    }
-
-    // ======= 2. ตรวจสอบสถานะและเงื่อนไข (ต้องเป็นลูกพ่วงและยังไม่ถูกจัดส่ง) =======
-    const checkScript = `SELECT master_order_id, order_status FROM public.tbl_order WHERE id = $1 AND rm_dt IS NULL`;
-    const checkRes = await pgConn.getWithParams(dbPrefix + lic_code, checkScript, [order_id], config.connectionString());
-
-    if (checkRes.data.length === 0) {
-      return sendResponse(res, 'error', '-2', 'ไม่พบข้อมูลออเดอร์ในระบบ', []);
-    }
-
-    const orderData = checkRes.data[0];
-
-    if (orderData.master_order_id != 2) {
-      return sendResponse(res, 'error', '-2', 'ออเดอร์นี้ไม่ได้เป็นออเดอร์พ่วง (Child Order) จึงไม่สามารถปลดได้', []);
-    }
-
-    if (orderData.order_status != 0) {
-      return sendResponse(res, 'error', '-3', 'ออเดอร์ถูกวางแผนหรือจัดส่งแล้ว ไม่สามารถปลดออกจากการพ่วงได้', []);
-    }
-
-    // ======= 3. ดำเนินการปลดการพ่วง (Update เป็น NULL) =======
-    const updateScript = `UPDATE public.tbl_order SET master_order_id = NULL, consignment_no = NULL WHERE id = $1`;
-    const updateRes = await pgConn.execute2params(dbPrefix + lic_code, updateScript, [order_id], config.connectionString());
-
-    if (updateRes.affected_rows === 0) {
-      return sendResponse(res, 'error', '-4', 'ไม่สามารถปลดการพ่วงได้ เนื่องจากไม่พบข้อมูลออเดอร์ที่ตรงกับเงื่อนไข', []);
-    }
-
-    // ======= 4. บันทึก Log และส่งคำตอบกลับ =======
-    await xglobal.action_logs(lic_code, action[0].id, 'ปลดออเดอร์พ่วงออกด้วยตนเอง', JSON.stringify(req.body[0]), 'success', action[0].value);
-    return sendResponse(res, 'success', '0', 'ปลดการพ่วงสำเร็จ ออเดอร์ของคุณกลับเป็นออเดอร์ปกติแล้ว', []);
-
-  } catch (err) {
-    console.error(err);
-    return sendResponse(res, 'error', '-4', 'เกิดข้อผิดพลาดภายในระบบในการปลดออเดอร์พ่วง', []);
-  }
-};
-
-// ====================== ดึงรายการออเดอร์ที่พ่วงกัน (Linked Order List) ======================
-exports.getLinkedOrderList = async (req, res, next) => {
-  try {
-    const lic_code = req.header('lic_code');
-    const { consignment_no, order_id, master_order_id } = req.body[0] || {};
-
-    // ======= 1. ตรวจสอบพารามิเตอร์ขาเข้า =======
-    const missing = [];
-    if (!lic_code) missing.push('lic_code');
-    if (!consignment_no) missing.push('consignment_no');
-    if (!order_id) missing.push('order_id');
-
-    if (missing.length > 0) {
-      return sendResponse(res, 'error', '-1', `ข้อมูลพารามิเตอร์ไม่ถูกต้อง (ขาด: ${missing.join(', ')})`, []);
-    }
-
-    // ======= 2. ตรวจสอบ Role ของผู้เรียก =======
-    let requesterRole = master_order_id;
-    if (requesterRole === undefined) {
-      const checkRoleScript = `SELECT master_order_id FROM public.tbl_order WHERE id = $1 AND rm_dt IS NULL`;
-      const roleRes = await pgConn.getWithParams(dbPrefix + lic_code, checkRoleScript, [order_id], config.connectionString());
-
-      if (roleRes.data.length === 0) {
-        return sendResponse(res, 'error', '-2', 'ไม่พบข้อมูลออเดอร์ของผู้เรียกในระบบ', []);
-      }
-      requesterRole = roleRes.data[0].master_order_id;
-    }
-
-    if (requesterRole === null || requesterRole === undefined) {
-      return sendResponse(res, 'error', '-2', 'ไม่สามารถระบุสถานะ (Master/Child) ของออเดอร์นี้ได้', []);
-    }
-
-    // ======= 3. ดึงข้อมูลรายการในกลุ่มพ่วง =======
-    let listScript = `
-      SELECT 
-        tbl_order.id, tbl_order.order_no, tbl_order.order_type, tbl_order.sh_cus_ref, tbl_order.sold_to, tbl_order.ship_to, 
-        tbl_order.deli_date_req, tbl_order.deli_time_req, tbl_order.master_order_id, tbl_order.consignment_no,
-        tbl_order.order_status,
-        tbl_petrol.ptrl_desc
-      FROM public.tbl_order 
-      LEFT JOIN tbl_petrol ON tbl_order.ship_to = ptrl_number
-      WHERE tbl_order.consignment_no = $1 
-        AND tbl_order.order_status = 0
-        AND tbl_order.rm_dt IS NULL 
-    `;
-
-    // ถ้าเป็น Child (2) ให้เห็นแค่ออเดอร์หลัก (1) และตัวเอง
-    if (requesterRole == 2) {
-      listScript += ` AND (tbl_order.master_order_id = 1 OR tbl_order.id = ${order_id})`;
-    }
-
-    listScript += ` ORDER BY tbl_order.master_order_id ASC, tbl_order.id ASC`;
-
-    const listRes = await pgConn.getWithParams(dbPrefix + lic_code, listScript, [consignment_no], config.connectionString());
-
-    console.log(`DEBUG getLinkedOrderList Data (Count: ${listRes.data.length}):`, listRes.data);
-
-    if (listRes.data.length === 0) {
-      return sendResponse(res, 'error', '-3', `ไม่พบรายการออเดอร์ที่พ่วงกันด้วยเลข ${consignment_no} ในระบบ (หรือสถานะไม่ใช่ 0)`, []);
-    }
-
-    // ======= 4. แยกชุดข้อมูลเป็น Master และ Children =======
-    const master_order = listRes.data.find(item => item.master_order_id == 1) || null;
-    const child_orders = listRes.data.filter(item => item.master_order_id != 1);
-
-    // ตรวจสอบกรณีเป็นปั๊มลูกแต่หาปั๊มหลักไม่เจอ (Data inconsistency)
-    if (requesterRole == 2 && !master_order) {
-      return sendResponse(res, 'error', '-3', 'ไม่พบข้อมูลออเดอร์หลักที่พ่วงอยู่ กรุณาติดต่อผู้ดูแลระบบ', []);
-    }
-
-    // จัดโครงสร้าง Data ตาม Role
-    // let finalData = {};
-    // if (requesterRole == 1) {
-    //   finalData = { child_orders };
-    // } else {
-    //   finalData = { master_order, child_orders };
-    // }
-
-    let finalData = { master_order, child_orders }
-    return sendResponse(res, 'success', '0', 'ดึงข้อมูลออเดอร์พ่วงสำเร็จ', finalData);
-
-  } catch (err) {
-    console.error(err);
-    return sendResponse(res, 'error', '-4', 'เกิดข้อผิดพลาดภายในระบบในการดึงข้อมูลออเดอร์พ่วง', []);
-  }
-};
-
-
-
-

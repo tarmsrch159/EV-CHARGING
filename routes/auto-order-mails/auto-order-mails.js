@@ -99,7 +99,7 @@ const getManagerByPtrlCode = async (lic_code, ptrl_code) => {
     const script = `
         SELECT emp_code, emp_username, emp_userpassword
         FROM tbl_employee
-        WHERE ptrl_code = $1 AND emp_flag = '1' AND rm_dt IS NULL
+        WHERE ptrl_code = $1 AND emp_flag = '1' AND emp_role_code = '2' AND rm_dt IS NULL
         ORDER BY ist_dt ASC
         LIMIT 1
     `;
@@ -261,7 +261,7 @@ const sendAutoOrderEmail = async (stationData) => {
         const reportBaseUrlProd = 'https://spd-demo.dtc.co.th:9101/main/order/order-report';
         const reportBaseUrlTest = 'http://localhost:5173/main/order/order-report';
 
-        // สลับ URL ที่นี่ (ตอนนี้ใช้ตัว Test ตามที่พี่แจ้งครับ)
+
         const reportBaseUrl = reportBaseUrlProd;
 
         const firstOrder = stationData.orders[0] || {};
