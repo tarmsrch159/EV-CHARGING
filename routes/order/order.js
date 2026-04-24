@@ -513,6 +513,7 @@ exports.getChildOrderInformation = async (req, res, next) => {
         // 4. ดึงข้อมูลรายการสินค้า (Items) และสต็อกน้ำมันของแต่ละออเดอร์ (จากตาราง Automatics)
         // =========================================================================
         let validOrders = [];
+        let invalidOrders = [];
         for (let i = 0; i < tbl_temporary.data.length; i++) {
           let order = tbl_temporary.data[i];
           let itemScript = `
@@ -551,11 +552,15 @@ exports.getChildOrderInformation = async (req, res, next) => {
           if (hasData) {
             order.items = itemResult.code ? [] : itemResult.data;
             validOrders.push(order);
+          } else {
+            order.items = itemResult.code ? [] : itemResult.data;
+            invalidOrders.push(order);
           }
         }
 
         // ใช้เฉพาะข้อมูลที่ Valid
-        tbl_temporary.data = validOrders;
+        let finalValidData = validOrders;
+        let finalInvalidData = invalidOrders;
 
         // =========================================================================
         // นับจำนวน Record ทั้งหมด (สำหรับทำ Total Pages ในระบบ Pagination)
@@ -586,17 +591,22 @@ exports.getChildOrderInformation = async (req, res, next) => {
           rows_total = parseInt(tbl_temporary0.data[0].rows_total);
         }
 
-        // ส่ง Response กรณีสำเร็จ (มีข้อมูล) พร้อมแนบ Summary Report
+        // ส่ง Response แยกเป็น 2 ชุด (Valid และ Invalid)
         let response = [
           {
             status: "success",
             invalid_code: "0",
-            message: "",
-            data: tbl_temporary.data,
+            message: "ข้อมูลออเดอร์ที่มีข้อมูล Stock และ daysales ครบถ้วน",
+            data: finalValidData,
+            invalid_data: {
+              message: "ข้อมูลออเดอร์ที่ไม่มีข้อมูล Stock และ daysales",
+              data: finalInvalidData
+            },
             response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
             page_total: page_total <= 0 ? 1 : page_total,
             rows_total: rows_total,
           },
+
         ];
         res.status(200).send(response);
         return;
