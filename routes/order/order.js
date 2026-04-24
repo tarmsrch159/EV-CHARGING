@@ -5601,29 +5601,87 @@ exports.getLinkedOrderList = async (req, res, next) => {
 
     console.log(`DEBUG getLinkedOrderList Data (Count: ${listRes.data.length}):`, listRes.data);
 
-    if (listRes.data.length === 0) {
-      return sendResponse(res, 'error', '-3', `ไม่พบรายการออเดอร์ที่พ่วงกันด้วยเลข ${consignment_no} ในระบบ (หรือสถานะไม่ใช่ 0)`, []);
+    // ======= 4. ดึงข้อมูล Items และสต็อกสำหรับแต่ละออเดอร์ =======
+    let validOrders = [];
+    let invalidOrders = [];
+
+    for (let i = 0; i < listRes.data.length; i++) {
+      let order = listRes.data[i];
+      let itemScript = `
+        SELECT 
+          tbl_order_item.id, tbl_order_item.order_no, tbl_order_item.item_no,
+          tbl_order_item.ptrl_tank_code,
+          COALESCE(tbl_petrol_tank.tnk_number, '0') as tank_number,
+          COALESCE(auto_tank.tnk_capacity::text, tbl_petrol_tank.tnk_capacity::text) as tank_capacity,
+          COALESCE(auto_tank.tnk_deadstock::text, tbl_petrol_tank.tnk_deadstock::text) as un_pump,
+          tbl_item.itm_desc, tbl_item.itm_material_number,
+          tbl_order_item.item_qty,
+          COALESCE(auto_tank.stock, 0) as current_stock,
+          COALESCE(auto_sales.sale_previous, 0) as day_sales,
+          tbl_depot.dpo_desc
+        FROM tbl_order_item
+        LEFT JOIN tbl_item ON tbl_order_item.item_no = tbl_item.itm_code
+        LEFT JOIN tbl_depot ON tbl_order_item.deli_plant = tbl_depot.dpo_code
+        LEFT JOIN tbl_petrol_tank ON tbl_order_item.ptrl_tank_code = tbl_petrol_tank.ptrl_tank_code
+        LEFT JOIN tbl_petrol ON tbl_petrol_tank.ptrl_code = tbl_petrol.ptrl_code
+        LEFT JOIN tbl_automatics_tanks_information auto_tank ON tbl_petrol.ptrl_code = auto_tank.ptrl_code 
+             AND tbl_petrol_tank.ptrl_tank_code = auto_tank.tank_code
+        LEFT JOIN tbl_automatics_sales_previous_information auto_sales ON tbl_petrol.ptrl_code = auto_sales.ptrl_code 
+             AND tbl_petrol_tank.ptrl_tank_code = auto_sales.tank_code
+        WHERE tbl_order_item.order_no = '${order.id}' AND tbl_order_item.rm_dt IS NULL
+        ORDER BY tbl_order_item.item_no ASC
+      `;
+
+      let itemResult = await pgConn.get(dbPrefix + lic_code, itemScript, config.connectionString());
+
+      // Check data availability
+      let hasData = false;
+      if (itemResult.data && itemResult.data.length > 0) {
+        hasData = itemResult.data.some(item => parseFloat(item.current_stock) > 0 || parseFloat(item.day_sales) > 0);
+      }
+
+      order.items = itemResult.code ? [] : itemResult.data;
+      if (hasData) {
+        validOrders.push(order);
+      } else {
+        invalidOrders.push(order);
+      }
     }
 
-    // ======= 4. แยกชุดข้อมูลเป็น Master และ Children =======
+    // ======= 5. แยกชุดข้อมูลเป็น Master และ Children (แสดงทั้งหมดตามเดิม) =======
     const master_order = listRes.data.find(item => item.master_order_id == 1) || null;
     const child_orders = listRes.data.filter(item => item.master_order_id != 1);
 
-    // ตรวจสอบกรณีเป็นปั๊มลูกแต่หาปั๊มหลักไม่เจอ (Data inconsistency)
+    // ชุดข้อมูลสำหรับ Invalid
+    const master_order_invalid = invalidOrders.find(item => item.master_order_id == 1) || null;
+    const child_orders_invalid = invalidOrders.filter(item => item.master_order_id != 1);
+
+    // ตรวจสอบกรณีเป็นปั๊มลูกแต่หาปั๊มหลักไม่เจอ
     if (requesterRole == 2 && !master_order) {
       return sendResponse(res, 'error', '-3', 'ไม่พบข้อมูลออเดอร์หลักที่พ่วงอยู่ กรุณาติดต่อผู้ดูแลระบบ', []);
     }
 
-    // จัดโครงสร้าง Data ตาม Role
-    // let finalData = {};
-    // if (requesterRole == 1) {
-    //   finalData = { child_orders };
-    // } else {
-    //   finalData = { master_order, child_orders };
-    // }
+    let finalData = {
+      master_order,
+      child_orders,
 
-    let finalData = { master_order, child_orders }
-    return sendResponse(res, 'success', '0', 'ดึงข้อมูลออเดอร์พ่วงสำเร็จ', finalData);
+    };
+    let invalidData = {
+      message: "ข้อมูลออเดอร์ที่ไม่มีข้อมูล Stock และ daysales",
+      data: {
+        master_order: master_order_invalid,
+        child_orders: child_orders_invalid
+      }
+    }
+
+    return res.json({
+      status: 'success',
+      invalid_code: '0',
+      message: "ดึงข้อมูลออเดอร์พ่วงสำเร็จ",
+      data: finalData,
+      invalidData: invalidData,
+      response_time: moment().format('YYYY-MM-DD HH:mm:ss'),
+    });
 
   } catch (err) {
     console.error(err);
