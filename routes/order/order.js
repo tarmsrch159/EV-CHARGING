@@ -399,7 +399,7 @@ exports.getOrderInformationByID = async (req, res, next) => {
                 tbl_order_item.id, tbl_order_item.order_no, tbl_order_item.item_no,
                 tbl_order_item.ptrl_tank_code,
                 tbl_petrol_tank.tnk_number as tank_number,
-                tbl_petrol_tank.tnk_capacity as tank_capacity,
+                COALESCE(auto_tank.tnk_capacity::text, tbl_petrol_tank.tnk_capacity::text) as tank_capacity,
                 tbl_order_item.item_qty, tbl_order_item.deli_plant, 
                 tbl_order_item.long_text_id, tbl_order_item.long_text,
                 tbl_order_item.sales_order_item, tbl_order_item.auto_order,
@@ -407,51 +407,36 @@ exports.getOrderInformationByID = async (req, res, next) => {
                 tbl_order_item.deli_status, tbl_order_item.misc_deli_no,
                 tbl_order_item.ist_dt, tbl_order_item.mdf_dt,
                 tbl_item.itm_desc as product, tbl_item.itm_material_number, tbl_item.itm_code,
-                tbl_petrol_tank.tnk_deadstock AS un_pump,
-                tbl_petrol_tank.tnk_capacity AS max_stock,
+                COALESCE(auto_tank.tnk_deadstock, tbl_petrol_tank.tnk_deadstock) AS un_pump,
+                COALESCE(auto_tank.tnk_capacity, tbl_petrol_tank.tnk_capacity) AS max_stock,
                 tbl_petrol_tank.tnk_target AS target_stock,
-                tank.tank_start,
-                tank.tank_end,
-                meter_summary.total_sales,
-                meter_summary.total_sales + tbl_petrol_tank.tnk_deadstock AS min_stock,
-                tank.recive_val::INT,
+                COALESCE(auto_tank.current_stock, 0) as tank_start,
+                COALESCE(auto_tank.yesterday_stock, 0) as tank_end,
+                COALESCE(auto_sales.sale_previous, 0) as day_sales,
+                (COALESCE(auto_sales.sale_previous, 0) + COALESCE(auto_tank.tnk_deadstock, tbl_petrol_tank.tnk_deadstock, 0)) as min_stock,
                 tbl_order_item.remark,
                 tbl_depot.dpo_code, tbl_depot.dpo_desc, tbl_depot.dpo_short_desc
             FROM tbl_order_item
             LEFT JOIN tbl_item ON tbl_order_item.item_no = tbl_item.itm_code
             LEFT JOIN tbl_depot ON tbl_order_item.deli_plant = tbl_depot.dpo_code AND tbl_depot.dpo_flag = '1'
-          INNER JOIN tbl_petrol_tank ON tbl_order_item.ptrl_tank_code = tbl_petrol_tank.ptrl_tank_code 
+            LEFT JOIN tbl_order ON tbl_order_item.order_no = tbl_order.id
+            LEFT JOIN tbl_petrol ON tbl_order.ship_to = tbl_petrol.ptrl_number
+            INNER JOIN tbl_petrol_tank ON tbl_order_item.ptrl_tank_code = tbl_petrol_tank.ptrl_tank_code 
                 AND tbl_petrol_tank.ptrl_tank_flag = '1'
-            
-            LEFT JOIN tbl_order_eodtank tank ON (
-                tbl_petrol_tank.tnk_number = tank.tank_no 
-                AND tank.shipto_no = '${orderData.ptrl_sitecode || orderData.ptrl_number}'
-                AND tank.date_at = '${date_at}'
-            )
             LEFT JOIN (
                 SELECT 
-                    tank_no,
-                    product_name,
-                    shipto_no,
-                    buy_date,
-                    SUM(meter_diff) AS total_sales
-                FROM (
-                    SELECT DISTINCT ON (product_name, shipto_no, tank_no, buy_date, meter_start)
-                        product_name,
-                        shipto_no,
-                        tank_no,
-                        buy_date,
-                        (meter_end - meter_start) AS meter_diff
-                    FROM tbl_order_eodmeter
-                    WHERE buy_date = '${date_at}'
-                    AND shipto_no = '${orderData.ptrl_sitecode || orderData.ptrl_number}'
-                    ORDER BY product_name, shipto_no, tank_no, buy_date, meter_start, id DESC
-                ) AS latest_meters
-                GROUP BY product_name, tank_no, shipto_no, buy_date
-            ) meter_summary ON (
-                tbl_petrol_tank.tnk_number = meter_summary.tank_no 
-                AND meter_summary.shipto_no = '${orderData.ptrl_number}'
-            )
+                    ptrl_code, 
+                    tank_code,
+                    MAX(tnk_capacity) as tnk_capacity,
+                    MAX(tnk_deadstock) as tnk_deadstock,
+                    MAX(CASE WHEN stock_at::date = '${moment(orderData.ist_dt).format("YYYY-MM-DD")}'::date - INTERVAL '1 day' THEN stock END) as current_stock,
+                    MAX(CASE WHEN stock_at::date = '${moment(orderData.ist_dt).format("YYYY-MM-DD")}'::date - INTERVAL '2 day' THEN stock END) as yesterday_stock
+                FROM tbl_automatics_tanks_information
+                GROUP BY ptrl_code, tank_code
+            ) auto_tank ON tbl_petrol.ptrl_code = auto_tank.ptrl_code 
+                 AND tbl_petrol_tank.ptrl_tank_code = auto_tank.tank_code
+            LEFT JOIN tbl_automatics_sales_previous_information auto_sales ON tbl_petrol.ptrl_code = auto_sales.ptrl_code 
+                 AND tbl_petrol_tank.ptrl_tank_code = auto_sales.tank_code
             WHERE CAST(tbl_order_item.order_no AS TEXT) = '${id}'
             AND tbl_order_item.order_item_flag = '1'
             ORDER BY tbl_order_item.ptrl_tank_code ASC`;
@@ -5482,8 +5467,8 @@ exports.getLinkedOrderList = async (req, res, next) => {
             tbl_item.itm_desc, tbl_item.itm_material_number,
             COALESCE(tbl_order_item.item_qty, 0) as item_qty,
             tbl_order_item.remark,
-            COALESCE(auto_tank.current_stock, 0) as current_stock,
-            COALESCE(auto_tank.yesterday_stock, 0) as yesterday_stock,
+            COALESCE(auto_tank.current_stock, 0) as tank_start,
+            COALESCE(auto_tank.yesterday_stock, 0) as tank_end,
             COALESCE(auto_sales.sale_previous, 0) as day_sales,
             (COALESCE(auto_sales.sale_previous, 0) + COALESCE(auto_tank.tnk_deadstock, tbl_petrol_tank.tnk_deadstock, 0)) as min_stock,
             tbl_depot.dpo_desc
@@ -5522,8 +5507,8 @@ exports.getLinkedOrderList = async (req, res, next) => {
             tbl_item.itm_desc, tbl_item.itm_material_number,
             tbl_order_item.item_qty,
             tbl_order_item.remark,
-            COALESCE(auto_tank.current_stock, 0) as current_stock,
-            COALESCE(auto_tank.yesterday_stock, 0) as yesterday_stock,
+            COALESCE(auto_tank.current_stock, 0) as tank_start,
+            COALESCE(auto_tank.yesterday_stock, 0) as tank_end,
             COALESCE(auto_sales.sale_previous, 0) as day_sales,
             (COALESCE(auto_sales.sale_previous, 0) + COALESCE(auto_tank.tnk_deadstock, tbl_petrol_tank.tnk_deadstock, 0)) as min_stock,
             tbl_depot.dpo_desc
@@ -5556,7 +5541,7 @@ exports.getLinkedOrderList = async (req, res, next) => {
       // Check data availability
       let hasData = false;
       if (itemResult.data && itemResult.data.length > 0) {
-        hasData = itemResult.data.some(item => parseFloat(item.current_stock) > 0 || parseFloat(item.day_sales) > 0);
+        hasData = itemResult.data.some(item => parseFloat(item.tank_start) > 0 || parseFloat(item.day_sales) > 0);
       }
 
       order.items = itemResult.code ? [] : itemResult.data;
@@ -5833,8 +5818,8 @@ exports.getChildOrderInformation = async (req, res, next) => {
               tbl_item.itm_desc, tbl_item.itm_material_number,
               tbl_order_item.item_qty,
               tbl_order_item.remark,
-              COALESCE(auto_tank.current_stock, 0) as current_stock,
-              COALESCE(auto_tank.yesterday_stock, 0) as yesterday_stock,
+              COALESCE(auto_tank.current_stock, 0) as tank_start,
+              COALESCE(auto_tank.yesterday_stock, 0) as tank_end,
               COALESCE(auto_sales.sale_previous, 0) as day_sales,
               (COALESCE(auto_sales.sale_previous, 0) + COALESCE(auto_tank.tnk_deadstock, tbl_petrol_tank.tnk_deadstock, 0)) as min_stock,
               tbl_depot.dpo_desc
@@ -5866,7 +5851,7 @@ exports.getChildOrderInformation = async (req, res, next) => {
           // ======== ตรวจสอบว่ามีข้อมูล Stock หรือยอดขายหรือไม่ ========
           let hasData = false;
           if (itemResult.data && itemResult.data.length > 0) {
-            hasData = itemResult.data.some(item => parseFloat(item.current_stock) > 0 || parseFloat(item.day_sales) > 0);
+            hasData = itemResult.data.some(item => parseFloat(item.tank_start) > 0 || parseFloat(item.day_sales) > 0);
           }
 
           if (hasData) {
