@@ -3799,10 +3799,10 @@ exports.setOrderInformation = async (req, res, next) => {
     }
 
     // ========== Audit Log: ดึงข้อมูลเก่าก่อน update ==========
-    let scriptGetOldOrder = `SELECT description, deli_date_req, deli_time_req, status_deli, ship_to, order_no, sh_cus_ref FROM tbl_order WHERE id = $1`;
-    let oldOrderResult = await pgConn.getWithParams(
+    let scriptCheckOrderNo = `SELECT id, order_no, sh_cus_ref, ship_to, status_deli, order_status FROM tbl_order WHERE id = $1`;
+    let checkOrderNo = await pgConn.getWithParams(
       dbPrefix + lic_code,
-      scriptGetOldOrder,
+      scriptCheckOrderNo,
       [order_no],
       config.connectionString(),
     );
@@ -4169,83 +4169,62 @@ exports.editOrderItem = async (req, res, next) => {
       let orderInfo = checkOrderNo.data[0];
       let event_type = req.body[0].event_type || "override";
 
+      // --- ดึงข้อมูลพื้นฐาน (เช่น คลัง) จากรายการเดิมเก็บไว้ก่อน ---
+      let getDeliPlantScript = `SELECT deli_plant FROM tbl_order_item WHERE order_no = $1 AND rm_dt IS NULL LIMIT 1`;
+      let deliPlantRes = await pgConn.getWithParams(dbPrefix + lic_code, getDeliPlantScript, [order_no], config.connectionString());
+      let default_deli_plant = (!deliPlantRes.code && deliPlantRes.data.length > 0) ? deliPlantRes.data[0].deli_plant : "";
+
+      // --- ลบรายการเดิมทั้งหมด (Hard Delete) ---
+      let deleteOldItemsScript = `DELETE FROM tbl_order_item WHERE order_no = $1`;
+      await pgConn.execute2params(
+        dbPrefix + lic_code,
+        deleteOldItemsScript,
+        [order_no],
+        config.connectionString()
+      );
+
+      // --- เพิ่มรายการใหม่เข้าไปทั้งหมด ---
+      let itemLogs = [];
       for (let i = 0; i < order_item.length; i++) {
         let item = order_item[i];
         let item_quantity = item.item_quantity;
         let item_no = item.item_no;
         let remark = item.remark;
         let ptrl_tank_code = item.ptrl_tank_code;
-        let itemChanges = [];
 
-        // ========== Audit Log: ดึงค่าเก่าของ item ==========
-        let getOldItemScript = `SELECT oi.item_qty, oi.remark, itm.itm_desc 
-                    FROM public.tbl_order_item oi 
-                    LEFT JOIN tbl_item itm ON oi.item_no = itm.itm_code
-                    WHERE oi.order_no = $1 AND oi.item_no = $2 AND oi.ptrl_tank_code = $3 ORDER BY oi.id DESC LIMIT 1`;
-        let oldItemRes = await pgConn.getWithParams(
-          dbPrefix + lic_code,
-          getOldItemScript,
-          [order_no, item_no, ptrl_tank_code],
-          config.connectionString(),
-        );
-
-
-        if (!oldItemRes.code && oldItemRes.data.length > 0) {
-          let oldItem = oldItemRes.data[0];
-          let itemLabel = oldItem.itm_desc || item_no;
-          let oldQty = parseFloat(oldItem.item_qty) || 0;
-          let newQty = parseFloat(item_quantity) || 0;
-
-          if (oldQty !== newQty) {
-            itemChanges.push({
-              field: `Order Qty (${itemLabel})`,
-              before: String(oldQty),
-              after: String(newQty),
-            });
-          }
-          if ((oldItem.remark || "") !== (remark || "")) {
-            itemChanges.push({
-              field: `Remark (${itemLabel})`,
-              before: oldItem.remark || "",
-              after: remark || "",
-            });
-          }
-        }
-
-        let update = `
-                    UPDATE tbl_order_item 
-                    SET item_qty = $1, remark = $2
-                    WHERE item_no = $3
-                        AND order_no = $4 AND ptrl_tank_code = $5
-                `;
-        let params = [item_quantity, remark, item_no, order_no, ptrl_tank_code];
-        await pgConn.execute2params(
-          dbPrefix + lic_code,
-          update,
-          params,
-          config.connectionString(),
-        );
-
-        if (itemChanges.length > 0) {
-          let editLogPayload = {
-            order_no: orderInfo.order_no || "-",
-            order_id: order_no,
-            ship_to: orderInfo.ship_to || "",
-            reason: remark || req.body[0].remark || req.body[0].reason || "",
-            changes: itemChanges,
-          };
-          await xglobal.action_logs(
-            lic_code,
-            action[0].id,
-            event_type,
-            JSON.stringify(editLogPayload),
-            "success",
-            action[0].value,
+        if (parseFloat(item_quantity) > 0) {
+          let insertScript = `
+              INSERT INTO tbl_order_item (
+                  order_no, item_no, item_qty, remark, ptrl_tank_code, 
+                  ist_dt, auto_order, deli_plant, order_item_flag
+              ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+          `;
+          let insertParams = [
+            order_no, item_no, item_quantity, remark, ptrl_tank_code,
+            moment().format("YYYY-MM-DD HH:mm:ss"), 0, default_deli_plant, '1'
+          ];
+          await pgConn.execute2params(
+            dbPrefix + lic_code,
+            insertScript,
+            insertParams,
+            config.connectionString(),
           );
+
+          itemLogs.push(`${item_no} (${item_quantity} L)`);
         }
       }
 
-      // ========== อัปเดตข้อมูลหลักของออเดอร์ (อัปเดต Description และวันเวลาด้วย) ==========
+      // บันทึก Log การเปลี่ยนแปลงแบบสรุป
+      await xglobal.action_logs(
+        lic_code,
+        action[0].id,
+        "แก้ไขข้อมูล Order",
+        JSON.stringify(req.body[0]),
+        `อัปเดตรายการสินค้าใหม่ทั้งหมด: ${itemLogs.join(", ")}`,
+        action[0].value,
+      );
+
+      // ========== อัปเดตข้อมูลหลักของออเดอร์ (อัปเดต Description และเวลาแก้ไข) ==========
       let updateOrder = `
                 UPDATE tbl_order 
                 SET description = $1, 
