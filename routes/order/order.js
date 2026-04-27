@@ -5547,10 +5547,9 @@ exports.getLinkedOrderList = async (req, res, next) => {
               COALESCE(auto_tank.yesterday_stock, 0) as tank_end,
               COALESCE(auto_sales.sale_previous, 0) as day_sales,
               (COALESCE(auto_sales.sale_previous, 0) + COALESCE(auto_tank.tnk_deadstock, tbl_petrol_tank.tnk_deadstock, 0)) as min_stock,
-              tbl_depot.dpo_desc
+              (SELECT dpo_desc FROM tbl_depot WHERE dpo_code = (SELECT dpo_code FROM tbl_petrol_depot WHERE ptrl_code = '${order.ptrl_code}' AND rm_dt IS NULL LIMIT 1)) as dpo_desc
             FROM tbl_order_item
             LEFT JOIN tbl_item ON tbl_order_item.item_no = tbl_item.itm_code
-            LEFT JOIN tbl_depot ON tbl_order_item.deli_plant = tbl_depot.dpo_code
             LEFT JOIN tbl_petrol_tank ON tbl_order_item.ptrl_tank_code = tbl_petrol_tank.ptrl_tank_code
             LEFT JOIN tbl_petrol ON tbl_petrol_tank.ptrl_code = tbl_petrol.ptrl_code
             LEFT JOIN (
@@ -5587,7 +5586,7 @@ exports.getLinkedOrderList = async (req, res, next) => {
               COALESCE(auto_tank.yesterday_stock, 0) as tank_end,
               COALESCE(auto_sales.sale_previous, 0) as day_sales,
               (COALESCE(auto_sales.sale_previous, 0) + COALESCE(auto_tank.tnk_deadstock, tpt.tnk_deadstock, 0)) as min_stock,
-              (SELECT dpo_desc FROM tbl_depot WHERE dpo_code = (SELECT deli_plant FROM tbl_order_item WHERE order_no = '${order.id}' AND rm_dt IS NULL LIMIT 1)) as dpo_desc
+              (SELECT dpo_desc FROM tbl_depot WHERE dpo_code = (SELECT dpo_code FROM tbl_petrol_depot WHERE ptrl_code = '${order.ptrl_code}' AND rm_dt IS NULL LIMIT 1)) as dpo_desc
             FROM tbl_petrol_tank tpt
             LEFT JOIN tbl_item itm ON tpt.itm_code = itm.itm_code
             LEFT JOIN tbl_petrol p ON tpt.ptrl_code = p.ptrl_code
@@ -5610,6 +5609,8 @@ exports.getLinkedOrderList = async (req, res, next) => {
           )
           ORDER BY tank_number ASC
         `;
+
+        console.log(itemScript);
       } else {
         // --- กรณี Child: โชว์แค่ที่สั่ง ---
         itemScript = `
@@ -5626,10 +5627,9 @@ exports.getLinkedOrderList = async (req, res, next) => {
             COALESCE(auto_tank.yesterday_stock, 0) as tank_end,
             COALESCE(auto_sales.sale_previous, 0) as day_sales,
             (COALESCE(auto_sales.sale_previous, 0) + COALESCE(auto_tank.tnk_deadstock, tbl_petrol_tank.tnk_deadstock, 0)) as min_stock,
-            tbl_depot.dpo_desc
+           (SELECT dpo_desc FROM tbl_depot WHERE dpo_code = (SELECT dpo_code FROM tbl_petrol_depot WHERE ptrl_code = '${order.ptrl_code}' AND rm_dt IS NULL LIMIT 1)) as dpo_desc
           FROM tbl_order_item
           LEFT JOIN tbl_item ON tbl_order_item.item_no = tbl_item.itm_code
-          LEFT JOIN tbl_depot ON tbl_order_item.deli_plant = tbl_depot.dpo_code
           LEFT JOIN tbl_petrol_tank ON tbl_order_item.ptrl_tank_code = tbl_petrol_tank.ptrl_tank_code
           LEFT JOIN tbl_petrol ON tbl_petrol_tank.ptrl_code = tbl_petrol.ptrl_code
           LEFT JOIN (
