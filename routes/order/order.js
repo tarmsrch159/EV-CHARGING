@@ -5472,6 +5472,7 @@ exports.getLinkedOrderList = async (req, res, next) => {
           COALESCE(auto_tank.current_stock, 0) as current_stock,
           COALESCE(auto_tank.yesterday_stock, 0) as yesterday_stock,
           COALESCE(auto_sales.sale_previous, 0) as day_sales,
+          (COALESCE(auto_sales.sale_previous, 0) + COALESCE(auto_tank.tnk_deadstock, tbl_petrol_tank.tnk_deadstock, 0)) as min_stock,
           tbl_depot.dpo_desc
         FROM tbl_order_item
         LEFT JOIN tbl_item ON tbl_order_item.item_no = tbl_item.itm_code
@@ -5484,8 +5485,8 @@ exports.getLinkedOrderList = async (req, res, next) => {
                 tank_code,
                 MAX(tnk_capacity) as tnk_capacity,
                 MAX(tnk_deadstock) as tnk_deadstock,
-                MAX(CASE WHEN stock_at::date = CURRENT_DATE - INTERVAL '1 day' THEN stock END) as current_stock,
-                MAX(CASE WHEN stock_at::date = CURRENT_DATE - INTERVAL '2 day' THEN stock END) as yesterday_stock
+                MAX(CASE WHEN stock_at::date = '${moment(order.ist_dt).format('YYYY-MM-DD')}'::date - INTERVAL '1 day' THEN stock END) as current_stock,
+                MAX(CASE WHEN stock_at::date = '${moment(order.ist_dt).format('YYYY-MM-DD')}'::date - INTERVAL '2 day' THEN stock END) as yesterday_stock
             FROM tbl_automatics_tanks_information
             GROUP BY ptrl_code, tank_code
         ) auto_tank ON tbl_petrol.ptrl_code = auto_tank.ptrl_code 
@@ -5780,6 +5781,7 @@ exports.getChildOrderInformation = async (req, res, next) => {
               COALESCE(auto_tank.current_stock, 0) as current_stock,
               COALESCE(auto_tank.yesterday_stock, 0) as yesterday_stock,
               COALESCE(auto_sales.sale_previous, 0) as day_sales,
+              (COALESCE(auto_sales.sale_previous, 0) + COALESCE(auto_tank.tnk_deadstock, tbl_petrol_tank.tnk_deadstock, 0)) as min_stock,
               tbl_depot.dpo_desc
             FROM tbl_order_item
             LEFT JOIN tbl_item ON tbl_order_item.item_no = tbl_item.itm_code
@@ -5792,8 +5794,8 @@ exports.getChildOrderInformation = async (req, res, next) => {
                     tank_code,
                     MAX(tnk_capacity) as tnk_capacity,
                     MAX(tnk_deadstock) as tnk_deadstock,
-                    MAX(CASE WHEN stock_at::date = CURRENT_DATE - INTERVAL '1 day' THEN stock END) as current_stock,
-                    MAX(CASE WHEN stock_at::date = CURRENT_DATE - INTERVAL '2 day' THEN stock END) as yesterday_stock
+                    MAX(CASE WHEN stock_at::date = '${moment(order.ist_dt).format('YYYY-MM-DD')}'::date - INTERVAL '1 day' THEN stock END) as current_stock,
+                    MAX(CASE WHEN stock_at::date = '${moment(order.ist_dt).format('YYYY-MM-DD')}'::date - INTERVAL '2 day' THEN stock END) as yesterday_stock
                 FROM tbl_automatics_tanks_information
                 GROUP BY ptrl_code, tank_code
             ) auto_tank ON tbl_petrol.ptrl_code = auto_tank.ptrl_code 
