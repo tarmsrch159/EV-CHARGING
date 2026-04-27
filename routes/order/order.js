@@ -5448,7 +5448,7 @@ exports.getLinkedOrderList = async (req, res, next) => {
         tbl_order.ship_cond, 
         tbl_order.pay_term, 
         tbl_order.deli_date_req, 
-        tbl_master_time.time_value, 
+        tbl_master_time.time_value as deli_time_req, 
         tbl_order.description, 
         tbl_order.sh_cus_date_ref, 
         tbl_order.status_deli, 
