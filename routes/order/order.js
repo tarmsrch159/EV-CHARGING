@@ -911,7 +911,6 @@ exports.getOrderReportInformation = async (req, res, next) => {
             ORDER BY latest_order DESC 
             LIMIT 1;
         `;
-    console.log(topOrdererScript);
     let tbl_top_orderer = await pgConn.get(
       dbPrefix + lic_code,
       topOrdererScript,
@@ -925,7 +924,6 @@ exports.getOrderReportInformation = async (req, res, next) => {
       let Orderer_name = tbl_top_orderer.data[0].emp_role_desc;
       let code = tbl_top_orderer.data[0].created_by_tms;
       top_orderer = Orderer_name ? Orderer_name : code;
-      console.log(Orderer_name);
     }
 
     // =========================================================
@@ -5301,6 +5299,83 @@ exports.addLinkedOrderInformation = async (req, res, next) => {
   }
 };
 
+exports.setLinkedOrderInformation = async (req, res, next) => {
+  try {
+    const lic_code = req.header('lic_code');
+    const {
+      order_id,
+      child_order_id,
+      action
+    } = req.body[0] || {};
+
+    // ======= 1. ตรวจสอบพารามิเตอร์ที่จำเป็น =======
+    const missing = [];
+    if (!lic_code) missing.push('lic_code');
+    if (!order_id) missing.push('order_id');
+    if (!child_order_id || !Array.isArray(child_order_id)) missing.push('child_order_id (Array)');
+    if (!action) missing.push('action');
+
+    if (missing.length > 0) {
+      return sendResponse(res, 'error', '-1', `ข้อมูลพารามิเตอร์ไม่ถูกต้อง (ขาด: ${missing.join(', ')})`, []);
+    }
+
+    const now = moment().format('YYYY-MM-DD HH:mm:ss');
+
+    // ======= 2. รัน Transaction เพื่ออัปเดตความสัมพันธ์ใหม่ =======
+    const transactionResult = await pgConn.runTransaction(dbPrefix + lic_code, async (client) => {
+
+      // ดึง consignment_no จากออเดอร์หลัก
+      const getConsignmentNoRes = await client.query(`SELECT consignment_no FROM tbl_order WHERE id = $1 AND rm_dt IS NULL`, [order_id]);
+      if (!getConsignmentNoRes.rows.length) {
+        return { code: '-3', message: 'ไม่พบข้อมูลออเดอร์หลัก หรือออเดอร์หลักไม่มี consignment_no' };
+      }
+      const consignment_no = getConsignmentNoRes.rows[0].consignment_no;
+
+
+      if (!consignment_no) {
+        return { code: '-4', message: 'ออเดอร์หลักนี้ยังไม่มีการตั้งเลข consignment_no' };
+      }
+
+      //  ยืนยันตัวหลักเป็น Master
+      const updateMasterScript = `
+        UPDATE tbl_order 
+        SET master_order_id = 1, mdf_dt = $1
+        WHERE id = $2 AND rm_dt IS NULL
+      `;
+      await client.query(updateMasterScript, [now, order_id]);
+
+      //  อัปเดตออเดอร์ตัวอื่นๆ ให้มาเป็นออเดอร์พ่วง ของกลุ่มนี้
+      if (child_order_id.length > 0) {
+        const updateChildScript = `
+          UPDATE tbl_order 
+          SET master_order_id = 2, consignment_no = $1, mdf_dt = $2
+          WHERE id = ANY($3) AND rm_dt IS NULL AND order_status = 0
+        `;
+        await client.query(updateChildScript, [consignment_no, now, child_order_id]);
+      }
+
+      return { order_id, consignment_no };
+    }, config.connectionString());
+
+    // ======= 3. ตรวจสอบผลลัพธ์ =======
+    if (transactionResult.code) {
+      return sendResponse(res, 'error', '-3', `ไม่สามารถบันทึกข้อมูลได้: ${transactionResult.message}`, []);
+    }
+
+    const { order_id: final_id, consignment_no: final_consignment } = transactionResult.data;
+
+    // ======= 4. บันทึก Log และส่งคำตอบกลับ =======
+    await xglobal.action_logs(lic_code, action[0].id, 'ปรับปรุงการพ่วงออเดอร์', JSON.stringify(req.body[0]), 'success', action[0].value);
+    return sendResponse(res, 'success', '0', 'อัปเดตการพ่วงออเดอร์สำเร็จ', [{
+      order_id: final_id,
+      consignment_no: final_consignment
+    }]);
+
+  } catch (err) {
+    console.error(err);
+    return sendResponse(res, 'error', '-4', 'เกิดข้อผิดพลาดภายในระบบในการอัปเดตออเดอร์พ่วง', []);
+  }
+};
 
 // ====================== ปลดออเดอร์ออกจากกลุ่มพ่วง (Unlink) ======================
 exports.unlinkOrderInformation = async (req, res, next) => {

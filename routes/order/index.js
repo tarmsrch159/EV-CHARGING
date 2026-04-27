@@ -14,6 +14,7 @@ router.post('/order-logs/information', order.getLoggingOrderInformation);
 router.post('/re-order/information', order.reCreateOrderInformation);
 router.put('/information', order.addOrderInformation);
 router.put('/linked-order/information', order.addLinkedOrderInformation);
+router.patch('/set-linked-order/information', order.setLinkedOrderInformation);
 router.delete('/unlinked-order/information', order.unlinkOrderInformation);
 router.post('/linked-order/list', order.getLinkedOrderList);
 router.patch('/information', order.setOrderInformation);
