@@ -334,7 +334,7 @@ exports.getOrderInformationByID = async (req, res, next) => {
                 tbl_petrol_group.ptrl_group_desc,
                 tbl_order.order_status,
                 tbl_order.chanel, tbl_order.division, tbl_order.sold_to, tbl_order.ship_to, 
-                tbl_petrol.ptrl_desc as station, tbl_petrol.ptrl_code, tbl_petrol.ptrl_number, tbl_petrol.ptrl_sitecode,
+                tbl_petrol.ptrl_desc, tbl_petrol.ptrl_code, tbl_petrol.ptrl_number, tbl_petrol.ptrl_sitecode,
                 tbl_order.cus_ref, tbl_order.cus_date_ref, tbl_order.po_name, tbl_order.order_by, 
                 tbl_order.ship_cond, tbl_order.pay_term, tbl_order.deli_date_req as request_date, tbl_master_time.time_value as RequestTime, 
                 tbl_order.description, tbl_order.sh_cus_date_ref, 
@@ -5488,43 +5488,89 @@ exports.getLinkedOrderList = async (req, res, next) => {
 
     for (let i = 0; i < listRes.data.length; i++) {
       let order = listRes.data[i];
-      let itemScript = `
-        SELECT 
-          tbl_order_item.id, tbl_order_item.order_no, tbl_order_item.item_no,
-          tbl_order_item.ptrl_tank_code,
-          COALESCE(tbl_petrol_tank.tnk_number, '0') as tank_number,
-          COALESCE(auto_tank.tnk_capacity::text, tbl_petrol_tank.tnk_capacity::text) as tank_capacity,
-          COALESCE(auto_tank.tnk_deadstock::text, tbl_petrol_tank.tnk_deadstock::text) as un_pump,
-          tbl_item.itm_desc, tbl_item.itm_material_number,
-          tbl_order_item.item_qty,
-          tbl_order_item.remark,
-          COALESCE(auto_tank.current_stock, 0) as current_stock,
-          COALESCE(auto_tank.yesterday_stock, 0) as yesterday_stock,
-          COALESCE(auto_sales.sale_previous, 0) as day_sales,
-          (COALESCE(auto_sales.sale_previous, 0) + COALESCE(auto_tank.tnk_deadstock, tbl_petrol_tank.tnk_deadstock, 0)) as min_stock,
-          tbl_depot.dpo_desc
-        FROM tbl_order_item
-        LEFT JOIN tbl_item ON tbl_order_item.item_no = tbl_item.itm_code
-        LEFT JOIN tbl_depot ON tbl_order_item.deli_plant = tbl_depot.dpo_code
-        LEFT JOIN tbl_petrol_tank ON tbl_order_item.ptrl_tank_code = tbl_petrol_tank.ptrl_tank_code
-        LEFT JOIN tbl_petrol ON tbl_petrol_tank.ptrl_code = tbl_petrol.ptrl_code
-        LEFT JOIN (
-            SELECT 
-                ptrl_code, 
-                tank_code,
-                MAX(tnk_capacity) as tnk_capacity,
-                MAX(tnk_deadstock) as tnk_deadstock,
-                MAX(CASE WHEN stock_at::date = '${moment(order.ist_dt).format('YYYY-MM-DD')}'::date - INTERVAL '1 day' THEN stock END) as current_stock,
-                MAX(CASE WHEN stock_at::date = '${moment(order.ist_dt).format('YYYY-MM-DD')}'::date - INTERVAL '2 day' THEN stock END) as yesterday_stock
-            FROM tbl_automatics_tanks_information
-            GROUP BY ptrl_code, tank_code
-        ) auto_tank ON tbl_petrol.ptrl_code = auto_tank.ptrl_code 
-             AND tbl_petrol_tank.ptrl_tank_code = auto_tank.tank_code
-        LEFT JOIN tbl_automatics_sales_previous_information auto_sales ON tbl_petrol.ptrl_code = auto_sales.ptrl_code 
-             AND tbl_petrol_tank.ptrl_tank_code = auto_sales.tank_code
-        WHERE tbl_order_item.order_no = '${order.id}' AND tbl_order_item.rm_dt IS NULL
-        ORDER BY tbl_order_item.item_no ASC
-      `;
+      let itemScript = "";
+      if (order.master_order_id == 1) {
+        // --- กรณี Master: โชว์ทุกแทงค์ของปั๊ม ---
+        itemScript = `
+          SELECT 
+            tbl_order_item.id, 
+            '${order.id}' as order_no, 
+            tbl_petrol_tank.itm_code as item_no,
+            tbl_petrol_tank.ptrl_tank_code,
+            COALESCE(tbl_petrol_tank.tnk_number, '0') as tank_number,
+            COALESCE(auto_tank.tnk_capacity::text, tbl_petrol_tank.tnk_capacity::text) as tank_capacity,
+            COALESCE(auto_tank.tnk_deadstock::text, tbl_petrol_tank.tnk_deadstock::text) as un_pump,
+            tbl_item.itm_desc, tbl_item.itm_material_number,
+            COALESCE(tbl_order_item.item_qty, 0) as item_qty,
+            tbl_order_item.remark,
+            COALESCE(auto_tank.current_stock, 0) as current_stock,
+            COALESCE(auto_tank.yesterday_stock, 0) as yesterday_stock,
+            COALESCE(auto_sales.sale_previous, 0) as day_sales,
+            (COALESCE(auto_sales.sale_previous, 0) + COALESCE(auto_tank.tnk_deadstock, tbl_petrol_tank.tnk_deadstock, 0)) as min_stock,
+            tbl_depot.dpo_desc
+          FROM tbl_petrol_tank
+          INNER JOIN tbl_petrol ON tbl_petrol_tank.ptrl_code = tbl_petrol.ptrl_code
+          LEFT JOIN tbl_item ON tbl_petrol_tank.itm_code = tbl_item.itm_code
+          LEFT JOIN tbl_order_item ON tbl_petrol_tank.ptrl_tank_code = tbl_order_item.ptrl_tank_code 
+               AND tbl_order_item.order_no = '${order.id}' AND tbl_order_item.rm_dt IS NULL
+          LEFT JOIN tbl_depot ON tbl_order_item.deli_plant = tbl_depot.dpo_code
+          LEFT JOIN (
+              SELECT 
+                  ptrl_code, 
+                  tank_code,
+                  MAX(tnk_capacity) as tnk_capacity,
+                  MAX(tnk_deadstock) as tnk_deadstock,
+                  MAX(CASE WHEN stock_at::date = '${moment(order.ist_dt).format('YYYY-MM-DD')}'::date - INTERVAL '1 day' THEN stock END) as current_stock,
+                  MAX(CASE WHEN stock_at::date = '${moment(order.ist_dt).format('YYYY-MM-DD')}'::date - INTERVAL '2 day' THEN stock END) as yesterday_stock
+              FROM tbl_automatics_tanks_information
+              GROUP BY ptrl_code, tank_code
+          ) auto_tank ON tbl_petrol.ptrl_code = auto_tank.ptrl_code 
+               AND tbl_petrol_tank.ptrl_tank_code = auto_tank.tank_code
+          LEFT JOIN tbl_automatics_sales_previous_information auto_sales ON tbl_petrol.ptrl_code = auto_sales.ptrl_code 
+               AND tbl_petrol_tank.ptrl_tank_code = auto_sales.tank_code
+          WHERE tbl_petrol.ptrl_number = '${order.ship_to}'
+          ORDER BY tbl_petrol_tank.tnk_number ASC
+        `;
+      } else {
+        // --- กรณี Child: โชว์แค่ที่สั่ง ---
+        itemScript = `
+          SELECT 
+            tbl_order_item.id, tbl_order_item.order_no, tbl_order_item.item_no,
+            tbl_order_item.ptrl_tank_code,
+            COALESCE(tbl_petrol_tank.tnk_number, '0') as tank_number,
+            COALESCE(auto_tank.tnk_capacity::text, tbl_petrol_tank.tnk_capacity::text) as tank_capacity,
+            COALESCE(auto_tank.tnk_deadstock::text, tbl_petrol_tank.tnk_deadstock::text) as un_pump,
+            tbl_item.itm_desc, tbl_item.itm_material_number,
+            tbl_order_item.item_qty,
+            tbl_order_item.remark,
+            COALESCE(auto_tank.current_stock, 0) as current_stock,
+            COALESCE(auto_tank.yesterday_stock, 0) as yesterday_stock,
+            COALESCE(auto_sales.sale_previous, 0) as day_sales,
+            (COALESCE(auto_sales.sale_previous, 0) + COALESCE(auto_tank.tnk_deadstock, tbl_petrol_tank.tnk_deadstock, 0)) as min_stock,
+            tbl_depot.dpo_desc
+          FROM tbl_order_item
+          LEFT JOIN tbl_item ON tbl_order_item.item_no = tbl_item.itm_code
+          LEFT JOIN tbl_depot ON tbl_order_item.deli_plant = tbl_depot.dpo_code
+          LEFT JOIN tbl_petrol_tank ON tbl_order_item.ptrl_tank_code = tbl_petrol_tank.ptrl_tank_code
+          LEFT JOIN tbl_petrol ON tbl_petrol_tank.ptrl_code = tbl_petrol.ptrl_code
+          LEFT JOIN (
+              SELECT 
+                  ptrl_code, 
+                  tank_code,
+                  MAX(tnk_capacity) as tnk_capacity,
+                  MAX(tnk_deadstock) as tnk_deadstock,
+                  MAX(CASE WHEN stock_at::date = '${moment(order.ist_dt).format('YYYY-MM-DD')}'::date - INTERVAL '1 day' THEN stock END) as current_stock,
+                  MAX(CASE WHEN stock_at::date = '${moment(order.ist_dt).format('YYYY-MM-DD')}'::date - INTERVAL '2 day' THEN stock END) as yesterday_stock
+              FROM tbl_automatics_tanks_information
+              GROUP BY ptrl_code, tank_code
+          ) auto_tank ON tbl_petrol.ptrl_code = auto_tank.ptrl_code 
+               AND tbl_petrol_tank.ptrl_tank_code = auto_tank.tank_code
+          LEFT JOIN tbl_automatics_sales_previous_information auto_sales ON tbl_petrol.ptrl_code = auto_sales.ptrl_code 
+               AND tbl_petrol_tank.ptrl_tank_code = auto_sales.tank_code
+          WHERE tbl_order_item.order_no = '${order.id}' AND tbl_order_item.rm_dt IS NULL
+          ORDER BY tbl_order_item.item_no ASC
+        `;
+      }
 
       let itemResult = await pgConn.get(dbPrefix + lic_code, itemScript, config.connectionString());
 
@@ -5824,8 +5870,8 @@ exports.getChildOrderInformation = async (req, res, next) => {
                     tank_code,
                     MAX(tnk_capacity) as tnk_capacity,
                     MAX(tnk_deadstock) as tnk_deadstock,
-                    MAX(CASE WHEN stock_at::date = '${moment(order.ist_dt).format('YYYY-MM-DD')}'::date - INTERVAL '1 day' THEN stock END) as current_stock,
-                    MAX(CASE WHEN stock_at::date = '${moment(order.ist_dt).format('YYYY-MM-DD')}'::date - INTERVAL '2 day' THEN stock END) as yesterday_stock
+                    MAX(CASE WHEN stock_at::date = '${moment(order.ist_dt).format("YYYY-MM-DD")}'::date - INTERVAL '1 day' THEN stock END) as current_stock,
+                    MAX(CASE WHEN stock_at::date = '${moment(order.ist_dt).format("YYYY-MM-DD")}'::date - INTERVAL '2 day' THEN stock END) as yesterday_stock
                 FROM tbl_automatics_tanks_information
                 GROUP BY ptrl_code, tank_code
             ) auto_tank ON tbl_petrol.ptrl_code = auto_tank.ptrl_code 
