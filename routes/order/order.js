@@ -4225,18 +4225,6 @@ exports.editOrderItem = async (req, res, next) => {
           params,
           config.connectionString(),
         );
-        let updateOrder = `
-                    UPDATE tbl_order 
-                    SET auto_order = $1 
-                    WHERE id = $2
-                `;
-        let paramsOrder = [0, order_no];
-        await pgConn.execute2params(
-          dbPrefix + lic_code,
-          updateOrder,
-          paramsOrder,
-          config.connectionString(),
-        );
 
         if (itemChanges.length > 0) {
           let editLogPayload = {
@@ -4256,6 +4244,27 @@ exports.editOrderItem = async (req, res, next) => {
           );
         }
       }
+
+      // ========== อัปเดตข้อมูลหลักของออเดอร์ (อัปเดต Description และวันเวลาด้วย) ==========
+      let updateOrder = `
+                UPDATE tbl_order 
+                SET description = $1, 
+                    auto_order = $2,
+                    mdf_dt = $3
+                WHERE id = $4
+            `;
+      let paramsOrder = [
+        description || "",
+        0,
+        moment().format("YYYY-MM-DD HH:mm:ss"),
+        order_no
+      ];
+      await pgConn.execute2params(
+        dbPrefix + lic_code,
+        updateOrder,
+        paramsOrder,
+        config.connectionString(),
+      );
 
       // ============= Success response =============
       let response = [
