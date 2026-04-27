@@ -5416,12 +5416,28 @@ exports.getLinkedOrderList = async (req, res, next) => {
     // ======= 3. ดึงข้อมูลรายการในกลุ่มพ่วง =======
     let listScript = `
       SELECT 
-        tbl_order.id, tbl_order.order_no, tbl_order.order_type, tbl_order.sh_cus_ref, tbl_order.sold_to, tbl_order.ship_to, 
-        tbl_order.deli_date_req, tbl_order.deli_time_req, tbl_order.master_order_id, tbl_order.consignment_no,
+        tbl_order.id, tbl_order.order_no, tbl_order.sh_cus_ref as aos_order_no, tbl_order.order_type, tbl_order.order_group, 
+        tbl_order_type.ord_type_desc,
+        tbl_petrol_group.ptrl_group_desc,
         tbl_order.order_status,
-        tbl_petrol.ptrl_desc
+        tbl_order.chanel, tbl_order.division, tbl_order.sold_to, tbl_order.ship_to, 
+        tbl_petrol.ptrl_desc as station, tbl_petrol.ptrl_code, tbl_petrol.ptrl_number, tbl_petrol.ptrl_sitecode,
+        tbl_order.cus_ref, tbl_order.cus_date_ref, tbl_order.po_name, tbl_order.order_by, 
+        tbl_order.ship_cond, tbl_order.pay_term, tbl_order.deli_date_req as request_date, tbl_master_time.time_value as RequestTime, 
+        tbl_order.description, tbl_order.sh_cus_date_ref, 
+        tbl_order.status_deli, tbl_order.status_block, tbl_order.status_sd_process, 
+        tbl_order.status_check, tbl_order.sd_doc_reject, tbl_order.cus_group, 
+        tbl_order.hana_created, tbl_order.hana_time, tbl_order.created_by, 
+        tbl_order.ist_dt, tbl_order.mdf_dt, tbl_order.rm_dt,
+        tbl_order.auto_order,
+        tbl_petrol.ptrl_address,
+        tbl_petrol.ptrl_zip_code,
+        tbl_order.master_order_id, tbl_order.consignment_no
       FROM public.tbl_order 
-      LEFT JOIN tbl_petrol ON tbl_order.ship_to = ptrl_number
+      LEFT JOIN tbl_order_type ON tbl_order.order_type = tbl_order_type.ord_type_code
+      LEFT JOIN tbl_petrol ON tbl_order.ship_to = tbl_petrol.ptrl_number
+      LEFT JOIN tbl_petrol_group ON tbl_petrol_group.ptrl_group_code = tbl_petrol.ptrl_group_code
+      LEFT JOIN tbl_master_time ON tbl_order.deli_time_req = tbl_master_time.time_code
       WHERE tbl_order.consignment_no = $1 
         AND tbl_order.order_status = 0
         AND tbl_order.rm_dt IS NULL 
