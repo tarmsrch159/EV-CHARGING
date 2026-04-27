@@ -5477,7 +5477,7 @@ exports.getLinkedOrderList = async (req, res, next) => {
           LEFT JOIN tbl_item ON tbl_petrol_tank.itm_code = tbl_item.itm_code
           LEFT JOIN tbl_order_item ON tbl_petrol_tank.ptrl_tank_code = tbl_order_item.ptrl_tank_code 
                AND tbl_order_item.order_no = '${order.id}' AND tbl_order_item.rm_dt IS NULL
-          LEFT JOIN tbl_depot ON tbl_order_item.deli_plant = tbl_depot.dpo_code
+          LEFT JOIN tbl_depot ON COALESCE(tbl_order_item.deli_plant, (SELECT deli_plant FROM tbl_order_item WHERE order_no = '${order.id}' AND rm_dt IS NULL LIMIT 1)) = tbl_depot.dpo_code
           LEFT JOIN (
               SELECT 
                   ptrl_code, 
@@ -5492,7 +5492,7 @@ exports.getLinkedOrderList = async (req, res, next) => {
                AND tbl_petrol_tank.ptrl_tank_code = auto_tank.tank_code
           LEFT JOIN tbl_automatics_sales_previous_information auto_sales ON tbl_petrol.ptrl_code = auto_sales.ptrl_code 
                AND tbl_petrol_tank.ptrl_tank_code = auto_sales.tank_code
-          WHERE tbl_petrol.ptrl_number = '${order.ship_to}'
+          WHERE tbl_petrol.ptrl_code = '${order.ptrl_code}'
           ORDER BY tbl_petrol_tank.tnk_number ASC
         `;
       } else {
