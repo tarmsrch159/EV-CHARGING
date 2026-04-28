@@ -417,10 +417,9 @@ exports.getOrderInformationByID = async (req, res, next) => {
                 COALESCE(auto_sales.sale_previous, 0) as day_sales,
                 (COALESCE(auto_sales.sale_previous, 0) + COALESCE(auto_tank.tnk_deadstock, tbl_petrol_tank.tnk_deadstock, 0)) as min_stock,
                 tbl_order_item.remark,
-                tbl_depot.dpo_code, tbl_depot.dpo_desc, tbl_depot.dpo_short_desc
+                (SELECT dpo_desc FROM tbl_depot WHERE dpo_code = (SELECT dpo_code FROM tbl_petrol_depot WHERE ptrl_code = '${orderData.ptrl_code}' AND rm_dt IS NULL LIMIT 1)) as dpo_desc
             FROM tbl_order_item
             LEFT JOIN tbl_item ON tbl_order_item.item_no = tbl_item.itm_code
-            LEFT JOIN tbl_depot ON tbl_order_item.deli_plant = tbl_depot.dpo_code AND tbl_depot.dpo_flag = '1'
             LEFT JOIN tbl_order ON tbl_order_item.order_no = tbl_order.id
             LEFT JOIN tbl_petrol ON tbl_order.ship_to = tbl_petrol.ptrl_number
             INNER JOIN tbl_petrol_tank ON tbl_order_item.ptrl_tank_code = tbl_petrol_tank.ptrl_tank_code 
@@ -478,7 +477,7 @@ exports.getOrderInformationByID = async (req, res, next) => {
                 COALESCE(auto_sales.sale_previous, 0) as day_sales,
                 (COALESCE(auto_sales.sale_previous, 0) + COALESCE(auto_tank.tnk_deadstock, tpt.tnk_deadstock, 0)) as min_stock,
                 NULL as remark,
-                NULL as dpo_code, NULL as dpo_desc, NULL as dpo_short_desc
+                (SELECT dpo_desc FROM tbl_depot WHERE dpo_code = (SELECT dpo_code FROM tbl_petrol_depot WHERE ptrl_code = '${orderData.ptrl_code}' AND rm_dt IS NULL LIMIT 1)) as dpo_desc
             FROM tbl_petrol_tank tpt
             LEFT JOIN tbl_item itm ON tpt.itm_code = itm.itm_code
             LEFT JOIN (
