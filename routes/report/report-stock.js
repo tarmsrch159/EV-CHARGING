@@ -173,11 +173,8 @@ exports.getReportStock = async (req, res, next) => {
         console.log('ptrl_sitecode', ptrl_sitecode);
 
         let param = [];
-        param.push(date_at);
-
-        let wh = '';
-        param.push(ptrl_sitecode);
-        wh += ` AND tpr.ptrl_sitecode = $${param.length} `;
+        param.push(date_at); // $1
+        param.push(ptrl_sitecode); // $2
 
         let scriptSql = `
             SELECT
@@ -190,51 +187,46 @@ exports.getReportStock = async (req, res, next) => {
                         'itm_code', tit.itm_code,
                         'itm_material_number', tit.itm_material_number,
                         'itm_desc', tit.itm_desc,
-                        'un_pump', tpt.tnk_deadstock,
-                        'max_stock', tpt.tnk_capacity,
+                        'un_pump', COALESCE(auto_tank.tnk_deadstock, tpt.tnk_deadstock),
+                        'max_stock', COALESCE(auto_tank.tnk_capacity, tpt.tnk_capacity),
                         'target_stock', tpt.tnk_target,
-                        'tank_start', tank.tank_start,
-                        'tank_end', tank.tank_end,
-                        'total_sales', COALESCE(CAST(meter_summary.total_sales AS NUMERIC(18,2)), 0),
-                        'min_stock', COALESCE(CAST(meter_summary.total_sales AS NUMERIC(18,2)), 0) + tpt.tnk_deadstock,
-                        'recive_val', COALESCE(tank.recive_val, 0),
-                        'current_stock', COALESCE(tank.tank_end, 0) + COALESCE(tank.recive_val::NUMERIC, 0)
+                        'tank_start', COALESCE(auto_tank.tank_start, 0),
+                        'tank_end', COALESCE(auto_tank.tank_end, 0),
+                        'total_sales', COALESCE(auto_sales.total_sales, 0),
+                        'min_stock', COALESCE(auto_sales.total_sales, 0) + COALESCE(auto_tank.tnk_deadstock, tpt.tnk_deadstock, 0),
+                        'recive_val', 0,
+                        'current_stock', COALESCE(auto_tank.tank_end, 0),
+                        'dpo_desc', (SELECT dpo_desc FROM tbl_depot WHERE dpo_code = (SELECT dpo_code FROM tbl_petrol_depot WHERE ptrl_code = tpr.ptrl_code AND rm_dt IS NULL LIMIT 1))
                     )
                     ORDER BY tpt.tnk_number ASC
                 ) AS data
             FROM tbl_petrol_tank tpt 
-            INNER JOIN tbl_petrol tpr ON tpt.ptrl_code = tpr.ptrl_code
+            INNER JOIN (
+                SELECT ptrl_code, ptrl_sitecode FROM tbl_petrol WHERE ptrl_flag = '1'
+            ) tpr ON tpt.ptrl_code = tpr.ptrl_code
             LEFT JOIN tbl_item tit ON tpt.itm_code = tit.itm_code
-            LEFT JOIN tbl_order_eodtank tank ON (
-                tpt.tnk_number = tank.tank_no 
-                AND tpr.ptrl_sitecode = tank.shipto_no
-                AND tank.date_at = $1
-            )
             LEFT JOIN (
                 SELECT 
-                    tank_no,
-                    product_name,
-                    shipto_no,
-                    buy_date,
-                    SUM(meter_diff) AS total_sales
-                FROM (
-                    SELECT DISTINCT ON (product_name, shipto_no, tank_no, buy_date, meter_start, meter_start)
-                        product_name,
-                        shipto_no,
-                        tank_no,
-                        buy_date,
-                        ABS(meter_end - meter_start) AS meter_diff
-                    FROM tbl_order_eodmeter
-                    WHERE buy_date = $1
-                    ORDER BY product_name, shipto_no, tank_no, buy_date, meter_start, meter_start, id DESC
-                ) AS latest_meters
-                GROUP BY product_name, tank_no, shipto_no, buy_date
-            ) meter_summary ON (
-                tpt.tnk_number = meter_summary.tank_no 
-                AND tpr.ptrl_sitecode = meter_summary.shipto_no
-            )
-            WHERE tpt.ptrl_tank_flag = '1' ${wh}
-            GROUP BY tpr.ptrl_sitecode
+                    ptrl_code, 
+                    tank_code,
+                    MAX(tnk_capacity) as tnk_capacity,
+                    MAX(tnk_deadstock) as tnk_deadstock,
+                    MAX(CASE WHEN stock_at::date = $1::date - INTERVAL '2 day' THEN stock END) as tank_start,
+                    MAX(CASE WHEN stock_at::date = $1::date - INTERVAL '1 day' THEN stock END) as tank_end
+                FROM tbl_automatics_tanks_information
+                GROUP BY ptrl_code, tank_code
+            ) auto_tank ON tpr.ptrl_code = auto_tank.ptrl_code AND tpt.ptrl_tank_code = auto_tank.tank_code
+            LEFT JOIN (
+                SELECT 
+                    ptrl_code, 
+                    tank_code, 
+                    MAX(sale_previous) as total_sales
+                FROM tbl_automatics_sales_previous_information
+                WHERE sale_at_previous::date = $1::date - INTERVAL '1 day'
+                GROUP BY ptrl_code, tank_code
+            ) auto_sales ON tpr.ptrl_code = auto_sales.ptrl_code AND tpt.ptrl_tank_code = auto_sales.tank_code
+            WHERE tpr.ptrl_sitecode = $2
+            GROUP BY tpr.ptrl_sitecode, tpr.ptrl_code
             ORDER BY tpr.ptrl_sitecode ASC;
         `;
 
