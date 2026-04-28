@@ -4162,25 +4162,25 @@ exports.editOrderItem = async (req, res, next) => {
     deli_time_req = deli_time_req != undefined ? deli_time_req : "Z00";
 
     // ====================== เช็ค Validate item_quantity ======================
-    if (order_item && Array.isArray(order_item) && order_item.length > 0) {
-      for (var i = 0; i < order_item.length; i++) {
-        var item_quantity_check = order_item[i].item_quantity;
-        if (!/^\d+(\.\d+)?$/.test(String(item_quantity_check))) {
-          let response = [
-            {
-              status: "error",
-              invalid_code: "-1",
-              message:
-                "ไม่สามารถบันทึกข้อมูล Order ได้ เนื่องจาก item_quantity ต้องเป็นตัวเลขที่ถูกต้องเท่านั้น (ห้ามมีเครื่องหมายพิเศษ หน้าข้อความ)",
-              data: [],
-              response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
-            },
-          ];
-          res.status(200).send(response);
-          return;
-        }
-      }
-    }
+    // if (order_item && Array.isArray(order_item) && order_item.length > 0) {
+    //   for (var i = 0; i < order_item.length; i++) {
+    //     var item_quantity_check = order_item[i].item_quantity;
+    //     if (!/^\d+(\.\d+)?$/.test(String(item_quantity_check))) {
+    //       let response = [
+    //         {
+    //           status: "error",
+    //           invalid_code: "-1",
+    //           message:
+    //             "ไม่สามารถบันทึกข้อมูล Order ได้ เนื่องจาก item_quantity ต้องเป็นตัวเลขที่ถูกต้องเท่านั้น (ห้ามมีเครื่องหมายพิเศษ หน้าข้อความ)",
+    //           data: [],
+    //           response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+    //         },
+    //       ];
+    //       res.status(200).send(response);
+    //       return;
+    //     }
+    //   }
+    // }
 
     let scriptCheckOrderNo = `SELECT id, order_no, sh_cus_ref, ship_to, status_deli, order_status FROM tbl_order WHERE id = $1`;
     let checkOrderNo = await pgConn.getWithParams(
