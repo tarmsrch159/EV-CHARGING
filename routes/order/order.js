@@ -505,7 +505,7 @@ exports.getOrderInformationByID = async (req, res, next) => {
               AND tpt.rm_dt IS NULL
               AND tpt.ptrl_tank_code NOT IN (SELECT ptrl_tank_code FROM tbl_order_item WHERE CAST(order_no AS TEXT) = '${id}' AND rm_dt IS NULL AND ptrl_tank_code IS NOT NULL)
         )
-        ORDER BY tank_number ASC`;
+        ORDER BY item_qty DESC`;
 
     console.log('itemScript', itemScript)
 
