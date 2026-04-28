@@ -504,7 +504,7 @@ exports.getOrderInformationByID = async (req, res, next) => {
               AND tpt.rm_dt IS NULL
               AND tpt.ptrl_tank_code NOT IN (SELECT ptrl_tank_code FROM tbl_order_item WHERE CAST(order_no AS TEXT) = '${id}' AND rm_dt IS NULL AND ptrl_tank_code IS NOT NULL)
         )
-        ORDER BY item_qty DESC`;
+        ORDER BY tank_number ASC`;
 
     console.log('itemScript', itemScript)
 
@@ -1956,7 +1956,6 @@ const getConfirmOrder = async (lic_code, order_id, action) => {
         },
       ],
     });
-    // console.log(payloadData);
 
     try {
       // ============ SAP API =============
@@ -1967,6 +1966,7 @@ const getConfirmOrder = async (lic_code, order_id, action) => {
       let statusRes = api_response.data.SalesDocuments[0].MessageType;
       let response = [];
 
+
       if (statusRes === "E") {
         response.push({
           status: "error",
@@ -1974,17 +1974,19 @@ const getConfirmOrder = async (lic_code, order_id, action) => {
           message: api_response.data,
         });
 
-        let logPayloadErr = {
-          order_id: order_id,
-          reason: req.body[0].reason || req.body[0].description || "",
-          ...JSON.parse(payloadData),
-        };
+        let messageSub = api_response.data.SalesDocuments[0].Messages
+          .filter(m => m.SubMessageType === 'E')
+          .map(m => ({
+            type: m.SubMessageType,
+            text: m.SubMessageText
+          }));
+
         await xglobal.action_logs(
           lic_code,
           action[0].id,
-          "confirm_order_sap",
-          JSON.stringify(logPayloadErr),
-          "error",
+          "confirm_order_api_error",
+          JSON.stringify({ order_id: order_id }),
+          JSON.stringify({ message_sub: messageSub }).substring(0, 200),
           action[0].value,
         );
       } else {
@@ -2094,26 +2096,44 @@ const getConfirmOrder = async (lic_code, order_id, action) => {
 
       return response;
     } catch (error) {
-      // console.log(error);
       let errMsg = error.response ? error.response.data : error.message;
-      let errDetail = errMsg.fault.detail.errorcode;
+
+      let errDetail = "";
+      if (errMsg && errMsg.fault && errMsg.fault.detail) {
+        errDetail = errMsg.fault.detail.errorcode || "Unknown Detail";
+      } else {
+        errDetail = typeof errMsg === 'string' ? errMsg : JSON.stringify(errMsg);
+      }
 
       let response = [
         {
           status: "error",
           invalid_code: "-2",
           message: "External API Error: " + errDetail,
-          data: [],
+          data: errMsg,
           response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
         },
       ];
+
+      let sapErrorLogs = "";
+      if (errMsg && errMsg.SalesDocuments && errMsg.SalesDocuments[0] && errMsg.SalesDocuments[0].Messages) {
+        let messageSub = errMsg.SalesDocuments[0].Messages
+          .filter(m => m.SubMessageType === 'E')
+          .map(m => ({
+            type: m.SubMessageType,
+            text: m.SubMessageText
+          }));
+        sapErrorLogs = JSON.stringify({ message_sub: messageSub });
+      } else {
+        sapErrorLogs = typeof errMsg === 'string' ? errMsg : JSON.stringify(errMsg);
+      }
 
       await xglobal.action_logs(
         lic_code,
         action[0].id,
         "confirm_order_api_error",
+        sapErrorLogs,
         JSON.stringify({ order_id }),
-        JSON.stringify(errMsg),
         action[0].value,
       );
       return response;
@@ -2147,8 +2167,6 @@ exports.getConfirmOrder = async (req, res, next) => {
   for (let current_id of orderIds) {
     let result = await getConfirmOrder(lic_code, current_id, action);
     // let result = ex_data;
-    console.log("status =>", result[0].status);
-    console.log("result =>", result);
 
     if (result[0].status === "success") {
       status = "success";
@@ -2164,8 +2182,25 @@ exports.getConfirmOrder = async (req, res, next) => {
           order_id: current_id,
           message_text: sDocs[0].MessageText,
           message_value: sDocs[0].SHCustomerReference,
-          message_sub: sDocs[0].Messages,
+          message_sub: sDocs[0].Messages
+            .filter(item => item.SubMessageType === 'E')
+            .map(item => ({
+              type: item.SubMessageType,
+              text: item.SubMessageText
+            })),
         });
+        const messagesForLog = error_message[error_message.length - 1].message_sub
+          .map(m => m.text)
+          .join(", ");
+
+        await xglobal.action_logs(
+          lic_code,
+          action[0].id,
+          "confirm_order_sap_msg",
+          JSON.stringify({ order_id: current_id }),
+          messagesForLog.substring(0, 200),
+          action[0].value
+        )
       } else {
         error_message.push({
           order_id: current_id,
@@ -5714,7 +5749,7 @@ exports.getLinkedOrderList = async (req, res, next) => {
               GROUP BY ptrl_code, tank_code
           ) auto_sales ON tbl_petrol.ptrl_code = auto_sales.ptrl_code AND tbl_petrol_tank.ptrl_tank_code = auto_sales.tank_code
           WHERE tbl_order_item.order_no = '${order.id}' AND tbl_order_item.rm_dt IS NULL
-          ORDER BY tbl_order_item.ptrl_tank_code, tbl_order_item.id DESC
+          ORDER BY tbl_petrol_tank.tank_number ASC
         `;
       }
 
@@ -6026,7 +6061,7 @@ exports.getChildOrderInformation = async (req, res, next) => {
                 GROUP BY ptrl_code, tank_code
             ) auto_sales ON tbl_petrol.ptrl_code = auto_sales.ptrl_code AND tbl_petrol_tank.ptrl_tank_code = auto_sales.tank_code
             WHERE tbl_order_item.order_no = '${order.id}' AND tbl_order_item.rm_dt IS NULL
-            ORDER BY tbl_order_item.ptrl_tank_code, tbl_order_item.id DESC
+            ORDER BY tbl_petrol_tank.tank_number ASC
           `;
 
           let itemResult = await pgConn.get(dbPrefix + lic_code, itemScript, config.connectionString());
