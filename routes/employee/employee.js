@@ -354,6 +354,8 @@ exports.setEmployeeInformation = async (req, res, next) => {
             off_code,
             ptrl_code,
             ptrl_group_code,
+            order_type,
+            sales_org,
             action
         } = req.body[0];
 
@@ -381,6 +383,8 @@ exports.setEmployeeInformation = async (req, res, next) => {
             emp_group_code = emp_group_code == undefined ? '' : emp_group_code;
             ptrl_code = ptrl_code == undefined ? '' : ptrl_code;
             ptrl_group_code = ptrl_group_code == undefined ? [] : ptrl_group_code;
+            order_type = order_type == undefined ? [] : order_type;
+            sales_org = sales_org == undefined ? [] : sales_org;
 
             // if (off_code.toString().toUpperCase() == 'ALL') {
 
@@ -423,6 +427,24 @@ exports.setEmployeeInformation = async (req, res, next) => {
             if (Array.isArray(ptrl_group_code) && ptrl_group_code.length > 0) {
                 for (const code of ptrl_group_code) {
                     script += `INSERT INTO tbl_employee_petrol_group (emp_code, ptrl_group_code, emp_pgrp_flag, ist_dt) VALUES ('${emp_code}', '${code}', 1, '${now_dt}');\n`;
+                }
+            }
+
+            // อัปเดตข้อมูล order type (ลบอันเก่าแล้ว Insert ใหม่)
+            script += `DELETE FROM tbl_employee_order_type WHERE emp_code = '${emp_code}';\n`;
+            if (Array.isArray(order_type) && order_type.length > 0) {
+                for (const code of order_type) {
+                    let otyp_id = 'OTYP-' + moment().format('YYYYMMDD') + Math.floor(100000 + Math.random() * 900000);
+                    script += `INSERT INTO tbl_employee_order_type (emp_otyp_id, emp_code, ord_type_code, emp_otyp_flag, ist_dt) VALUES ('${otyp_id}', '${emp_code}', '${code}', 1, '${now_dt}');\n`;
+                }
+            }
+
+            // อัปเดตข้อมูล sales org (ลบอันเก่าแล้ว Insert ใหม่)
+            script += `DELETE FROM tbl_employee_sales_org WHERE emp_code = '${emp_code}';\n`;
+            if (Array.isArray(sales_org) && sales_org.length > 0) {
+                for (const code of sales_org) {
+                    let sorg_id = 'SORG-' + moment().format('YYYYMMDD') + Math.floor(100000 + Math.random() * 900000);
+                    script += `INSERT INTO tbl_employee_sales_org (emp_sorg_id, emp_code, sales_org_code, emp_sorg_flag, ist_dt) VALUES ('${sorg_id}', '${emp_code}', '${code}', 1, '${now_dt}');\n`;
                 }
             }
 
@@ -571,6 +593,8 @@ exports.addEmployeeInformation = async (req, res, next) => {
             off_code,
             ptrl_code,
             ptrl_group_code,
+            order_type,
+            sales_org,
             action
         } = req.body[0];
 
@@ -597,6 +621,8 @@ exports.addEmployeeInformation = async (req, res, next) => {
             emp_group_code = emp_group_code == undefined ? '' : emp_group_code;
             ptrl_code = ptrl_code == undefined ? '' : ptrl_code;
             ptrl_group_code = ptrl_group_code == undefined ? [] : ptrl_group_code;
+            order_type = order_type == undefined ? [] : order_type;
+            sales_org = sales_org == undefined ? [] : sales_org;
 
             // let query_ptrl = `SELECT ptrl_code, ptrl_number, ptrl_desc FROM tbl_petrol WHERE ptrl_code = '${ptrl_code}'`
             // let tbl_temporary_ptrl = await pgConn.get(dbPrefix + lic_code, query_ptrl, config.connectionString());
@@ -670,6 +696,22 @@ exports.addEmployeeInformation = async (req, res, next) => {
             if (Array.isArray(ptrl_group_code) && ptrl_group_code.length > 0) {
                 for (const code of ptrl_group_code) {
                     script += `INSERT INTO tbl_employee_petrol_group (emp_code, ptrl_group_code, emp_pgrp_flag, ist_dt) VALUES ('${emp_code}', '${code}', 1, '${now_dt}');\n`;
+                }
+            }
+
+            // 3) Insert ข้อมูล order type ที่ relate กับพนักงาน (รองรับหลายรายการ)
+            if (Array.isArray(order_type) && order_type.length > 0) {
+                for (const code of order_type) {
+                    let otyp_id = 'OTYP-' + moment().format('YYYYMMDD') + Math.floor(100000 + Math.random() * 900000);
+                    script += `INSERT INTO tbl_employee_order_type (emp_otyp_id, emp_code, ord_type_code, emp_otyp_flag, ist_dt) VALUES ('${otyp_id}', '${emp_code}', '${code}', 1, '${now_dt}');\n`;
+                }
+            }
+
+            // 4) Insert ข้อมูล sales org ที่ relate กับพนักงาน (รองรับหลายรายการ)
+            if (Array.isArray(sales_org) && sales_org.length > 0) {
+                for (const code of sales_org) {
+                    let sorg_id = 'SORG-' + moment().format('YYYYMMDD') + Math.floor(100000 + Math.random() * 900000);
+                    script += `INSERT INTO tbl_employee_sales_org (emp_sorg_id, emp_code, sales_org_code, emp_sorg_flag, ist_dt) VALUES ('${sorg_id}', '${emp_code}', '${code}', 1, '${now_dt}');\n`;
                 }
             }
 
