@@ -87,7 +87,7 @@ exports.getStockAutoOrderInformation = async (req, res, next) => {
     let dataScript = `
             ${baseSelectQuery}
             ${whereClause}
-            ORDER BY ati.ist_dt DESC;
+            ORDER BY tbl_petrol_tank.tnk_number ASC;
         `;
 
 
@@ -267,7 +267,7 @@ exports.getSalesAutoOrderInformation = async (req, res, next) => {
     let dataScript = `
             ${baseSelectQuery}
             ${whereClause}
-            ORDER BY ats.ist_dt DESC;
+            ORDER BY tbl_petrol_tank.tnk_number ASC;
         `;
 
     let tbl_temporary = await pgConn.get(
