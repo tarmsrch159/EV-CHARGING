@@ -33,7 +33,7 @@ exports.startLowStockLoop = async () => {
 
     while (true) {
         await executeLoop();
-        // await sleep(5000);
-        await sleep(60000);
+        // await sleep(5000); // Test รันทุกๆ 5 วินาที
+        await sleep(60000); // Production รันทุกๆ 1 นาที
     }
 };
