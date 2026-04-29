@@ -35,6 +35,7 @@ var reasonRouter = require('./routes/reason/index');
 var runoutConfigRouter = require('./routes/runout-config/index');
 var sapAlertConfigRouter = require('./routes/sap-alert-config/index');
 var autoOrderMailsRouter = require('./routes/auto-order-mails/index');
+var manualStockRouter = require('./routes/manual-stock/index');
 const autoOrderMailsController = require('./routes/auto-order-mails/auto-order-mails');
 const autoOrderMailsScheduler = require('./routes/auto-order-mails/auto-order-mail-scheduler');
 const orderController = require('./routes/order/order');
@@ -331,6 +332,8 @@ app.use('/api-tms-v2/sap-alert-config', sapAlertConfigRouter);
 app.use('/api-tms-v2/auto-order-mails', autoOrderMailsRouter);
 //Low Stock Alert
 app.use('/api-tms-v2/low-stock-alert', lowStockAlertRouter);
+//Manual Stock
+app.use('/api-tms-v2/manual-stock', manualStockRouter);
 
 
 // ตั้งเวลาทำงานทุก 1 ชั่วโมง

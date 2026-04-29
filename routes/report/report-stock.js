@@ -186,6 +186,7 @@ exports.getReportStock = async (req, res, next) => {
                         'tank_no', tpt.tnk_number,
                         'itm_code', tit.itm_code,
                         'itm_material_number', tit.itm_material_number,
+                        'product_no', eod.product_no,
                         'itm_desc', tit.itm_desc,
                         'un_pump', COALESCE(auto_tank.tnk_deadstock, tpt.tnk_deadstock),
                         'max_stock', COALESCE(auto_tank.tnk_capacity, tpt.tnk_capacity),
@@ -205,6 +206,9 @@ exports.getReportStock = async (req, res, next) => {
                 SELECT ptrl_code, ptrl_sitecode FROM tbl_petrol WHERE ptrl_flag = '1'
             ) tpr ON tpt.ptrl_code = tpr.ptrl_code
             LEFT JOIN tbl_item tit ON tpt.itm_code = tit.itm_code
+            LEFT JOIN tbl_order_eodtank eod ON tpr.ptrl_sitecode = eod.shipto_no 
+                AND tpt.tnk_number::text = eod.tank_no 
+                AND eod.date_at = $1::date
             LEFT JOIN (
                 SELECT 
                     ptrl_code, 
