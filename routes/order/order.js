@@ -131,6 +131,8 @@ exports.getOrderInformation = async (req, res, next) => {
       conditions.push(
         `tbl_petrol.ptrl_group_code IN (SELECT ptrl_group_code FROM tbl_employee_petrol_group WHERE emp_code = '${act_id}' AND emp_pgrp_flag = 1)`,
       );
+
+
       conditions.push(`tbl_petrol.ptrl_flag = '1'`);
     } else if (act_val !== "ALL") {
       // สิทธิ์พนักงานทั่วไป: มองเห็นเฉพาะ Order ที่ตัวเองเป็นคนสร้าง
