@@ -1,7 +1,7 @@
 const config = require('../../configuration/connection');
 const pgConn = require('../../library/pgConnection');
 const moment = require('moment');
-const mailer = require('../auto-order-mails/nodemailer/mail');
+const mailer = require('../../middleware/nodemailer/mail');
 const xglobal = new require('../../middleware/global');
 
 /**
@@ -102,7 +102,7 @@ const generateLowStockEmailHtml = (petrolInfo, lowStockTanks) => {
  * @param {string} lic_code - License Code
  * @param {string} manual_off_code - (Optional) รหัส Office กรณีสั่งรันแบบ Manual
  */
-exports.processLowStockAlerts = async (lic_code, manual_off_code = null) => {
+exports.processLowStockAlerts = async (lic_code, manual_off_code = "off-1747276087326") => {
     if (!lic_code) return;
     const dbName = config.dbPrefix() + lic_code;
     const currentTime = moment();
@@ -110,12 +110,12 @@ exports.processLowStockAlerts = async (lic_code, manual_off_code = null) => {
     try {
         console.log(`\n🔍 [Low Stock Alert] เริ่มตรวจสอบปั๊ม (${lic_code}) เวลา ${currentTime.format('HH:mm:ss')}...`);
 
+        // ============ เตรียมเงื่อนไขการดึงข้อมูลปั๊ม ============
         let wh = "";
-        let params = [];
+        let params = [manual_off_code];
 
         // ============ กรณีที่ มี office_code ส่งมา ===============
-        if (manual_off_code && manual_off_code !== 'ALL') {
-            params.push(manual_off_code);
+        if (manual_off_code) {
             wh = ` AND o.off_code = $1 `;
         } else {
             // ============ กรณีที่ ไม่ มี office_code ส่งมา ===============
@@ -124,67 +124,70 @@ exports.processLowStockAlerts = async (lic_code, manual_off_code = null) => {
             wh = ` AND o.order_cutoff_time <= $1::TIME `;
         }
 
-        // 1. ดึงปั๊มที่เข้าข่าย (อ้างอิงเวลา cutoff)
+        // ============ ดึงรายการปั๊มที่ต้องตรวจสอบ ============
         let scriptSql = `
-            SELECT 
+            SELECT DISTINCT
                 p.ptrl_code, p.ptrl_number, p.ptrl_sitecode, p.ptrl_desc, p.coverage_days
             FROM tbl_petrol p
             INNER JOIN tbl_office o ON p.off_code = o.off_code
             WHERE p.ptrl_flag = '1' 
-                AND p.rm_dt IS NULL 
+                AND p.rm_dt IS NULL
+                AND p.ptrl_code = 'petr-202604091340184930'
                 ${wh}
         `;
+
 
         const activeStations = await pgConn.getWithParams(dbName, scriptSql, params, config.connectionString());
 
         if (!activeStations.data || activeStations.data.length === 0) {
-            console.log(`   ⚪ ไม่มีปั๊มที่ถึงเวลาประเมินในขณะนี้`);
+            console.log(`   ⚪ ไม่มีปั๊มที่ถึงเวลาตรวจสอบจำนวนน้ำมันในขณะนี้`);
             return;
         }
 
+
+
         const dateAt = currentTime.clone().subtract(1, 'days').format('YYYY-MM-DD');
 
-        // 2. ตรวจสอบสต็อกรายปั๊ม
+        // ตรวจสอบสต็อกรายปั๊ม
         for (const station of activeStations.data) {
             const coverageDays = parseFloat(station.coverage_days) || 3;
 
+            // ============ ดึงข้อมูลสต็อกน้ำมันแต่ละถัง (ATG) ============
             let stockSql = `
-                WITH meter_summary AS (
-                    SELECT 
-                        tank_no, shipto_no, buy_date, product_name,
-                        SUM(meter_diff) AS day_sales
-                    FROM (
-                        SELECT DISTINCT ON (shipto_no, tank_no, buy_date, meter_start)
-                            shipto_no, tank_no, buy_date, product_name,
-                            ABS(meter_end - meter_start) AS meter_diff
-                        FROM tbl_order_eodmeter
-                        WHERE buy_date = $1
-                        ORDER BY shipto_no, tank_no, buy_date, meter_start, id DESC
-                    ) AS m 
-                    GROUP BY tank_no, shipto_no, buy_date, product_name
-                )
-                SELECT 
+                  SELECT 
+                    tpt.ptrl_tank_code,
                     tpt.tnk_number,
-                    tpt.tnk_deadstock AS un_pump,
-                    ms.product_name,
-                    COALESCE(ms.day_sales, 1) AS day_sales,
-                    COALESCE(tank.tank_end, 0) + COALESCE(tank.recive_val::NUMERIC, 0) AS current_stock
+                    tpt.itm_code,
+                    itm.itm_material_number,
+                    COALESCE(auto_tank.tnk_deadstock, 0) AS un_pump,
+                    tpt.unpump_level,
+                    itm.itm_desc AS product_name,
+                    COALESCE(auto_sales.sale_previous, 0) AS day_sales,
+                    COALESCE(auto_tank.stock, 0) as current_stock,
+                    auto_tank.stock_at
                 FROM tbl_petrol_tank tpt 
-                LEFT JOIN tbl_order_eodtank tank ON (
-                    tpt.tnk_number = tank.tank_no 
-                    AND tank.shipto_no = $2 
-                    AND tank.date_at = $1
-                )
-                LEFT JOIN meter_summary ms ON (
-                    tpt.tnk_number = ms.tank_no 
-                    AND ms.shipto_no = $2
-                )
-                WHERE tpt.ptrl_code = $3 
+                LEFT JOIN tbl_item itm ON tpt.itm_code = itm.itm_code
+                LEFT JOIN (
+                    select
+                    DISTINCT ON (tank_code, ptrl_code)
+                        tank_code, ptrl_code, stock, tnk_deadstock, stock_at
+                    FROM tbl_automatics_tanks_information
+                    ORDER BY tank_code, ptrl_code, stock_at DESC
+                ) auto_tank ON tpt.ptrl_tank_code = auto_tank.tank_code AND tpt.ptrl_code = auto_tank.ptrl_code
+                 LEFT JOIN (
+                    SELECT ptrl_code, tank_code, 
+                    MAX(sale_previous) as sale_previous
+                    FROM tbl_automatics_sales_previous_information
+                    GROUP BY ptrl_code, tank_code
+                ) auto_sales ON tpt.ptrl_code = auto_sales.ptrl_code AND tpt.ptrl_tank_code = auto_sales.tank_code
+                WHERE tpt.ptrl_code = $1
                     AND tpt.ptrl_tank_flag = '1'
+                    AND tpt.rm_dt IS NULL
                 ORDER BY tpt.tnk_number ASC
             `;
 
-            const tankData = await pgConn.getWithParams(dbName, stockSql, [dateAt, station.ptrl_sitecode, station.ptrl_code], config.connectionString());
+
+            const tankData = await pgConn.getWithParams(dbName, stockSql, [station.ptrl_code], config.connectionString());
 
             if (!tankData.data || tankData.data.length === 0) continue;
 
@@ -193,24 +196,57 @@ exports.processLowStockAlerts = async (lic_code, manual_off_code = null) => {
             for (const tank of tankData.data) {
                 const currentStock = parseFloat(tank.current_stock) || 0;
                 const deadStock = parseFloat(tank.un_pump) || 0;
+                const unpumpLevel = parseFloat(tank.unpump_level) || 0;
                 const daySales = parseFloat(tank.day_sales) > 0 ? parseFloat(tank.day_sales) : 1;
+                const unpump = (deadStock * unpumpLevel) / 100;
+                const actualUnpump = deadStock + unpump;
 
-                const usableStock = currentStock - deadStock;
+
+                const usableStock = currentStock - actualUnpump;
                 const actualUsable = usableStock > 0 ? usableStock : 0;
-                const daysRemaining = actualUsable / daySales;
+                const daysRemaining = Math.floor(actualUsable / daySales);
+                // ============ ตรวจสอบคำสั่งซื้อที่ค้างอยู่ (Pending Orders) ============
+                let pendingQty = 0;
+                let orderCheckSql = `
+                    SELECT SUM(oi.item_qty) as pending_qty
+                    FROM tbl_order_item oi
+                    JOIN tbl_order o ON oi.order_no = o.id
+                    WHERE (oi.ptrl_tank_code = $1 OR (o.ship_to = $2 AND (oi.item_no = $3 OR oi.item_no = $4)))
+                      AND oi.order_item_flag = '1'
+                      AND oi.rm_dt IS NULL
+                      AND o.rm_dt IS NULL
+                      AND o.order_flag = '1'
+                      AND o.order_status IN ('0', '1', '2')
+                      AND (oi.sd_process_status IS NULL OR oi.sd_process_status != 'C')
+                      AND (oi.sd_reject_reason IS NULL OR oi.sd_reject_reason = '')
+                `;
+                const orderResult = await pgConn.getWithParams(dbName, orderCheckSql, [tank.ptrl_tank_code, station.ptrl_number, tank.itm_code, tank.itm_material_number], config.connectionString());
+                if (orderResult.data && orderResult.data[0]) {
+                    pendingQty = parseFloat(orderResult.data[0].pending_qty) || 0;
+                }
 
-                console.log(`      DEBUG Tank ${tank.tnk_number}: Current=${currentStock}, Deadstock=${deadStock}, Usable=${actualUsable}`);
+                // console.log(`   🔍 [Debug] ถัง ${tank.tnk_number} | Stock: ${actualUsable.toFixed(2)} | Pending: ${pendingQty} | Total: ${(actualUsable + pendingQty).toFixed(2)} | Days: ${Math.floor((actualUsable + pendingQty) / daySales)} / ${coverageDays}`);
+
+                const totalPotentialStock = actualUsable + pendingQty;
+                const potentialDaysRemaining = Math.floor(totalPotentialStock / daySales);
 
                 if (daysRemaining <= coverageDays) {
-                    lowStockTanks.push({
-                        ...tank,
-                        usable_stock: actualUsable,
-                        days_remaining: daysRemaining,
-                        coverage_days: coverageDays
-                    });
+                    // ถ้ามียอดสั่งซื้อเพิ่มแล้วรวมแล้วเกินเกณฑ์ ไม่ต้องแจ้งเตือน
+                    if (potentialDaysRemaining <= coverageDays) {
+                        lowStockTanks.push({
+                            ...tank,
+                            usable_stock: actualUsable,
+                            pending_qty: pendingQty,
+                            days_remaining: daysRemaining,
+                            coverage_days: coverageDays
+                        });
+                    } else {
+                        console.log(`   ⚪ [Order Found] ถัง ${tank.tnk_number} มีการสั่งเพิ่ม ${pendingQty.toLocaleString()} ลิตร (รวมแล้วอยู่ได้ ${potentialDaysRemaining} วัน) จึงข้ามการแจ้งเตือน`);
+                    }
                 }
             }
 
+            // ============ ตรวจสอบและส่งอีเมลแจ้งเตือน ============
             if (lowStockTanks.length > 0) {
                 console.log(`   ⚠️ [Low Stock Detected] ปั๊ม ${station.ptrl_desc} (${station.ptrl_number})`);
                 lowStockTanks.forEach(tank => {
@@ -226,6 +262,7 @@ exports.processLowStockAlerts = async (lic_code, manual_off_code = null) => {
                         AND mail_alert_flag = 1 
                         AND rm_dt IS NULL
                 `;
+
                 const alertConfigs = await pgConn.getWithParams(dbName, alertSql, [station.ptrl_code], config.connectionString());
 
                 if (!alertConfigs.data || alertConfigs.data.length === 0) {
@@ -266,16 +303,16 @@ exports.processLowStockAlerts = async (lic_code, manual_off_code = null) => {
                     const subject = `[AOS Alert] แจ้งเตือนน้ำมันใกล้หมด - ${station.ptrl_desc}`;
                     const htmlContent = generateLowStockEmailHtml(station, lowStockTanks);
 
-                    console.log(`   📧 [Alert] ปั๊ม ${station.ptrl_desc} | กำลังส่งอีเมลจริงไปที่: ${recipientList}`);
+                    console.log(`   📧 [Alert] ปั๊ม ${station.ptrl_desc} | กำลังส่งอีเมลไปที่: ${recipientList}`);
 
                     try {
-                        // ส่งแบบ 3 parameter ตามที่ mail.js กำหนดไว้
+
                         await mailer.sendMail(recipientList, subject, htmlContent);
                         console.log(`   ✅ [Success] ส่งอีเมลแจ้งเตือนเรียบร้อยแล้ว`);
 
-                        // อัปเดต Last Alert Time
+                        // ============ อัปเดตสถานะการแจ้งเตือนลง Database ============
                         for (const mailCode of mailCodesToUpdate) {
-                            await pgConn.execute(dbName,
+                            await pgConn.execute2params(dbName,
                                 `UPDATE tbl_petrol_mail_alert SET last_alert_dt = $1 WHERE ptrl_mail_code = $2`,
                                 [currentTime.format('YYYY-MM-DD HH:mm:ss'), mailCode],
                                 config.connectionString()

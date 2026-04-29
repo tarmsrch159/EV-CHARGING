@@ -6,7 +6,7 @@ const xglobal = require('../../middleware/global');
 const sendResponse = xglobal.sendResponse;
 const config = require('../../configuration/connection');
 const pgConn = require('../../library/pgConnection');
-const mailer = require('./nodemailer/mail');
+const mailer = require('../../middleware/nodemailer/mail');
 
 const dbPrefix = config.dbPrefix();
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));

@@ -100,7 +100,11 @@ exports.getAmphureInformation = async (req, res, next) => {
     try {
 
         let lic_code = req.header('lic_code');
-        let { prov_code, amph_code, action } = req.body[0];
+        let { prov_code, amph_code, action, page_index, page_limit } = req.body[0];
+        page_index = page_index === undefined ? 1 : page_index;
+        page_limit = page_limit === undefined ? 30 : page_limit;
+        if (page_index > 0) page_index -= 1;
+
         //เช็คเฉพาะส่วนที่สำคัญ
         if (prov_code == undefined || amph_code == undefined || lic_code == undefined || action == undefined) {
             let response = [{
@@ -136,7 +140,9 @@ exports.getAmphureInformation = async (req, res, next) => {
                 from tbl_amphure 
                 left join tbl_province on tbl_amphure.prov_code = tbl_province.prov_code
                 where amph_flag = '1' and tbl_amphure.prov_code = '${prov_code}' and tbl_amphure.amph_code = '${amph_code}'
-                order by amph_desc asc`;
+                order by amph_desc asc
+                offset (${page_index} * ${page_limit}) limit ${page_limit}
+                `;
             }
             else {
                 script = `select tbl_amphure.prov_code, tbl_province.prov_desc, tbl_province.prov_desc_en, tbl_amphure.amph_flag, 
@@ -145,20 +151,63 @@ exports.getAmphureInformation = async (req, res, next) => {
                 from tbl_amphure 
                 left join tbl_province on tbl_amphure.prov_code = tbl_province.prov_code
                 where amph_flag = '1' and tbl_amphure.prov_code = '${prov_code}' 
-                order by amph_desc asc`;
+                order by amph_desc asc
+                offset (${page_index} * ${page_limit}) limit ${page_limit}
+                `;
             }
-
             let tbl_temporary = await pgConn.get(dbPrefix + lic_code, script, config.connectionString());
             if (!tbl_temporary.code) {
                 //debugger
                 if (tbl_temporary.data.length > 0) {
                     tbl_temporary.data = JSON.parse(JSON.stringify(tbl_temporary.data).replace(/\:null/gi, "\:\"\""));
 
+                    let page_total = 0;
+                    let rows_total = 0;
+
+                    let countScript = ``;
+
+                    if (amph_code.toString().toUpperCase() != 'ALL') {
+                        countScript = `SELECT 
+                        CEIL((CEIL(SUM(rows_total)) / ${page_limit})) as page_total, 
+                        SUM(rows_total) as rows_total  
+                    FROM (
+                        SELECT 1 as rows_total FROM tbl_amphure 
+                        LEFT JOIN tbl_province ON tbl_amphure.prov_code = tbl_province.prov_code
+                        WHERE amph_flag = '1' and tbl_amphure.prov_code = '${prov_code}' and tbl_amphure.amph_code = '${amph_code}'
+                        ORDER BY amph_desc asc
+                    ) xtbl_master;`;
+                    }
+                    else {
+                        countScript = `SELECT 
+                        CEIL((CEIL(SUM(rows_total)) / ${page_limit})) as page_total, 
+                        SUM(rows_total) as rows_total  
+                    FROM (
+                        SELECT 1 as rows_total FROM tbl_amphure 
+                        LEFT JOIN tbl_province ON tbl_amphure.prov_code = tbl_province.prov_code
+                        where amph_flag = '1' and tbl_amphure.prov_code = '${prov_code}' 
+                        ORDER BY amph_desc asc
+                    ) xtbl_master;`;
+                    }
+
+                    let tbl_temporary0 = await pgConn.get(
+                        dbPrefix + lic_code,
+                        countScript,
+                        config.connectionString(),
+                    );
+
+                    if (!tbl_temporary0.code && tbl_temporary0.data.length > 0) {
+                        page_total = tbl_temporary0.data[0].page_total;
+                        rows_total = tbl_temporary0.data[0].rows_total;
+                    }
+
                     let response = [{
                         status: 'success',
                         invalid_code: '0',
                         message: '',
                         data: tbl_temporary.data,
+                        page_total: page_total,
+                        rows_total: rows_total,
+
                         response_time: moment().format('YYYY-MM-DD HH:mm:ss')
                     }]
 
@@ -170,6 +219,8 @@ exports.getAmphureInformation = async (req, res, next) => {
                         invalid_code: '0',
                         message: '',
                         data: xresult,
+                        page_total: 0,
+                        rows_total: 0,
                         response_time: moment().format('YYYY-MM-DD HH:mm:ss')
                     }]
 
