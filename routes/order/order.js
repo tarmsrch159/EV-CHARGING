@@ -923,9 +923,26 @@ exports.getOrderReportInformation = async (req, res, next) => {
         `tbl_petrol.ptrl_group_code IN (SELECT ptrl_group_code FROM tbl_employee_petrol_group WHERE emp_code = '${act_id}' AND emp_pgrp_flag = 1)`,
       );
       conditions.push(`tbl_petrol.ptrl_flag = '1'`);
+
+      // กรองตาม Order Type (ถ้ามีการตั้งค่าไว้ ถ้าไม่ตั้งจะเห็นทั้งหมด)
+      conditions.push(`(
+        NOT EXISTS (SELECT 1 FROM tbl_employee_order_type WHERE emp_code = '${act_id}' AND emp_otyp_flag = 1)
+        OR tbl_order.order_type IN (
+          SELECT tbl_order_type.sales_order_type 
+          FROM tbl_employee_order_type 
+          JOIN tbl_order_type  ON tbl_employee_order_type.ord_type_code = tbl_order_type.ord_type_code 
+          WHERE tbl_employee_order_type.emp_code = '${act_id}' AND tbl_employee_order_type.emp_otyp_flag = 1
+        )
+      )`);
+
+      // กรองตาม Sales Org (ถ้ามีการตั้งค่าไว้ ถ้าไม่ตั้งจะเห็นทั้งหมด)
+      conditions.push(`(
+        NOT EXISTS (SELECT 1 FROM tbl_employee_sales_org WHERE emp_code = '${act_id}' AND emp_sorg_flag = 1)
+        OR tbl_order.order_group IN (SELECT sales_org_code FROM tbl_employee_sales_org WHERE emp_code = '${act_id}' AND emp_sorg_flag = 1)
+      )`);
     } else if (act_val !== "ALL") {
       // สิทธิ์พนักงานทั่วไป: มองเห็นเฉพาะ Order ที่ตัวเองเป็นคนสร้าง
-      conditions.push(`tbl_order.created_by_tms = '${act_id}'`);
+      conditions.push(`tbl_order.ship_to IN (SELECT ptrl_number FROM tbl_petrol WHERE ptrl_code IN (SELECT ptrl_code FROM tbl_employee WHERE emp_code = '${act_id}' AND emp_flag = '1'))`);
     }
 
     // รวมเงื่อนไขทั้งหมดเข้าด้วยกัน
