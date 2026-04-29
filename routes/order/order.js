@@ -1409,50 +1409,52 @@ exports.getLoggingOrderInformation = async (req, res, next) => {
     // =========================================================
     //      จัดการเงื่อนไข WHERE แบบรวมศูนย์ (Dynamic Conditions)
     // =========================================================
-    let conditions = ["tbl_action_logs.rm_dt IS NULL"];
+    // นิยามตัวแปรช่วยในการดึงข้อมูลจาก JSON อย่างปลอดภัย (ป้องกัน Error 22P02)
+    const safeJson = `(CASE WHEN tbl_action_logs.action_body ~ '^\\s*\\{.*\\}\\s*$' THEN tbl_action_logs.action_body::json ELSE NULL END)`;
+    const safeShipTo = `COALESCE(${safeJson}->'body'->>'ship_to', ${safeJson}->>'ship_to')`;
+    const safeOrderId = `COALESCE(${safeJson}->>'order_id', ${safeJson}->'body'->>'order_id', ${safeJson}->>'id')`;
 
-    if (action_desc && action_desc.toString().toLowerCase() != "all") {
-      action_desc = action_desc.toString().toLowerCase();
-      conditions.push(`tbl_action_logs.action_desc = '${action_desc}'`);
-    } else {
-      conditions.push(
-        `tbl_action_logs.action_desc IN ('override', 'manual', 'cancel', 'cancel_order_sap')`,
-      );
-    }
+    let baseConditions = ["tbl_action_logs.rm_dt IS NULL"];
 
     if (start_date)
-      conditions.push(`tbl_action_logs.ist_dt >= '${start_date}'`);
-    if (end_date) conditions.push(`tbl_action_logs.ist_dt <= '${end_date}'`);
+      baseConditions.push(`tbl_action_logs.ist_dt >= '${start_date}'`);
+    if (end_date)
+      baseConditions.push(`tbl_action_logs.ist_dt <= '${end_date}'`);
 
-    // =========================================================
-    //                ระบบกรองตาม Role (Role Filter)
-    // =========================================================
+    // ระบบกรองตาม Role (Role Filter)
     if (role && role !== "ALL") {
-      conditions.push(`tbl_employee.emp_role_code = '${role}'`);
+      baseConditions.push(`tbl_employee.emp_role_code = '${role}'`);
     }
 
-    // =========================================================
-    //             ระบบกรองตามกลุ่มปั๊ม (Station Group)
-    // =========================================================
+    // ระบบกรองตามกลุ่มปั๊ม (Station Group)
     if (ptrl_group_code && ptrl_group_code !== "ALL") {
-      conditions.push(`tbl_petrol.ptrl_group_code = '${ptrl_group_code}'`);
+      baseConditions.push(`tbl_petrol.ptrl_group_code = '${ptrl_group_code}'`);
     }
 
-    // =========================================================
-    //              ระบบค้นหา (Search Engine Logic)
-    // =========================================================
+    // ระบบค้นหา (Search Engine Logic)
     if (search) {
-      conditions.push(`(
+      baseConditions.push(`(
                 tbl_action_logs.action_body::text ILIKE '%${search}%'
                 OR EXISTS (
                     SELECT 1 FROM tbl_petrol 
-                    WHERE ptrl_number = COALESCE(tbl_action_logs.action_body::json->'body'->>'ship_to', tbl_action_logs.action_body::json->>'ship_to')
+                    WHERE ptrl_number = ${safeShipTo}
                     AND ptrl_desc ILIKE '%${search}%'
                 )
             )`);
     }
 
-    let whereClause = "WHERE " + conditions.join(" AND ");
+    // เงื่อนไขเฉพาะของ Action Type
+    let actionConditions = [];
+    if (action_desc && action_desc.toString().toLowerCase() != "all") {
+      actionConditions.push(`tbl_action_logs.action_desc = '${action_desc.toLowerCase()}'`);
+    } else {
+      actionConditions.push(
+        `tbl_action_logs.action_desc IN ('override', 'manual', 'cancel', 'cancel_order_sap')`,
+      );
+    }
+
+    let whereClause = "WHERE " + [...baseConditions, ...actionConditions].join(" AND ");
+    let summaryWhereClause = "WHERE " + baseConditions.join(" AND ");
 
     let summary = {
       manual: 0,
@@ -1462,42 +1464,18 @@ exports.getLoggingOrderInformation = async (req, res, next) => {
     };
 
     // =========================================================
-    //       สร้างเงื่อนไขจำเพาะสำหรับส่วนสรุป (Summary Filter)
-    // =========================================================
-    let summaryFilter = ``;
-    if (start_date)
-      summaryFilter += ` AND tbl_action_logs.ist_dt >= '${start_date}'`;
-    if (end_date)
-      summaryFilter += ` AND tbl_action_logs.ist_dt <= '${end_date}'`;
-    if (role && role !== "ALL")
-      summaryFilter += ` AND emp_role_code = '${role}'`;
-    if (ptrl_group_code && ptrl_group_code !== "ALL")
-      summaryFilter += ` AND tbl_petrol.ptrl_group_code = '${ptrl_group_code}'`;
-
-    if (search) {
-      summaryFilter += ` AND (
-                tbl_action_logs.action_body::text ILIKE '%${search}%'
-                OR EXISTS (
-                    SELECT 1 FROM tbl_petrol subp 
-                    WHERE subp.ptrl_number = COALESCE(tbl_action_logs.action_body::json->'body'->>'ship_to', tbl_action_logs.action_body::json->>'ship_to')
-                    AND subp.ptrl_desc ILIKE '%${search}%'
-                )
-            )`;
-    }
-
-    // =========================================================
     //      คำนวณสรุปแยกประเภทตามเงื่อนไข (Summary Aggregation)
     // =========================================================
     let summaryScript = `
             SELECT 
-                COUNT(*) FILTER (WHERE LOWER(tbl_action_logs.action_desc) = 'manual' ${summaryFilter}) as manual_count,
-                COUNT(*) FILTER (WHERE LOWER(tbl_action_logs.action_desc) = 'override' ${summaryFilter}) as override_count,
-                COUNT(*) FILTER (WHERE LOWER(tbl_action_logs.action_desc) IN ('cancel', 'cancel_order_sap') ${summaryFilter}) as cancel_count,
+                COUNT(*) FILTER (WHERE LOWER(tbl_action_logs.action_desc) = 'manual') as manual_count,
+                COUNT(*) FILTER (WHERE LOWER(tbl_action_logs.action_desc) = 'override') as override_count,
+                COUNT(*) FILTER (WHERE LOWER(tbl_action_logs.action_desc) IN ('cancel', 'cancel_order_sap')) as cancel_count,
                 COUNT(*) FILTER (WHERE LOWER(tbl_action_logs.action_desc) IN ('manual', 'override', 'cancel', 'cancel_order_sap')) as total_count
             FROM tbl_action_logs 
             LEFT JOIN tbl_employee ON tbl_action_logs.action_code = tbl_employee.emp_code
-            LEFT JOIN tbl_petrol ON COALESCE(tbl_action_logs.action_body::json->'body'->>'ship_to', tbl_action_logs.action_body::json->>'ship_to') = tbl_petrol.ptrl_number
-            WHERE tbl_action_logs.rm_dt IS NULL;
+            LEFT JOIN tbl_petrol ON ${safeShipTo} = tbl_petrol.ptrl_number
+            ${summaryWhereClause} ;
         `;
     let tbl_summary = await pgConn.get(
       dbPrefix + lic_code,
@@ -1524,13 +1502,9 @@ exports.getLoggingOrderInformation = async (req, res, next) => {
             FROM tbl_action_logs 
             LEFT JOIN tbl_employee ON tbl_action_logs.action_code = tbl_employee.emp_code
             LEFT JOIN tbl_employee_role ON tbl_employee.emp_role_code = tbl_employee_role.emp_role_code
-            LEFT JOIN tbl_petrol ON COALESCE(tbl_action_logs.action_body::json->'body'->>'ship_to', tbl_action_logs.action_body::json->>'ship_to') = tbl_petrol.ptrl_number
+            LEFT JOIN tbl_petrol ON ${safeShipTo} = tbl_petrol.ptrl_number
             LEFT JOIN tbl_petrol_group ON tbl_petrol.ptrl_group_code = tbl_petrol_group.ptrl_group_code
-            LEFT JOIN tbl_order ON tbl_order.id::text = COALESCE(
-                tbl_action_logs.action_body::json->>'order_id', 
-                tbl_action_logs.action_body::json->'body'->>'order_id',
-                tbl_action_logs.action_body::json->>'id'
-            )
+            LEFT JOIN tbl_order ON tbl_order.id::text = ${safeOrderId}
             
             ${whereClause}
             ORDER BY tbl_action_logs.ist_dt DESC 
@@ -1594,7 +1568,7 @@ exports.getLoggingOrderInformation = async (req, res, next) => {
                         COUNT(*) as rows_total  
                     FROM tbl_action_logs 
                     LEFT JOIN tbl_employee ON tbl_action_logs.action_code = tbl_employee.emp_code
-                    LEFT JOIN tbl_petrol ON COALESCE(tbl_action_logs.action_body::json->'body'->>'ship_to', tbl_action_logs.action_body::json->>'ship_to') = tbl_petrol.ptrl_number
+                    LEFT JOIN tbl_petrol ON ${safeShipTo} = tbl_petrol.ptrl_number
                     ${whereClause}
                 `;
 
@@ -1641,7 +1615,10 @@ exports.getLoggingOrderInformation = async (req, res, next) => {
             invalid_code: "0",
             message: "",
             data: xresult,
+            summary: summary,
             response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+            page_total: 1,
+            rows_total: 0,
           },
         ];
 
