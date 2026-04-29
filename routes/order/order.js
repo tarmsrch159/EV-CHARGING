@@ -4481,6 +4481,16 @@ exports.editOrderItem = async (req, res, next) => {
       );
 
       // --- เพิ่มรายการใหม่เข้าไปทั้งหมด ---
+      // ดึงชื่อสินค้าทั้งหมดที่ส่งมาเตรียมไว้สำหรับ Log
+      let itemCodesInReq = order_item.map(i => `'${i.item_no}'`).join(",");
+      let itemNameMap = {};
+      if (itemCodesInReq) {
+        let itemNamesRes = await pgConn.get(dbPrefix + lic_code, `SELECT itm_code, itm_desc FROM tbl_item WHERE itm_code IN (${itemCodesInReq})`, config.connectionString());
+        if (!itemNamesRes.code) {
+          itemNamesRes.data.forEach(it => itemNameMap[it.itm_code] = it.itm_desc);
+        }
+      }
+
       // -- 1. Log การเปลี่ยนแปลงของ Description --
       if ((oldOrder.description || "") !== (description || "")) {
         let auditChanges = [{
@@ -4532,7 +4542,7 @@ exports.editOrderItem = async (req, res, next) => {
 
           // -- 2. Log การเปลี่ยนแปลงของ Item (แยกทีละรายการ) --
           let oldItem = oldItemsMap[item_no];
-          let itemLabel = (oldItem ? oldItem.itm_desc : "") || item_no;
+          let itemLabel = itemNameMap[item_no] || (oldItem ? oldItem.itm_desc : "") || item_no;
           let oldQty = oldItem ? parseFloat(oldItem.item_qty) || 0 : 0;
           let oldRemark = oldItem ? oldItem.remark || "" : "";
           let itemAuditChanges = [];
