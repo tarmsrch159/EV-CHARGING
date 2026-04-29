@@ -4481,15 +4481,28 @@ exports.editOrderItem = async (req, res, next) => {
       );
 
       // --- เพิ่มรายการใหม่เข้าไปทั้งหมด ---
-      let auditChanges = [];
-
-      // -- เทียบ Description --
+      // -- 1. Log การเปลี่ยนแปลงของ Description --
       if ((oldOrder.description || "") !== (description || "")) {
-        auditChanges.push({
+        let auditChanges = [{
           field: "Description",
           before: oldOrder.description || "-",
           after: description || "-"
-        });
+        }];
+        let logPayload = {
+          order_no: oldOrder.order_no || "-",
+          order_id: order_no,
+          ship_to: oldOrder.ship_to || "",
+          reason: req.body[0].remark || req.body[0].reason || description || "",
+          changes: auditChanges,
+        };
+        await xglobal.action_logs(
+          lic_code,
+          action[0].id,
+          event_type,
+          JSON.stringify(logPayload),
+          "success",
+          action[0].value,
+        );
       }
 
       for (let i = 0; i < order_item.length; i++) {
@@ -4517,25 +4530,44 @@ exports.editOrderItem = async (req, res, next) => {
             config.connectionString(),
           );
 
-          // -- เก็บข้อมูลสำหรับการ Audit Log --
+          // -- 2. Log การเปลี่ยนแปลงของ Item (แยกทีละรายการ) --
           let oldItem = oldItemsMap[item_no];
           let itemLabel = (oldItem ? oldItem.itm_desc : "") || item_no;
           let oldQty = oldItem ? parseFloat(oldItem.item_qty) || 0 : 0;
           let oldRemark = oldItem ? oldItem.remark || "" : "";
+          let itemAuditChanges = [];
 
           if (oldQty !== item_quantity) {
-            auditChanges.push({
+            itemAuditChanges.push({
               field: `Order Qty (${itemLabel})`,
               before: String(oldQty),
               after: String(item_quantity)
             });
           }
           if (oldRemark !== remark) {
-            auditChanges.push({
+            itemAuditChanges.push({
               field: `Remark (${itemLabel})`,
               before: oldRemark || "-",
               after: remark || "-"
             });
+          }
+
+          if (itemAuditChanges.length > 0) {
+            let logPayload = {
+              order_no: oldOrder.order_no || "-",
+              order_id: order_no,
+              ship_to: oldOrder.ship_to || "",
+              reason: req.body[0].remark || req.body[0].reason || description || "",
+              changes: itemAuditChanges,
+            };
+            await xglobal.action_logs(
+              lic_code,
+              action[0].id,
+              event_type,
+              JSON.stringify(logPayload),
+              "success",
+              action[0].value,
+            );
           }
 
           // ลบออกจาก map เพื่อเช็คว่ามีตัวไหนถูกลบออกไปบ้าง (หายไปจากออเดอร์)
@@ -4543,24 +4575,20 @@ exports.editOrderItem = async (req, res, next) => {
         }
       }
 
-      // -- เช็ครายการที่หายไป (ถูกลบออก) --
+      // -- 3. Log รายการที่ถูกลบออก --
       for (let item_no in oldItemsMap) {
         let oldItem = oldItemsMap[item_no];
-        auditChanges.push({
+        let itemAuditChanges = [{
           field: `Removed Item (${oldItem.itm_desc || item_no})`,
           before: String(oldItem.item_qty),
           after: "0 (Removed)"
-        });
-      }
-
-      // บันทึก Log การเปลี่ยนแปลงลง Audit Log
-      if (auditChanges.length > 0) {
+        }];
         let logPayload = {
           order_no: oldOrder.order_no || "-",
           order_id: order_no,
           ship_to: oldOrder.ship_to || "",
           reason: req.body[0].remark || req.body[0].reason || description || "",
-          changes: auditChanges,
+          changes: itemAuditChanges,
         };
         await xglobal.action_logs(
           lic_code,
