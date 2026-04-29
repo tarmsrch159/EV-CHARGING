@@ -770,6 +770,9 @@ exports.getOrderReportInformation = async (req, res, next) => {
       ptrl_group_code,
       ptrl_number,
       search,
+      emp_role_code,
+      reason,
+      dpo_code,
       page_index,
       page_limit,
       action,
@@ -783,6 +786,9 @@ exports.getOrderReportInformation = async (req, res, next) => {
     order_status = order_status === undefined ? "ALL" : order_status;
     ptrl_group_code = ptrl_group_code === undefined ? "ALL" : ptrl_group_code;
     ptrl_number = ptrl_number === undefined ? "ALL" : ptrl_number;
+    emp_role_code = emp_role_code === undefined ? "ALL" : emp_role_code;
+    dpo_code = dpo_code === undefined ? "ALL" : dpo_code;
+    reason = reason === undefined ? "ALL" : reason;
     // ========== เช็คเฉพาะส่วนที่สำคัญ ==========
     if (
       start_date === undefined ||
@@ -882,6 +888,32 @@ exports.getOrderReportInformation = async (req, res, next) => {
       );
     }
 
+    if (emp_role_code !== "" && emp_role_code.toString().toUpperCase() !== "ALL") {
+      conditions.push(`EXISTS (
+          SELECT 1 FROM (
+              SELECT ptrl_code, emp_role_code 
+              FROM tbl_employee 
+              WHERE emp_flag = '1' AND ptrl_code IS NOT NULL AND ptrl_code != ''
+              UNION ALL
+              SELECT p.ptrl_code, e.emp_role_code 
+              FROM tbl_employee e
+              INNER JOIN tbl_employee_petrol_group epg ON e.emp_code = epg.emp_code AND epg.emp_pgrp_flag = 1
+              INNER JOIN tbl_petrol p ON epg.ptrl_group_code = p.ptrl_group_code
+              WHERE e.emp_flag = '1'
+          ) emp_check 
+          WHERE emp_check.ptrl_code = tbl_petrol.ptrl_code 
+            AND emp_check.emp_role_code = '${emp_role_code}'
+      )`);
+    }
+
+    if (reason.toString().toUpperCase() !== "ALL") {
+      conditions.push(`tbl_order_item.remark LIKE '%${reason}%'`);
+    }
+
+    if (dpo_code.toString().toUpperCase() !== "ALL") {
+      conditions.push(`tbl_order_item.deli_plant = '${dpo_code}'`);
+    }
+
     let act_val = action[0].value.toString().toUpperCase();
     let act_id = action[0].id;
 
@@ -899,6 +931,11 @@ exports.getOrderReportInformation = async (req, res, next) => {
     // รวมเงื่อนไขทั้งหมดเข้าด้วยกัน
     let whereClause = "WHERE " + conditions.join(" AND ");
 
+    let empRoleFilterSQL = "";
+    if (emp_role_code !== "" && emp_role_code.toString().toUpperCase() !== "ALL") {
+      empRoleFilterSQL = `WHERE combined_emp.emp_role_code = '${emp_role_code}'`;
+    }
+
     // =========================================================================
     // [SUMMARY 1] คำนวณยอดรวมของ Manual Order (auto_order = '0')
     // =========================================================================
@@ -907,6 +944,24 @@ exports.getOrderReportInformation = async (req, res, next) => {
             SELECT COUNT(DISTINCT tbl_order.id) AS total_manual_order 
             FROM tbl_order 
             LEFT JOIN tbl_petrol ON tbl_order.ship_to = tbl_petrol.ptrl_number
+            LEFT JOIN (
+                SELECT DISTINCT ON (ptrl_code) ptrl_code, emp_name, emp_surname, emp_role_code 
+                FROM (
+                    SELECT ptrl_code, emp_name, emp_surname, emp_role_code 
+                    FROM tbl_employee 
+                    WHERE emp_flag = '1' AND ptrl_code IS NOT NULL AND ptrl_code != ''
+                    UNION ALL
+                    SELECT p.ptrl_code, e.emp_name, e.emp_surname, e.emp_role_code 
+                    FROM tbl_employee e
+                    INNER JOIN tbl_employee_petrol_group epg ON e.emp_code = epg.emp_code AND epg.emp_pgrp_flag = 1
+                    INNER JOIN tbl_petrol p ON epg.ptrl_group_code = p.ptrl_group_code
+                    WHERE e.emp_flag = '1'
+                ) combined_emp
+                ${empRoleFilterSQL}
+                ORDER BY ptrl_code, emp_role_code DESC
+            ) tbl_employee ON tbl_petrol.ptrl_code = tbl_employee.ptrl_code
+            LEFT JOIN tbl_employee_role ON tbl_employee.emp_role_code = tbl_employee_role.emp_role_code
+            LEFT JOIN tbl_order_item ON tbl_order.id = tbl_order_item.order_no
             ${whereClause} AND tbl_order.auto_order = '0';
         `;
     let tbl_count_manual = await pgConn.get(
@@ -923,12 +978,31 @@ exports.getOrderReportInformation = async (req, res, next) => {
         parseInt(tbl_count_manual.data[0].total_manual_order) || 0;
     }
 
+    // =========== [SUMMARY 2] Remark ที่มากที่สุด ===========
     let top_remark = "-";
     let topRemarkScript = `
             SELECT item.remark, COUNT(*) AS remark_count 
             FROM tbl_order 
             INNER JOIN tbl_order_item item ON CAST(tbl_order.id AS TEXT) = CAST(item.order_no AS TEXT)
             LEFT JOIN tbl_petrol ON tbl_order.ship_to = tbl_petrol.ptrl_number
+            LEFT JOIN (
+                SELECT DISTINCT ON (ptrl_code) ptrl_code, emp_name, emp_surname, emp_role_code 
+                FROM (
+                    SELECT ptrl_code, emp_name, emp_surname, emp_role_code 
+                    FROM tbl_employee 
+                    WHERE emp_flag = '1' AND ptrl_code IS NOT NULL AND ptrl_code != ''
+                    UNION ALL
+                    SELECT p.ptrl_code, e.emp_name, e.emp_surname, e.emp_role_code 
+                    FROM tbl_employee e
+                    INNER JOIN tbl_employee_petrol_group epg ON e.emp_code = epg.emp_code AND epg.emp_pgrp_flag = 1
+                    INNER JOIN tbl_petrol p ON epg.ptrl_group_code = p.ptrl_group_code
+                    WHERE e.emp_flag = '1'
+                ) combined_emp
+                ${empRoleFilterSQL}
+                ORDER BY ptrl_code, emp_role_code DESC
+            ) tbl_employee ON tbl_petrol.ptrl_code = tbl_employee.ptrl_code
+            LEFT JOIN tbl_employee_role ON tbl_employee.emp_role_code = tbl_employee_role.emp_role_code
+            LEFT JOIN tbl_order_item ON tbl_order.id = tbl_order_item.order_no
             ${whereClause} 
             AND item.rm_dt IS NULL 
             AND item.remark IS NOT NULL 
@@ -950,12 +1024,31 @@ exports.getOrderReportInformation = async (req, res, next) => {
       top_remark = tbl_top_remark.data[0].remark;
     }
 
+    // =========== [SUMMARY 3] คำนวณยอดรวมของ Manual Order (auto_order = '0') ===========
     let top_sum_qty = 0;
     let topSumQtyScript = `
             SELECT SUM(CAST(item.item_qty AS numeric)) AS sum_qty 
             FROM tbl_order 
             INNER JOIN tbl_order_item item ON CAST(tbl_order.id AS TEXT) = CAST(item.order_no AS TEXT)
             LEFT JOIN tbl_petrol ON tbl_order.ship_to = tbl_petrol.ptrl_number
+            LEFT JOIN (
+                SELECT DISTINCT ON (ptrl_code) ptrl_code, emp_name, emp_surname, emp_role_code 
+                FROM (
+                    SELECT ptrl_code, emp_name, emp_surname, emp_role_code 
+                    FROM tbl_employee 
+                    WHERE emp_flag = '1' AND ptrl_code IS NOT NULL AND ptrl_code != ''
+                    UNION ALL
+                    SELECT p.ptrl_code, e.emp_name, e.emp_surname, e.emp_role_code 
+                    FROM tbl_employee e
+                    INNER JOIN tbl_employee_petrol_group epg ON e.emp_code = epg.emp_code AND epg.emp_pgrp_flag = 1
+                    INNER JOIN tbl_petrol p ON epg.ptrl_group_code = p.ptrl_group_code
+                    WHERE e.emp_flag = '1'
+                ) combined_emp
+                ${empRoleFilterSQL}
+                ORDER BY ptrl_code, emp_role_code DESC
+            ) tbl_employee ON tbl_petrol.ptrl_code = tbl_employee.ptrl_code
+            LEFT JOIN tbl_employee_role ON tbl_employee.emp_role_code = tbl_employee_role.emp_role_code
+            LEFT JOIN tbl_order_item ON tbl_order.id = tbl_order_item.order_no
             ${whereClause} 
             AND item.rm_dt IS NULL;
         `;
@@ -972,6 +1065,7 @@ exports.getOrderReportInformation = async (req, res, next) => {
       top_sum_qty = parseFloat(tbl_top_sum_qty.data[0].sum_qty) || 0;
     }
 
+    // =========== [SUMMARY 4] ใครสั่งล่าสุด ===========
     let top_orderer = "-";
     let topOrdererScript = `
             SELECT tbl_employee.emp_name, tbl_employee_role.emp_role_desc, MAX(tbl_order.ist_dt) as latest_order
@@ -990,16 +1084,17 @@ exports.getOrderReportInformation = async (req, res, next) => {
                     INNER JOIN tbl_petrol p ON epg.ptrl_group_code = p.ptrl_group_code
                     WHERE e.emp_flag = '1'
                 ) combined_emp
+                ${empRoleFilterSQL}
                 ORDER BY ptrl_code, emp_role_code DESC
             ) tbl_employee ON tbl_petrol.ptrl_code = tbl_employee.ptrl_code
             LEFT JOIN tbl_employee_role ON tbl_employee.emp_role_code = tbl_employee_role.emp_role_code
+            LEFT JOIN tbl_order_item ON tbl_order.id = tbl_order_item.order_no
             ${whereClause}
             GROUP BY tbl_employee.emp_name, tbl_employee_role.emp_role_desc
             ORDER BY latest_order DESC 
             LIMIT 1;
         `;
 
-    console.log(topOrdererScript)
     let tbl_top_orderer = await pgConn.get(
       dbPrefix + lic_code,
       topOrdererScript,
@@ -1016,7 +1111,7 @@ exports.getOrderReportInformation = async (req, res, next) => {
     }
 
     // =========================================================
-    // 2. Query ดึงข้อมูลหลัก (Main Script)
+    //  Query ดึงข้อมูลหลัก (Main Script)
     // =========================================================
     let baseSelectQuery = `
             SELECT 
@@ -1071,6 +1166,7 @@ exports.getOrderReportInformation = async (req, res, next) => {
             )) as item_information,
             tbl_order.auto_order,
             tbl_order_item.remark,
+            tbl_depot.dpo_desc,
             tbl_employee_role.emp_role_desc
             FROM tbl_order  
             INNER JOIN tbl_order_item ON CAST(tbl_order.id AS TEXT) = CAST(tbl_order_item.order_no AS TEXT) 
@@ -1092,9 +1188,11 @@ exports.getOrderReportInformation = async (req, res, next) => {
                     INNER JOIN tbl_petrol p ON epg.ptrl_group_code = p.ptrl_group_code
                     WHERE e.emp_flag = '1'
                 ) combined_emp
+                ${empRoleFilterSQL}
                 ORDER BY ptrl_code, emp_role_code DESC
             ) tbl_employee ON tbl_petrol.ptrl_code = tbl_employee.ptrl_code
             LEFT JOIN tbl_employee_role ON tbl_employee.emp_role_code = tbl_employee_role.emp_role_code
+            LEFT JOIN tbl_depot ON tbl_order_item.deli_plant = tbl_depot.dpo_code
             LEFT JOIN (
                 SELECT ptrl_code, itm_code, string_agg(tnk_number, ', ') as tnk_number 
                 FROM tbl_petrol_tank 
@@ -1223,6 +1321,7 @@ exports.getOrderReportInformation = async (req, res, next) => {
     res.status(200).send(response);
   });
 };
+
 
 // =========== ดึงข้อมูลรายการสั่งซื้อ Order Log ===========
 exports.getLoggingOrderInformation = async (req, res, next) => {
