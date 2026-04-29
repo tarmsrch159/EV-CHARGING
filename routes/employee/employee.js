@@ -71,6 +71,9 @@ exports.getEmployeeInformation = async (req, res, next) => {
                 ) AS petrol_groups
             `;
 
+            let subquery_order_type = `(SELECT COALESCE(json_agg(ord_type_code), '[]') FROM tbl_employee_order_type WHERE emp_code = tbl_employee.emp_code AND emp_otyp_flag = 1) AS order_type`;
+            let subquery_sales_org = `(SELECT COALESCE(json_agg(sales_org_code), '[]') FROM tbl_employee_sales_org WHERE emp_code = tbl_employee.emp_code AND emp_sorg_flag = 1) AS sales_org`;
+
             if (emp_code.toString().toUpperCase() != 'ALL') {
                 script = `select  
                 emp_code, 
@@ -100,10 +103,9 @@ exports.getEmployeeInformation = async (req, res, next) => {
                 tbl_employee.off_code, 
                 tbl_office.off_desc, 
                 tbl_employee.ptrl_code, 
-                tbl_petrol.ptrl_desc
-
-               
-
+                tbl_petrol.ptrl_desc,
+                ${subquery_order_type},
+                ${subquery_sales_org}
                 from tbl_employee 
                 left join tbl_division on tbl_employee.emp_div_code = tbl_division.div_code
                 left join tbl_department on tbl_employee.emp_div_code = tbl_department.div_code
@@ -115,7 +117,7 @@ exports.getEmployeeInformation = async (req, res, next) => {
                 left join tbl_employee_role on tbl_employee.emp_role_code = tbl_employee_role.emp_role_code
                 left join tbl_office on tbl_employee.off_code = tbl_office.off_code
                 left join tbl_petrol on tbl_employee.ptrl_code = tbl_petrol.ptrl_code 
-                where emp_flag = '1' and emp_code = '${emp_code}'`;
+                where tbl_employee.emp_flag = '1' and tbl_employee.emp_code = '${emp_code}'`;
             }
             else {
                 script = `select  
@@ -148,6 +150,8 @@ exports.getEmployeeInformation = async (req, res, next) => {
 
                 tbl_employee.ptrl_code, 
                 tbl_petrol.ptrl_desc,
+                ${subquery_order_type},
+                ${subquery_sales_org},
 
                 -- แทรกข้อมูลกลุ่มปั๊มที่จัดรูปแบบแล้ว
                 ${subquery_petrol_groups}
@@ -163,7 +167,7 @@ exports.getEmployeeInformation = async (req, res, next) => {
                 left join tbl_employee_group on tbl_employee.emp_group_code = tbl_employee_group.emp_group_code
                 left join tbl_employee_role on tbl_employee.emp_role_code = tbl_employee_role.emp_role_code
                 left join tbl_office on tbl_employee.off_code = tbl_office.off_code 
-                where emp_flag = '1' `;
+                where tbl_employee.emp_flag = '1' `;
             }
 
             if (off_code.toString().toUpperCase() != 'ALL') {
@@ -188,20 +192,20 @@ exports.getEmployeeInformation = async (req, res, next) => {
                     let scriptCount = ``;
 
                     if (emp_code.toString().toUpperCase() != 'ALL') {
-                        scriptCount = `select ceil((ceil(count(emp_code)) / ${page_limit})) as page_total, (count(emp_code)) as rows_total 
+                        scriptCount = `select ceil((ceil(count(tbl_employee.emp_code)) / ${page_limit})) as page_total, (count(tbl_employee.emp_code)) as rows_total 
                         from tbl_employee 
-                        where emp_flag = '1' and emp_code = '${emp_code}'`;
+                        where tbl_employee.emp_flag = '1' and tbl_employee.emp_code = '${emp_code}'`;
                     } else {
-                        scriptCount = `select ceil((ceil(count(emp_code)) / ${page_limit})) as page_total, (count(emp_code)) as rows_total 
+                        scriptCount = `select ceil((ceil(count(tbl_employee.emp_code)) / ${page_limit})) as page_total, (count(tbl_employee.emp_code)) as rows_total 
                         from tbl_employee 
-                        where emp_flag = '1' `;
+                        where tbl_employee.emp_flag = '1' `;
                     }
 
                     if (off_code.toString().toUpperCase() != 'ALL') {
-                        scriptCount += ` and off_code = '${off_code}'`
+                        scriptCount += ` and tbl_employee.off_code = '${off_code}'`
                     }
                     if (ptrl_code.toString().toUpperCase() != 'ALL') {
-                        scriptCount += ` and ptrl_code = '${ptrl_code}'`
+                        scriptCount += ` and tbl_employee.ptrl_code = '${ptrl_code}'`
                     }
 
                     let tbl_temporary_count = await pgConn.get(dbPrefix + lic_code, scriptCount, config.connectionString());
