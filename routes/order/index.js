@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const order = require('./order')
 const order_type = require('./order-type');
+const order_sap_logs = require('./order-sap-logs');
 const auto_order = require('./auto-order');
 
 // ============= Order =============
@@ -25,6 +26,7 @@ router.delete('/information/remove', order.removeOrderInformationById);
 // ============= Order - SAP =============
 router.post('/confirm/information', order.getConfirmOrder);
 router.post('/order-hana/information', order.getOrderInformationHana);
+router.post('/order-sap-logs/information', order_sap_logs.getSapOrderErrorLogsInformation);
 router.post('/cancel-hana/information', order.cancelOrderInformationHana);
 
 // ============= Order type ==============

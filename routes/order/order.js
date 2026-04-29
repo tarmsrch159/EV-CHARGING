@@ -344,13 +344,21 @@ exports.getOrderInformationByID = async (req, res, next) => {
                 tbl_order.ist_dt, tbl_order.mdf_dt, tbl_order.rm_dt,
                 tbl_order.auto_order,
                 tbl_petrol.ptrl_address,
-                tbl_petrol.ptrl_zip_code
+                tbl_petrol.ptrl_zip_code,
+                tbl_employee.emp_name, tbl_employee.emp_surname, tbl_employee_role.emp_role_desc
             FROM tbl_order  
             
             LEFT JOIN tbl_order_type ON tbl_order.order_type = tbl_order_type.ord_type_code
             LEFT JOIN tbl_petrol_group ON tbl_petrol_group.ptrl_group_code = tbl_order.order_group
             LEFT JOIN tbl_petrol ON tbl_order.ship_to = tbl_petrol.ptrl_number
             LEFT JOIN tbl_master_time ON tbl_order.deli_time_req = tbl_master_time.time_code
+            LEFT JOIN (
+                SELECT DISTINCT ON (ptrl_code) ptrl_code, emp_name, emp_surname, emp_role_code 
+                FROM tbl_employee 
+                WHERE emp_flag = '1' 
+                ORDER BY ptrl_code, emp_role_code DESC
+            ) tbl_employee ON tbl_petrol.ptrl_code = tbl_employee.ptrl_code
+            LEFT JOIN tbl_employee_role ON tbl_employee.emp_role_code = tbl_employee_role.emp_role_code
             WHERE tbl_order.rm_dt IS NULL AND tbl_order.id = ${id}`;
 
     let orderResult = await pgConn.get(
@@ -966,18 +974,32 @@ exports.getOrderReportInformation = async (req, res, next) => {
 
     let top_orderer = "-";
     let topOrdererScript = `
-            SELECT tbl_order.created_by_tms, tbl_employee.emp_name, tbl_employee_role.emp_role_desc, MAX(tbl_order.ist_dt) as latest_order
+            SELECT tbl_employee.emp_name, tbl_employee_role.emp_role_desc, MAX(tbl_order.ist_dt) as latest_order
             FROM tbl_order 
-            LEFT JOIN tbl_employee ON tbl_order.created_by_tms = tbl_employee.emp_code
-            LEFT JOIN tbl_employee_role ON tbl_employee.emp_role_code = tbl_employee_role.emp_role_code
             LEFT JOIN tbl_petrol ON tbl_order.ship_to = tbl_petrol.ptrl_number
+            LEFT JOIN (
+                SELECT DISTINCT ON (ptrl_code) ptrl_code, emp_name, emp_surname, emp_role_code 
+                FROM (
+                    SELECT ptrl_code, emp_name, emp_surname, emp_role_code 
+                    FROM tbl_employee 
+                    WHERE emp_flag = '1' AND ptrl_code IS NOT NULL AND ptrl_code != ''
+                    UNION ALL
+                    SELECT p.ptrl_code, e.emp_name, e.emp_surname, e.emp_role_code 
+                    FROM tbl_employee e
+                    INNER JOIN tbl_employee_petrol_group epg ON e.emp_code = epg.emp_code AND epg.emp_pgrp_flag = 1
+                    INNER JOIN tbl_petrol p ON epg.ptrl_group_code = p.ptrl_group_code
+                    WHERE e.emp_flag = '1'
+                ) combined_emp
+                ORDER BY ptrl_code, emp_role_code DESC
+            ) tbl_employee ON tbl_petrol.ptrl_code = tbl_employee.ptrl_code
+            LEFT JOIN tbl_employee_role ON tbl_employee.emp_role_code = tbl_employee_role.emp_role_code
             ${whereClause}
-            AND tbl_order.created_by_tms IS NOT NULL 
-            AND TRIM(tbl_order.created_by_tms) <> '' 
-            GROUP BY tbl_order.created_by_tms, tbl_employee.emp_name, tbl_employee_role.emp_role_desc
+            GROUP BY tbl_employee.emp_name, tbl_employee_role.emp_role_desc
             ORDER BY latest_order DESC 
             LIMIT 1;
         `;
+
+    console.log(topOrdererScript)
     let tbl_top_orderer = await pgConn.get(
       dbPrefix + lic_code,
       topOrdererScript,
@@ -988,9 +1010,9 @@ exports.getOrderReportInformation = async (req, res, next) => {
       tbl_top_orderer.data &&
       tbl_top_orderer.data.length > 0
     ) {
-      let Orderer_name = tbl_top_orderer.data[0].emp_role_desc;
-      let code = tbl_top_orderer.data[0].created_by_tms;
-      top_orderer = Orderer_name ? Orderer_name : code;
+      let emp_name = tbl_top_orderer.data[0].emp_name;
+      let role_desc = tbl_top_orderer.data[0].emp_role_desc;
+      top_orderer = role_desc ? `${role_desc}` : "-";
     }
 
     // =========================================================
@@ -998,16 +1020,41 @@ exports.getOrderReportInformation = async (req, res, next) => {
     // =========================================================
     let baseSelectQuery = `
             SELECT 
-            tbl_order.id, tbl_order.order_no, tbl_order.sh_cus_ref as aos_order_no, 
-            tbl_order.order_type, tbl_order.order_group, 
-            tbl_order_type.ord_type_desc, tbl_petrol_group.ptrl_group_desc, tbl_order.order_status,
-            tbl_order.chanel, tbl_order.division, tbl_order.sold_to, tbl_order.ship_to, 
-            tbl_petrol.ptrl_desc as station, tbl_order.cus_ref, tbl_order.cus_date_ref, tbl_order.po_name, tbl_order.order_by, 
-            tbl_order.ship_cond, tbl_order.pay_term, tbl_order.deli_date_req as request_date, tbl_master_time.time_value as requesttime, 
-            tbl_order.description, tbl_order.sh_cus_date_ref, tbl_order.status_deli, tbl_order.status_block, tbl_order.status_sd_process, 
-            tbl_order.status_check, tbl_order.sd_doc_reject, tbl_order.cus_group, 
-            tbl_order.hana_created, tbl_order.hana_time, tbl_order.created_by, 
-            tbl_order.ist_dt, tbl_order.mdf_dt, tbl_order.rm_dt,
+            tbl_order.id, 
+            tbl_order.order_no, 
+            tbl_order.sh_cus_ref as aos_order_no, 
+            tbl_order.order_type, 
+            tbl_order.order_group, 
+            tbl_order_type.ord_type_desc, 
+            tbl_petrol_group.ptrl_group_desc, 
+            tbl_order.order_status,
+            tbl_order.chanel, 
+            tbl_order.division, 
+            tbl_order.sold_to, 
+            tbl_order.ship_to, 
+            tbl_petrol.ptrl_desc as station, 
+            tbl_order.cus_ref, 
+            tbl_order.cus_date_ref, 
+            tbl_order.po_name, 
+            tbl_order.order_by, 
+            tbl_order.ship_cond, 
+            tbl_order.pay_term, 
+            tbl_order.deli_date_req as request_date, 
+            tbl_master_time.time_value as requesttime, 
+            tbl_order.description, 
+            tbl_order.sh_cus_date_ref, 
+            tbl_order.status_deli, 
+            tbl_order.status_block, 
+            tbl_order.status_sd_process, 
+            tbl_order.status_check, 
+            tbl_order.sd_doc_reject, 
+            tbl_order.cus_group, 
+            tbl_order.hana_created, 
+            tbl_order.hana_time, 
+            tbl_order.created_by, 
+            tbl_order.ist_dt, 
+            tbl_order.mdf_dt, 
+            tbl_order.rm_dt,
             json_build_array(json_build_object(
                 'id', tbl_order_item.id,
                 'sales_order_item', tbl_order_item.sales_order_item,
@@ -1032,7 +1079,21 @@ exports.getOrderReportInformation = async (req, res, next) => {
             LEFT JOIN tbl_petrol ON tbl_order.ship_to = tbl_petrol.ptrl_number
             LEFT JOIN tbl_petrol_group ON tbl_petrol.ptrl_group_code = tbl_petrol_group.ptrl_group_code
             LEFT JOIN tbl_master_time ON tbl_order.deli_time_req = tbl_master_time.time_code
-            LEFT JOIN tbl_employee ON tbl_order.created_by_tms = tbl_employee.emp_code
+            LEFT JOIN (
+                SELECT DISTINCT ON (ptrl_code) ptrl_code, emp_name, emp_surname, emp_role_code 
+                FROM (
+                    SELECT ptrl_code, emp_name, emp_surname, emp_role_code 
+                    FROM tbl_employee 
+                    WHERE emp_flag = '1' AND ptrl_code IS NOT NULL AND ptrl_code != ''
+                    UNION ALL
+                    SELECT p.ptrl_code, e.emp_name, e.emp_surname, e.emp_role_code 
+                    FROM tbl_employee e
+                    INNER JOIN tbl_employee_petrol_group epg ON e.emp_code = epg.emp_code AND epg.emp_pgrp_flag = 1
+                    INNER JOIN tbl_petrol p ON epg.ptrl_group_code = p.ptrl_group_code
+                    WHERE e.emp_flag = '1'
+                ) combined_emp
+                ORDER BY ptrl_code, emp_role_code DESC
+            ) tbl_employee ON tbl_petrol.ptrl_code = tbl_employee.ptrl_code
             LEFT JOIN tbl_employee_role ON tbl_employee.emp_role_code = tbl_employee_role.emp_role_code
             LEFT JOIN (
                 SELECT ptrl_code, itm_code, string_agg(tnk_number, ', ') as tnk_number 
@@ -1042,6 +1103,8 @@ exports.getOrderReportInformation = async (req, res, next) => {
             WHERE tbl_order_item.rm_dt IS NULL
         `;
 
+
+
     // ประกอบร่าง Script หลัก
     let script = `
             ${baseSelectQuery}
@@ -1049,7 +1112,7 @@ exports.getOrderReportInformation = async (req, res, next) => {
             ORDER BY tbl_order.ist_dt DESC 
             OFFSET (${page_index} * ${page_limit}) LIMIT ${page_limit};
         `;
-
+    console.log(script)
     let tbl_temporary = await pgConn.get(
       dbPrefix + lic_code,
       script,
