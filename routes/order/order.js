@@ -4103,11 +4103,12 @@ exports.setOrderInformation = async (req, res, next) => {
         },
       ];
       res.status(200).send(response);
+      let event_type = req.body[0].event_type || "override";
       let logPayloadObj = { order_no: "-", ...req.body[0] };
       await xglobal.action_logs(
         lic_code,
         action[0].id,
-        "แก้ไขข้อมูล Order",
+        event_type,
         JSON.stringify(logPayloadObj),
         "ไม่พบข้อมูลออเดอร์ที่สามารถแก้ไขได้ในระบบ Not Found Status Delivery หรือ Status Delivery ไม่ใช่ A",
         action[0].value,
@@ -4154,7 +4155,7 @@ exports.setOrderInformation = async (req, res, next) => {
         await xglobal.action_logs(
           lic_code,
           action[0].id,
-          "แก้ไขข้อมูล Order",
+          event_type,
           JSON.stringify(logPayloadObj),
           "ไม่สามารถแก้ไข Order ได้",
           action[0].value,
@@ -4436,18 +4437,34 @@ exports.editOrderItem = async (req, res, next) => {
       ];
       res.status(200).send(response);
       let logPayloadObj = { order_no: "-", ...req.body[0] };
+      let event_type = req.body[0].event_type || "override";
       await xglobal.action_logs(
         lic_code,
         action[0].id,
-        "แก้ไขข้อมูล Order",
+        event_type,
         JSON.stringify(logPayloadObj),
         "ไม่พบข้อมูลออเดอร์ที่สามารถแก้ไขได้ในระบบ Not Found Status Delivery หรือ Status Delivery ไม่ใช่ A",
         action[0].value,
       );
       return;
     } else {
-      let orderInfo = checkOrderNo.data[0];
+      let oldOrder = checkOrderNo.data[0];
       let event_type = req.body[0].event_type || "override";
+
+      // ========== Audit Log: ดึงรายการสินค้าเดิมมาเก็บไว้เทียบ ==========
+      let getOldItemsScript = `
+        SELECT oi.item_no, oi.item_qty, oi.remark, itm.itm_desc 
+        FROM tbl_order_item oi
+        LEFT JOIN tbl_item itm ON oi.item_no = itm.itm_code
+        WHERE oi.order_no = $1 AND oi.rm_dt IS NULL
+      `;
+      let oldItemsRes = await pgConn.getWithParams(dbPrefix + lic_code, getOldItemsScript, [order_no], config.connectionString());
+      let oldItemsMap = {};
+      if (!oldItemsRes.code) {
+        oldItemsRes.data.forEach(item => {
+          oldItemsMap[item.item_no] = item;
+        });
+      }
 
       // --- ดึงข้อมูลพื้นฐาน (เช่น คลัง) จากรายการเดิมเก็บไว้ก่อน ---
       let getDeliPlantScript = `SELECT deli_plant FROM tbl_order_item WHERE order_no = $1 AND rm_dt IS NULL LIMIT 1`;
@@ -4464,15 +4481,25 @@ exports.editOrderItem = async (req, res, next) => {
       );
 
       // --- เพิ่มรายการใหม่เข้าไปทั้งหมด ---
-      let itemLogs = [];
+      let auditChanges = [];
+
+      // -- เทียบ Description --
+      if ((oldOrder.description || "") !== (description || "")) {
+        auditChanges.push({
+          field: "Description",
+          before: oldOrder.description || "-",
+          after: description || "-"
+        });
+      }
+
       for (let i = 0; i < order_item.length; i++) {
         let item = order_item[i];
-        let item_quantity = item.item_quantity;
+        let item_quantity = parseFloat(item.item_quantity) || 0;
         let item_no = item.item_no;
-        let remark = item.remark;
+        let remark = item.remark || "";
         let ptrl_tank_code = item.ptrl_tank_code;
 
-        if (parseFloat(item_quantity) > 0) {
+        if (item_quantity > 0) {
           let insertScript = `
               INSERT INTO tbl_order_item (
                   order_no, item_no, item_qty, remark, ptrl_tank_code, 
@@ -4490,19 +4517,60 @@ exports.editOrderItem = async (req, res, next) => {
             config.connectionString(),
           );
 
-          itemLogs.push(`${item_no} (${item_quantity} L)`);
+          // -- เก็บข้อมูลสำหรับการ Audit Log --
+          let oldItem = oldItemsMap[item_no];
+          let itemLabel = (oldItem ? oldItem.itm_desc : "") || item_no;
+          let oldQty = oldItem ? parseFloat(oldItem.item_qty) || 0 : 0;
+          let oldRemark = oldItem ? oldItem.remark || "" : "";
+
+          if (oldQty !== item_quantity) {
+            auditChanges.push({
+              field: `Order Qty (${itemLabel})`,
+              before: String(oldQty),
+              after: String(item_quantity)
+            });
+          }
+          if (oldRemark !== remark) {
+            auditChanges.push({
+              field: `Remark (${itemLabel})`,
+              before: oldRemark || "-",
+              after: remark || "-"
+            });
+          }
+
+          // ลบออกจาก map เพื่อเช็คว่ามีตัวไหนถูกลบออกไปบ้าง (หายไปจากออเดอร์)
+          delete oldItemsMap[item_no];
         }
       }
 
-      // บันทึก Log การเปลี่ยนแปลงแบบสรุป
-      await xglobal.action_logs(
-        lic_code,
-        action[0].id,
-        "แก้ไขข้อมูล Order",
-        JSON.stringify(req.body[0]),
-        `อัปเดตรายการสินค้าใหม่ทั้งหมด: ${itemLogs.join(", ")}`,
-        action[0].value,
-      );
+      // -- เช็ครายการที่หายไป (ถูกลบออก) --
+      for (let item_no in oldItemsMap) {
+        let oldItem = oldItemsMap[item_no];
+        auditChanges.push({
+          field: `Removed Item (${oldItem.itm_desc || item_no})`,
+          before: String(oldItem.item_qty),
+          after: "0 (Removed)"
+        });
+      }
+
+      // บันทึก Log การเปลี่ยนแปลงลง Audit Log
+      if (auditChanges.length > 0) {
+        let logPayload = {
+          order_no: oldOrder.order_no || "-",
+          order_id: order_no,
+          ship_to: oldOrder.ship_to || "",
+          reason: req.body[0].remark || req.body[0].reason || description || "",
+          changes: auditChanges,
+        };
+        await xglobal.action_logs(
+          lic_code,
+          action[0].id,
+          event_type,
+          JSON.stringify(logPayload),
+          "success",
+          action[0].value,
+        );
+      }
 
       // ========== อัปเดตข้อมูลหลักของออเดอร์ (อัปเดต Description และเวลาแก้ไข) ==========
       let updateOrder = `
