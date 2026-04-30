@@ -10,6 +10,7 @@ router.put('/email-alert', runoutConfig.addEmailAlert);
 router.patch('/email-alert', runoutConfig.setEmailAlertInformation);
 router.delete('/email-alert', runoutConfig.removeEmailAlert);
 router.post('/email-alert/information', runoutConfig.getEmailAlertInformation);
+router.patch('/email-alert/status', runoutConfig.updateEmailStatus);
 
 
 module.exports = router;

@@ -402,6 +402,6 @@ app.use(function (err, req, res, next) {
 // autoOrderMailsScheduler.startAutoOrderMailLoopCustom("15:25", "17:00", 1); // Custom เวลาได้
 
 // เริ่มต้น Background Scheduler สำหรับแจ้งเตือน Low Stock
-lowStockAlertScheduler.startLowStockLoop();
+// lowStockAlertScheduler.startLowStockLoop();
 
 module.exports = app;

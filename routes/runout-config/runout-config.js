@@ -112,7 +112,7 @@ exports.setRunoutInformation = async (req, res, next) => {
 exports.addEmailAlert = async (req, res, next) => {
     try {
         const lic_code = req.header('lic_code');
-        const { ptrl_code, email_alert, re_alert_type, alert_status, action } = req.body[0] || {};
+        const { ptrl_code, email_alert, re_alert_type, alert_status, ptrl_mail_status, action } = req.body[0] || {};
 
         const missing = [];
         if (!lic_code) missing.push('lic_code');
@@ -150,10 +150,10 @@ exports.addEmailAlert = async (req, res, next) => {
             if (email) {
                 const ptrl_mail_code = 'pmal-' + moment().format('YYYYMMDDHHmmss') + Math.floor(Math.random() * 1000);
                 const insertScript = `
-                    INSERT INTO tbl_petrol_mail_alert (ptrl_mail_code, ptrl_code, email_alert, mail_alert_flag, ist_dt, re_alert_type, alert_status)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7)
+                    INSERT INTO tbl_petrol_mail_alert (ptrl_mail_code, ptrl_code, email_alert, mail_alert_flag, ist_dt, re_alert_type, alert_status, ptrl_mail_status)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
                 `;
-                const params = [ptrl_mail_code, ptrl_code, email, 1, now, re_alert_type, alert_status];
+                const params = [ptrl_mail_code, ptrl_code, email, 1, now, re_alert_type, alert_status, ptrl_mail_status];
                 await pgConn.execute2params(dbPrefix + lic_code, insertScript, params, config.connectionString());
             }
         }
@@ -190,6 +190,7 @@ exports.getEmailAlertInformation = async (req, res, next) => {
                 pma.email_alert,
                 pma.re_alert_type,
                 pma.alert_status,
+                pma.ptrl_mail_status,
                 pma.mail_alert_flag,
                 pma.ist_dt
             FROM tbl_petrol_mail_alert pma
@@ -257,6 +258,43 @@ exports.setEmailAlertInformation = async (req, res, next) => {
 
         await xglobal.action_logs(lic_code, action[0].id, 'อัปเดตข้อมูลอีเมลแจ้งเตือน', JSON.stringify(req.body[0]), 'success', action[0].value);
         return sendResponse(res, 'success', '0', 'อัพเดตข้อมูลสำเร็จ', []);
+
+    } catch (err) {
+        console.error(err);
+        return sendResponse(res, 'error', '-4', 'เกิดข้อผิดพลาดภายในระบบ', []);
+    }
+};
+
+// =========================================================
+//            อัปเดตสถานะอีเมล Primary/Secondary (Update Email Status)
+// =========================================================
+exports.updateEmailStatus = async (req, res, next) => {
+    try {
+        const lic_code = req.header('lic_code');
+        const { ptrl_mail_status, action } = req.body[0] || {};
+        const { ptrl_mail_code } = req.query;
+
+        if (!lic_code || !ptrl_mail_code || !action) {
+            return sendResponse(res, 'error', '-1', 'ข้อมูลพารามิเตอร์ไม่ถูกต้อง', []);
+        }
+
+        const now = moment().format('YYYY-MM-DD HH:mm:ss');
+        const script = `
+            UPDATE tbl_petrol_mail_alert
+            SET ptrl_mail_status = $1, mdf_dt = $2
+            WHERE ptrl_mail_code = $3 AND rm_dt IS NULL
+        `;
+
+        const params = [ptrl_mail_status, now, ptrl_mail_code];
+        const result = await pgConn.execute2params(dbPrefix + lic_code, script, params, config.connectionString());
+
+        if (result.code) {
+            await xglobal.action_logs(lic_code, action[0].id, 'อัปเดตสถานะอีเมล', JSON.stringify(req.body[0]), 'ไม่สามารถอัพเดตได้', action[0].value);
+            return sendResponse(res, 'error', '-3', 'ไม่สามารถอัพเดตสถานะอีเมลได้', []);
+        }
+
+        await xglobal.action_logs(lic_code, action[0].id, 'อัปเดตสถานะอีเมล (Primary/Secondary)', JSON.stringify(req.body[0]), 'success', action[0].value);
+        return sendResponse(res, 'success', '0', 'อัพเดตสถานะสำเร็จ', []);
 
     } catch (err) {
         console.error(err);

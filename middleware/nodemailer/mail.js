@@ -46,17 +46,19 @@ const transporter = nodemailer.createTransport({
  * @param {string} to - อีเมลผู้รับ
  * @param {string} subject - หัวข้อ
  * @param {string} html - เนื้อหา HTML
+ * @param {Array} attachments - ไฟล์แนบ (Optional)
  */
-exports.sendMail = async (to, subject, html) => {
+exports.sendMail = async (to, subject, html, attachments = []) => {
   try {
     const info = await transporter.sendMail({
       from: currentConfig.from,
       to,
       subject,
-      html
+      html,
+      attachments
     });
 
-    console.log(`   ✅ [MAIL SENT] Message ID: ${info.messageId}`);
+    console.log(`   ✅ [MAIL SENT] Message ID: ${info.messageId} (Attachments: ${attachments.length})`);
     return { success: true, messageId: info.messageId };
   } catch (error) {
     console.error(`   ❌ [MAIL ERROR]:`, error.message);
