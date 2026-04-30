@@ -905,7 +905,8 @@ exports.getOrderReportInformation = async (req, res, next) => {
     }
 
     if (emp_role_code !== "" && emp_role_code.toString().toUpperCase() !== "ALL") {
-      conditions.push(`EXISTS (
+      conditions.push(`(
+        EXISTS (
           SELECT 1 FROM (
               SELECT ptrl_code, emp_role_code 
               FROM tbl_employee 
@@ -919,6 +920,13 @@ exports.getOrderReportInformation = async (req, res, next) => {
           ) emp_check 
           WHERE emp_check.ptrl_code = tbl_petrol.ptrl_code 
             AND emp_check.emp_role_code = '${emp_role_code}'
+        )
+        OR EXISTS (
+          SELECT 1 FROM tbl_employee e2 
+          WHERE e2.emp_code = tbl_order.created_by_tms 
+            AND e2.emp_role_code = '${emp_role_code}' 
+            AND e2.emp_flag = '1'
+        )
       )`);
     }
 
@@ -968,6 +976,7 @@ exports.getOrderReportInformation = async (req, res, next) => {
     if (emp_role_code !== "" && emp_role_code.toString().toUpperCase() !== "ALL") {
       empRoleFilterSQL = `WHERE combined_emp.emp_role_code = '${emp_role_code}'`;
     }
+
 
     // =========================================================================
     // [SUMMARY 1] คำนวณยอดรวมของ Manual Order (auto_order = '0')
@@ -1034,7 +1043,7 @@ exports.getOrderReportInformation = async (req, res, next) => {
                 ${empRoleFilterSQL}
                 ORDER BY ptrl_code, emp_role_code DESC
             ) tbl_employee ON tbl_petrol.ptrl_code = tbl_employee.ptrl_code
-            LEFT JOIN tbl_employee_role ON tbl_employee.emp_role_code = tbl_employee_role.emp_role_code
+            LEFT JOIN tbl_employee_role empr_st ON tbl_employee.emp_role_code = empr_st.emp_role_code
             LEFT JOIN tbl_order_item ON tbl_order.id = tbl_order_item.order_no
             ${whereClause} 
             AND item.rm_dt IS NULL 
@@ -1080,7 +1089,7 @@ exports.getOrderReportInformation = async (req, res, next) => {
                 ${empRoleFilterSQL}
                 ORDER BY ptrl_code, emp_role_code DESC
             ) tbl_employee ON tbl_petrol.ptrl_code = tbl_employee.ptrl_code
-            LEFT JOIN tbl_employee_role ON tbl_employee.emp_role_code = tbl_employee_role.emp_role_code
+            LEFT JOIN tbl_employee_role empr_st ON tbl_employee.emp_role_code = empr_st.emp_role_code
             LEFT JOIN tbl_order_item ON tbl_order.id = tbl_order_item.order_no
             ${whereClause} 
             AND item.rm_dt IS NULL;
@@ -1101,8 +1110,13 @@ exports.getOrderReportInformation = async (req, res, next) => {
     // =========== [SUMMARY 4] ใครสั่งล่าสุด ===========
     let top_orderer = "-";
     let topOrdererScript = `
-            SELECT tbl_employee.emp_name, tbl_employee_role.emp_role_desc, MAX(tbl_order.ist_dt) as latest_order
+            SELECT 
+                COALESCE(empc_tms.emp_name, tbl_employee.emp_name, '-') as emp_name,
+                COALESCE(empr_tms.emp_role_desc, empr_st.emp_role_desc) as emp_role_desc, 
+                MAX(tbl_order.ist_dt) as latest_order
             FROM tbl_order 
+            LEFT JOIN tbl_employee empc_tms ON tbl_order.created_by_tms = empc_tms.emp_code
+            LEFT JOIN tbl_employee_role empr_tms ON empc_tms.emp_role_code = empr_tms.emp_role_code
             LEFT JOIN tbl_petrol ON tbl_order.ship_to = tbl_petrol.ptrl_number
             LEFT JOIN (
                 SELECT DISTINCT ON (ptrl_code) ptrl_code, emp_name, emp_surname, emp_role_code 
@@ -1120,13 +1134,14 @@ exports.getOrderReportInformation = async (req, res, next) => {
                 ${empRoleFilterSQL}
                 ORDER BY ptrl_code, emp_role_code DESC
             ) tbl_employee ON tbl_petrol.ptrl_code = tbl_employee.ptrl_code
-            LEFT JOIN tbl_employee_role ON tbl_employee.emp_role_code = tbl_employee_role.emp_role_code
+            LEFT JOIN tbl_employee_role empr_st ON tbl_employee.emp_role_code = empr_st.emp_role_code
             LEFT JOIN tbl_order_item ON tbl_order.id = tbl_order_item.order_no
             ${whereClause}
-            GROUP BY tbl_employee.emp_name, tbl_employee_role.emp_role_desc
+            GROUP BY 1, 2
             ORDER BY latest_order DESC 
             LIMIT 1;
         `;
+
 
     let tbl_top_orderer = await pgConn.get(
       dbPrefix + lic_code,
@@ -1138,9 +1153,7 @@ exports.getOrderReportInformation = async (req, res, next) => {
       tbl_top_orderer.data &&
       tbl_top_orderer.data.length > 0
     ) {
-      let emp_name = tbl_top_orderer.data[0].emp_name;
-      let role_desc = tbl_top_orderer.data[0].emp_role_desc;
-      top_orderer = role_desc ? `${role_desc}` : "-";
+      top_orderer = tbl_top_orderer.data[0].emp_name || tbl_top_orderer.data[0].emp_role_desc || "-";
     }
 
     // =========================================================
@@ -1200,7 +1213,7 @@ exports.getOrderReportInformation = async (req, res, next) => {
             tbl_order.auto_order,
             tbl_order_item.remark,
             tbl_depot.dpo_desc,
-            tbl_employee_role.emp_role_desc
+            COALESCE(empr_tms.emp_role_desc, empr_st.emp_role_desc) as emp_role_desc
             FROM tbl_order  
             INNER JOIN tbl_order_item ON CAST(tbl_order.id AS TEXT) = CAST(tbl_order_item.order_no AS TEXT) 
             LEFT JOIN tbl_order_type ON tbl_order.order_type = tbl_order_type.ord_type_code
@@ -1208,6 +1221,8 @@ exports.getOrderReportInformation = async (req, res, next) => {
             LEFT JOIN tbl_petrol ON tbl_order.ship_to = tbl_petrol.ptrl_number
             LEFT JOIN tbl_petrol_group ON tbl_petrol.ptrl_group_code = tbl_petrol_group.ptrl_group_code
             LEFT JOIN tbl_master_time ON tbl_order.deli_time_req = tbl_master_time.time_code
+            LEFT JOIN tbl_employee empc_tms ON tbl_order.created_by_tms = empc_tms.emp_code
+            LEFT JOIN tbl_employee_role empr_tms ON empc_tms.emp_role_code = empr_tms.emp_role_code
             LEFT JOIN (
                 SELECT DISTINCT ON (ptrl_code) ptrl_code, emp_name, emp_surname, emp_role_code 
                 FROM (
@@ -1224,7 +1239,7 @@ exports.getOrderReportInformation = async (req, res, next) => {
                 ${empRoleFilterSQL}
                 ORDER BY ptrl_code, emp_role_code DESC
             ) tbl_employee ON tbl_petrol.ptrl_code = tbl_employee.ptrl_code
-            LEFT JOIN tbl_employee_role ON tbl_employee.emp_role_code = tbl_employee_role.emp_role_code
+            LEFT JOIN tbl_employee_role empr_st ON tbl_employee.emp_role_code = empr_st.emp_role_code
             LEFT JOIN tbl_depot ON tbl_order_item.deli_plant = tbl_depot.dpo_code
             LEFT JOIN (
                 SELECT ptrl_code, itm_code, string_agg(tnk_number, ', ') as tnk_number 
