@@ -914,7 +914,7 @@ exports.getOrderReportInformation = async (req, res, next) => {
     }
 
     if (reason.toString().toUpperCase() !== "ALL") {
-      conditions.push(`tbl_order_item.remark LIKE '%${reason}%'`);
+      conditions.push(`tbl_order_item.remark = '${reason}'`);
     }
 
     if (dpo_code.toString().toUpperCase() !== "ALL") {
