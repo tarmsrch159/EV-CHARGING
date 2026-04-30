@@ -582,7 +582,6 @@ exports.getVehicleTypeInformation = async (req, res, next) => {
 
       script += ` order by v.ist_dt desc`;
       script += ` limit ${page_limit} offset ${page_index * page_limit}`;
-      console.log(script)
       let tbl_temporary = await pgConn.get(
         dbPrefix + lic_code,
         script,
