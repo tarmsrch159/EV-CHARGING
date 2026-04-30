@@ -51,12 +51,17 @@ exports.getItemInformation = async (req, res, next) => {
                 tbl_item.itm_material_number,
                 tbl_item.itm_flag,
                 tbl_item.itm_weight_litr_per_kg,
+                tbl_item.itm_sales_org,
+                tbl_item.itm_order_type,
+                tbl_order_type.ord_type_desc,
+                tbl_order_type.sales_order_type,
                 tbl_item.ist_dt,
                 tbl_item.mdf_dt,
                 tbl_item.rm_dt 
                 from tbl_item
                 left join tbl_item_unit on tbl_item.itm_unit_code = tbl_item_unit.itm_unit_code
                 left join tbl_item_type on tbl_item.itm_type_code = tbl_item_type.itm_type_code 
+                left join tbl_order_type on tbl_item.itm_order_type = tbl_order_type.ord_type_code
                 where tbl_item.itm_flag = '1' and tbl_item.itm_code = '${itm_code}'`;
             }
             else {
@@ -72,12 +77,17 @@ exports.getItemInformation = async (req, res, next) => {
                 tbl_item.itm_material_number,
                 tbl_item.itm_flag,
                 tbl_item.itm_weight_litr_per_kg,
+                tbl_item.itm_sales_org,
+                tbl_item.itm_order_type,
+                tbl_order_type.ord_type_desc,
+                tbl_order_type.sales_order_type,
                 tbl_item.ist_dt,
                 tbl_item.mdf_dt,
                 tbl_item.rm_dt 
                 from tbl_item
                 left join tbl_item_unit on tbl_item.itm_unit_code = tbl_item_unit.itm_unit_code
                 left join tbl_item_type on tbl_item.itm_type_code = tbl_item_type.itm_type_code 
+                left join tbl_order_type on tbl_item.itm_order_type = tbl_order_type.ord_type_code
                 where tbl_item.itm_flag = '1'`;
             }
 
@@ -280,22 +290,33 @@ exports.setItemInformation = async (req, res, next) => {
             itm_image,
             itm_material_number,
             itm_weight_litr_per_kg,
+            itm_sales_org,
+            itm_order_type,
             action
         } = req.body[0];
 
-        //เช็คเฉพาะส่วนที่สำคัญ
-        if (itm_code == undefined || itm_desc == undefined || itm_short_desc == undefined
-            || itm_type_code == undefined || itm_unit_code == undefined || itm_icon == undefined || itm_image == undefined || itm_material_number == undefined
-            || itm_weight_litr_per_kg == undefined || action == undefined) {
+        //เช็คพารามิเตอร์ที่จำเป็น
+        let missing = [];
+        if (itm_code == undefined) missing.push('itm_code');
+        if (itm_desc == undefined) missing.push('itm_desc');
+        if (itm_short_desc == undefined) missing.push('itm_short_desc');
+        if (itm_type_code == undefined) missing.push('itm_type_code');
+        if (itm_unit_code == undefined) missing.push('itm_unit_code');
+        if (itm_icon == undefined) missing.push('itm_icon');
+        if (itm_image == undefined) missing.push('itm_image');
+        if (itm_material_number == undefined) missing.push('itm_material_number');
+        if (itm_weight_litr_per_kg == undefined) missing.push('itm_weight_litr_per_kg');
+        if (action == undefined) missing.push('action');
+
+        if (missing.length > 0) {
             let response = [{
                 status: 'error',
                 invalid_code: '-1',
-                message: 'ไม่สามารถบันทึกข้อมูล, เนื่องจากข้อมูลพารามิเตอร์ไม่ถูกต้อง',
+                message: `ไม่สามารถบันทึกข้อมูล, เนื่องจากข้อมูลพารามิเตอร์ไม่ถูกต้อง (ขาด: ${missing.join(', ')})`,
                 data: [],
                 response_time: moment().format('YYYY-MM-DD HH:mm:ss')
             }]
-
-            res.status(200).send(response);
+            return res.status(200).send(response);
         } else {
 
             let script = ``;
@@ -308,6 +329,8 @@ exports.setItemInformation = async (req, res, next) => {
             itm_image = '${itm_image}',
             itm_material_number = '${itm_material_number}',
             itm_weight_litr_per_kg = ${itm_weight_litr_per_kg},
+            itm_sales_org = '${itm_sales_org}',
+            itm_order_type = '${itm_order_type}',
             mdf_dt = '${moment().format('YYYY-MM-DD HH:mm:ss')}' 
             where itm_code = '${itm_code}';`
 
@@ -371,22 +394,32 @@ exports.addItemInformation = async (req, res, next) => {
             itm_image,
             itm_material_number,
             itm_weight_litr_per_kg,
+            itm_sales_org,
+            itm_order_type,
             action
         } = req.body[0];
 
-        //เช็คเฉพาะส่วนที่สำคัญ
-        if (itm_desc == undefined || itm_short_desc == undefined
-            || itm_type_code == undefined || itm_unit_code == undefined || itm_icon == undefined || itm_image == undefined || itm_material_number == undefined
-            || itm_weight_litr_per_kg == undefined || action == undefined) {
+        //เช็คพารามิเตอร์ที่จำเป็น
+        let missing = [];
+        if (itm_desc == undefined) missing.push('itm_desc');
+        if (itm_short_desc == undefined) missing.push('itm_short_desc');
+        if (itm_type_code == undefined) missing.push('itm_type_code');
+        if (itm_unit_code == undefined) missing.push('itm_unit_code');
+        if (itm_icon == undefined) missing.push('itm_icon');
+        if (itm_image == undefined) missing.push('itm_image');
+        if (itm_material_number == undefined) missing.push('itm_material_number');
+        if (itm_weight_litr_per_kg == undefined) missing.push('itm_weight_litr_per_kg');
+        if (action == undefined) missing.push('action');
+
+        if (missing.length > 0) {
             let response = [{
                 status: 'error',
                 invalid_code: '-1',
-                message: 'ไม่สามารถบันทึกข้อมูล, เนื่องจากข้อมูลพารามิเตอร์ไม่ถูกต้อง',
+                message: `ไม่สามารถบันทึกข้อมูล, เนื่องจากข้อมูลพารามิเตอร์ไม่ถูกต้อง (ขาด: ${missing.join(', ')})`,
                 data: [],
                 response_time: moment().format('YYYY-MM-DD HH:mm:ss')
             }]
-
-            res.status(200).send(response);
+            return res.status(200).send(response);
         } else {
 
             let script = ``;
@@ -411,10 +444,10 @@ exports.addItemInformation = async (req, res, next) => {
             let itm_code = 'itm-' + moment().format('x');
             script = `insert into tbl_item 
             (itm_code, itm_desc, itm_short_desc, itm_type_code, itm_unit_code, itm_icon, itm_image, 
-            itm_material_number, itm_weight_litr_per_kg, itm_flag, ist_dt) 
+            itm_material_number, itm_weight_litr_per_kg, itm_flag, ist_dt, itm_sales_org, itm_order_type) 
             values 
             ('${itm_code}', '${itm_desc}', '${itm_short_desc}', '${itm_type_code}', '${itm_unit_code}', '${itm_icon}', 
-            '${itm_image}', '${itm_material_number}', ${itm_weight_litr_per_kg}, '1', '${moment().format('YYYY-MM-DD HH:mm:ss')}');`
+            '${itm_image}', '${itm_material_number}', ${itm_weight_litr_per_kg}, '1', '${moment().format('YYYY-MM-DD HH:mm:ss')}', '${itm_sales_org}', '${itm_order_type}');`
 
             script = script.replace(/'NULL'/gi, "NULL")
             let tbl_temporary = await pgConn.execute(dbPrefix + lic_code, script, config.connectionString());
