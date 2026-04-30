@@ -4589,9 +4589,9 @@ exports.editOrderItem = async (req, res, next) => {
                 UPDATE tbl_order 
                 SET description = $1, 
                     auto_order = $2,
-                    mdf_dt = $4,
-                    created_by_tms = $5
-                WHERE id = $6
+                    mdf_dt = $3,
+                    created_by_tms = $4
+                WHERE id = $5
             `;
       let paramsOrder = [
         description || "",
