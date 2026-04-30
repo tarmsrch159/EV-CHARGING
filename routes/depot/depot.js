@@ -40,8 +40,10 @@ exports.getDepotInformation = async (req, res, next) => {
                 script = `select dpo_code, dpo_number, dpo_desc, dpo_short_desc, dpo_address, dpo_zip_code, dpo_country_code,
                 dpo_loading_minute, dpo_expenses_per_km, dpo_area, dpo_lat, dpo_lon,
                 tbl_depot.off_code, off_desc, tbl_depot.dpo_group_code, dpo_group_desc, tbl_depot.ist_dt, tbl_depot.mdf_dt, tbl_depot.rm_dt, tbl_depot.prov_code, 
-                tbl_depot.amph_code, tbl_depot.tamb_code, tbl_province.prov_desc, tbl_amphure.amph_desc, tbl_tambon.tamb_desc, dpo_flag 
+                tbl_depot.amph_code, tbl_depot.tamb_code, tbl_province.prov_desc, tbl_amphure.amph_desc, tbl_tambon.tamb_desc, dpo_flag,
+                tbl_depot.dpo_sales_org, tbl_order_type.ord_type_desc, tbl_order_type.sales_order_type
                 from tbl_depot 
+                left join tbl_order_type on tbl_depot.dpo_order_type = tbl_order_type.ord_type_code
                 left join tbl_office on tbl_depot.off_code = tbl_office.off_code 
                 left join tbl_depot_group on tbl_depot.dpo_group_code = tbl_depot_group.dpo_group_code 
                 left join tbl_province on tbl_depot.prov_code = tbl_province.prov_code 
@@ -53,8 +55,10 @@ exports.getDepotInformation = async (req, res, next) => {
                 script = `select dpo_code, dpo_number, dpo_desc, dpo_short_desc, dpo_address, dpo_zip_code, dpo_country_code,
                 dpo_loading_minute, dpo_expenses_per_km, dpo_area, dpo_lat, dpo_lon,
                 tbl_depot.off_code, off_desc, tbl_depot.dpo_group_code, dpo_group_desc, tbl_depot.ist_dt, tbl_depot.mdf_dt, tbl_depot.rm_dt, tbl_depot.prov_code, 
-                tbl_depot.amph_code, tbl_depot.tamb_code, tbl_province.prov_desc, tbl_amphure.amph_desc, tbl_tambon.tamb_desc, dpo_flag 
+                tbl_depot.amph_code, tbl_depot.tamb_code, tbl_province.prov_desc, tbl_amphure.amph_desc, tbl_tambon.tamb_desc, dpo_flag,
+                tbl_depot.dpo_sales_org, tbl_order_type.ord_type_desc, tbl_order_type.sales_order_type
                 from tbl_depot 
+                left join tbl_order_type on tbl_depot.dpo_order_type = tbl_order_type.ord_type_code
                 left join tbl_office on tbl_depot.off_code = tbl_office.off_code 
                 left join tbl_depot_group on tbl_depot.dpo_group_code = tbl_depot_group.dpo_group_code 
                 left join tbl_province on tbl_depot.prov_code = tbl_province.prov_code 
@@ -298,24 +302,39 @@ exports.setDepotInformation = async (req, res, next) => {
             prov_code,
             amph_code,
             tamb_code,
+            dpo_sales_org,
+            dpo_order_type,
             action
         } = req.body[0];
 
-        //เช็คเฉพาะส่วนที่สำคัญ
-        if (dpo_code == undefined || dpo_number == undefined || dpo_city == undefined || dpo_desc == undefined
-            || dpo_short_desc == undefined || dpo_address == undefined || dpo_zip_code == undefined || dpo_country_code == undefined || dpo_loading_minute == undefined
-            || dpo_expenses_per_km == undefined || dpo_area == undefined
-            || dpo_lat == undefined || dpo_lon == undefined || off_code == undefined || dpo_group_code == undefined
-            || action == undefined) {
+        //เช็คพารามิเตอร์ที่จำเป็น
+        let missing = [];
+        if (dpo_code == undefined) missing.push('dpo_code');
+        if (dpo_number == undefined) missing.push('dpo_number');
+        if (dpo_city == undefined) missing.push('dpo_city');
+        if (dpo_desc == undefined) missing.push('dpo_desc');
+        if (dpo_short_desc == undefined) missing.push('dpo_short_desc');
+        if (dpo_address == undefined) missing.push('dpo_address');
+        if (dpo_zip_code == undefined) missing.push('dpo_zip_code');
+        if (dpo_country_code == undefined) missing.push('dpo_country_code');
+        if (dpo_loading_minute == undefined) missing.push('dpo_loading_minute');
+        if (dpo_expenses_per_km == undefined) missing.push('dpo_expenses_per_km');
+        if (dpo_area == undefined) missing.push('dpo_area');
+        if (dpo_lat == undefined) missing.push('dpo_lat');
+        if (dpo_lon == undefined) missing.push('dpo_lon');
+        if (off_code == undefined) missing.push('off_code');
+        if (dpo_group_code == undefined) missing.push('dpo_group_code');
+        if (action == undefined) missing.push('action');
+
+        if (missing.length > 0) {
             let response = [{
                 status: 'error',
                 invalid_code: '-1',
-                message: 'ไม่สามารถบันทึกข้อมูล, เนื่องจากข้อมูลพารามิเตอร์ไม่ถูกต้อง',
+                message: `ไม่สามารถบันทึกข้อมูล, เนื่องจากข้อมูลพารามิเตอร์ไม่ถูกต้อง (ขาด: ${missing.join(', ')})`,
                 data: [],
                 response_time: moment().format('YYYY-MM-DD HH:mm:ss')
             }]
-
-            res.status(200).send(response);
+            return res.status(200).send(response);
         } else {
 
             let script = ``;
@@ -337,6 +356,8 @@ exports.setDepotInformation = async (req, res, next) => {
             prov_code = '${prov_code}',
             amph_code = '${amph_code}',
             tamb_code = '${tamb_code}',
+            dpo_sales_org = '${dpo_sales_org}',
+            dpo_order_type = '${dpo_order_type}',
             mdf_dt = '${moment().format('YYYY-MM-DD HH:mm:ss')}'
             where dpo_code = '${dpo_code}';`
 
@@ -408,22 +429,40 @@ exports.addDepotInformation = async (req, res, next) => {
             prov_code,
             amph_code,
             tamb_code,
+            dpo_sales_org,
+            dpo_order_type,
             action
         } = req.body[0];
 
-        //เช็คเฉพาะส่วนที่สำคัญ
-        if (dpo_number == undefined || dpo_desc == undefined || dpo_short_desc == undefined || dpo_address == undefined || dpo_zip_code == undefined || dpo_country_code == undefined || dpo_loading_minute == undefined
-            || dpo_expenses_per_km == undefined || dpo_area == undefined || dpo_lat == undefined || dpo_lon == undefined || off_code == undefined || dpo_group_code == undefined
-            || prov_code == undefined || amph_code == undefined || tamb_code == undefined || action == undefined) {
+        //เช็คพารามิเตอร์ที่จำเป็น
+        let missing = [];
+        if (dpo_number == undefined) missing.push('dpo_number');
+        if (dpo_desc == undefined) missing.push('dpo_desc');
+        if (dpo_short_desc == undefined) missing.push('dpo_short_desc');
+        if (dpo_address == undefined) missing.push('dpo_address');
+        if (dpo_zip_code == undefined) missing.push('dpo_zip_code');
+        if (dpo_country_code == undefined) missing.push('dpo_country_code');
+        if (dpo_loading_minute == undefined) missing.push('dpo_loading_minute');
+        if (dpo_expenses_per_km == undefined) missing.push('dpo_expenses_per_km');
+        if (dpo_area == undefined) missing.push('dpo_area');
+        if (dpo_lat == undefined) missing.push('dpo_lat');
+        if (dpo_lon == undefined) missing.push('dpo_lon');
+        if (off_code == undefined) missing.push('off_code');
+        if (dpo_group_code == undefined) missing.push('dpo_group_code');
+        if (prov_code == undefined) missing.push('prov_code');
+        if (amph_code == undefined) missing.push('amph_code');
+        if (tamb_code == undefined) missing.push('tamb_code');
+        if (action == undefined) missing.push('action');
+
+        if (missing.length > 0) {
             let response = [{
                 status: 'error',
                 invalid_code: '-1',
-                message: 'ไม่สามารถบันทึกข้อมูล, เนื่องจากข้อมูลพารามิเตอร์ไม่ถูกต้อง',
+                message: `ไม่สามารถบันทึกข้อมูล, เนื่องจากข้อมูลพารามิเตอร์ไม่ถูกต้อง (ขาด: ${missing.join(', ')})`,
                 data: [],
                 response_time: moment().format('YYYY-MM-DD HH:mm:ss')
             }]
-
-            res.status(200).send(response);
+            return res.status(200).send(response);
         } else {
 
             let script = ``;
@@ -450,12 +489,12 @@ exports.addDepotInformation = async (req, res, next) => {
             let dpo_code = 'dpo-' + moment().format('x');
             script = `insert into tbl_depot 
             (dpo_code, dpo_number, dpo_desc, dpo_short_desc, dpo_address, dpo_zip_code, dpo_country_code, dpo_loading_minute,
-            dpo_expenses_per_km, dpo_area, dpo_lat, dpo_lon, off_code, dpo_group_code, prov_code, amph_code, tamb_code, dpo_flag, ist_dt) 
+            dpo_expenses_per_km, dpo_area, dpo_lat, dpo_lon, off_code, dpo_group_code, prov_code, amph_code, tamb_code, dpo_flag, ist_dt, dpo_sales_org, dpo_order_type) 
             values 
             ('${dpo_code}', '${dpo_number}', '${dpo_desc}', '${dpo_short_desc}', '${dpo_address}', '${dpo_zip_code}', 
             '${dpo_country_code}', ${dpo_loading_minute}, ${dpo_expenses_per_km}, 
             ${dpo_area}, ${dpo_lat}, ${dpo_lon}, '${off_code}', '${dpo_group_code}',
-            '${prov_code}', '${amph_code}', '${tamb_code}', '1', '${moment().format('YYYY-MM-DD HH:mm:ss')}');`
+            '${prov_code}', '${amph_code}', '${tamb_code}', '1', '${moment().format('YYYY-MM-DD HH:mm:ss')}', '${dpo_sales_org}', '${dpo_order_type}');`
 
             script = script.replace(/'NULL'/gi, "NULL")
             let tbl_temporary = await pgConn.execute(dbPrefix + lic_code, script, config.connectionString());
