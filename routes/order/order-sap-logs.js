@@ -84,6 +84,7 @@ exports.getSapOrderErrorLogsInformation = async (req, res, next) => {
     let dataScript = `
             ${baseSelectQuery}
             ${whereClause}
+            ORDER BY ist_dt DESC
             OFFSET (${page_index} * ${page_limit}) LIMIT ${page_limit};
         `;
 

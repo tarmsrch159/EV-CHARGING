@@ -2155,6 +2155,9 @@ const getConfirmOrder = async (lic_code, order_id, action) => {
           JSON.stringify({ message_sub: messageSub }).substring(0, 200),
           action[0].value,
         );
+
+        let update_fail_script = `update tbl_order set order_status = '9', mdf_dt = '${moment().format("YYYY-MM-DD HH:mm:ss")}' where id = '${order_id}'`;
+        await pgConn.execute(dbPrefix + lic_code, update_fail_script, config.connectionString());
       } else {
         response.push({
           status: "success",
@@ -2302,6 +2305,10 @@ const getConfirmOrder = async (lic_code, order_id, action) => {
         JSON.stringify({ order_id }),
         action[0].value,
       );
+
+      let update_fail_script = `update tbl_order set order_status = '9', mdf_dt = '${moment().format("YYYY-MM-DD HH:mm:ss")}' where id = '${order_id}'`;
+      await pgConn.execute(dbPrefix + lic_code, update_fail_script, config.connectionString());
+
       return response;
     }
   })().catch(async (err) => {
