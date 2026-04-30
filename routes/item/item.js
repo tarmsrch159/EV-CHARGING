@@ -103,8 +103,37 @@ exports.getItemInformation = async (req, res, next) => {
                 or tbl_item_unit.itm_unit_desc ILIKE '%${search}%')`
             }
 
+            // ดัก undefined ให้ Action
+            let act_val = action?.[0]?.value?.toString().toUpperCase() || "ALL";
+            let act_id = action?.[0]?.id || "";
+
+            // จัดการเงื่อนไขตามสิทธิ์การเข้าถึง
+            if (act_val !== "ALL") {
+                if (act_val === "GROUP") {
+
+                    // กรองตาม Order Type (ZOR1, ZOR2)
+                    script += ` AND (
+          NOT EXISTS (SELECT 1 FROM tbl_employee_order_type WHERE emp_code = '${act_id}' AND emp_otyp_flag = 1)
+          OR tbl_item.itm_order_type IN (
+            SELECT t2.ord_type_code 
+            FROM tbl_employee_order_type t1 
+            JOIN tbl_order_type t2 ON t1.ord_type_code = t2.ord_type_code 
+            WHERE t1.emp_code = '${act_id}' AND t1.emp_otyp_flag = 1
+          )
+        )`;
+
+                    // กรองตาม Sales Org (เช่น 1000, 1900)
+                    script += ` AND (
+          NOT EXISTS (SELECT 1 FROM tbl_employee_sales_org WHERE emp_code = '${act_id}' AND emp_sorg_flag = 1)
+          OR tbl_item.itm_sales_org IN (SELECT sales_org_code FROM tbl_employee_sales_org WHERE emp_code = '${act_id}' AND emp_sorg_flag = 1)
+        )`;
+                }
+            }
+
             script += ` order by tbl_item.ist_dt desc, tbl_item.itm_desc asc `
             script += ` offset (${page_index}*${page_limit}) limit ${page_limit};`
+
+            console.log(script);
 
             let tbl_temporary = await pgConn.get(dbPrefix + lic_code, script, config.connectionString());
             if (!tbl_temporary.code) {
