@@ -502,17 +502,18 @@ exports.getVehicleTypeInformation = async (req, res, next) => {
     }
 
     //เช็คเฉพาะส่วนที่สำคัญ
-    if (
-      veh_type_code == undefined ||
-      lic_code == undefined ||
-      action == undefined
-    ) {
+    //เช็คพารามิเตอร์ที่จำเป็น
+    let missing = [];
+    if (veh_type_code == undefined) missing.push('veh_type_code');
+    if (lic_code == undefined) missing.push('lic_code');
+    if (action == undefined) missing.push('action');
+
+    if (missing.length > 0) {
       let response = [
         {
           status: "error",
           invalid_code: "-1",
-          message:
-            "ไม่สามารถดึงข้อมูลได้, เนื่องจากข้อมูลพารามิเตอร์ไม่ถูกต้อง",
+          message: `ไม่สามารถดึงข้อมูลได้, เนื่องจากข้อมูลพารามิเตอร์ไม่ถูกต้อง (ขาด: ${missing.join(', ')})`,
           data: xresult,
           response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
         },
@@ -534,13 +535,17 @@ exports.getVehicleTypeInformation = async (req, res, next) => {
                     v.capacity_max,
                     v.capacity_min,
                     v.compartment_qty,
+                    v.veht_sales_org,
+                    v.veht_order_type,
+                    ot.ord_type_desc,
+                    ot.sales_order_type,
                     v.ist_dt, 
                     v.mdf_dt, 
                     v.rm_dt,
                     case when v.unloading_minute is null then 0 else v.unloading_minute end as unloading_minute,
                     case when v.loading_minute is null then 0 else v.loading_minute end as loading_minute
                 from tbl_vehicle_type v
-                
+                left join tbl_order_type ot on v.veht_order_type = ot.ord_type_code
                 where v.veh_type_flag = '1'`;
 
       if (veh_type_code.toString().toUpperCase() != "ALL") {
@@ -1041,29 +1046,31 @@ exports.addVehicleTypeInformation = async (req, res, next) => {
       compartment_item,
       unloading_minute,
       loading_minute,
+      veht_sales_org,
+      veht_order_type,
       action,
     } = req.body[0];
 
-    //เช็คเฉพาะส่วนที่สำคัญ
-    if (
-      !veh_type_desc ||
-      compartment_item == undefined ||
-      max_merg == undefined ||
-      capacity_total == undefined ||
-      capacity_max == undefined ||
-      capacity_min == undefined ||
-      compartment_qty == undefined ||
-      unloading_minute == undefined ||
-      loading_minute == undefined ||
-      !action ||
-      !lic_code
-    ) {
+    //เช็คพารามิเตอร์ที่จำเป็น
+    let missing = [];
+    if (!veh_type_desc) missing.push('veh_type_desc');
+    if (compartment_item == undefined) missing.push('compartment_item');
+    if (max_merg == undefined) missing.push('max_merg');
+    if (capacity_total == undefined) missing.push('capacity_total');
+    if (capacity_max == undefined) missing.push('capacity_max');
+    if (capacity_min == undefined) missing.push('capacity_min');
+    if (compartment_qty == undefined) missing.push('compartment_qty');
+    if (unloading_minute == undefined) missing.push('unloading_minute');
+    if (loading_minute == undefined) missing.push('loading_minute');
+    if (!action) missing.push('action');
+    if (!lic_code) missing.push('lic_code');
+
+    if (missing.length > 0) {
       let response = [
         {
           status: "error",
           invalid_code: "-1",
-          message:
-            "ไม่สามารถบันทึกข้อมูล, เนื่องจากข้อมูลพารามิเตอร์ไม่ถูกต้อง",
+          message: `ไม่สามารถบันทึกข้อมูล, เนื่องจากข้อมูลพารามิเตอร์ไม่ถูกต้อง (ขาด: ${missing.join(', ')})`,
           data: [],
           response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
         },
@@ -1107,6 +1114,8 @@ exports.addVehicleTypeInformation = async (req, res, next) => {
                     compartment_qty = ${compartment_qty},
                     unloading_minute = ${unloading_minute},
                     loading_minute = ${loading_minute},
+                    veht_sales_org = '${veht_sales_org}',
+                    veht_order_type = '${veht_order_type}',
                     mdf_dt = '${moment().format("YYYY-MM-DD HH:mm:ss")}' 
                     WHERE veh_type_code = '${veh_type_code}';`;
         let tbl_update = await pgConn.execute(
@@ -1125,8 +1134,8 @@ exports.addVehicleTypeInformation = async (req, res, next) => {
         veh_type_code = "veht-" + moment().format("x");
 
         let scriptInsert = `INSERT INTO tbl_vehicle_type 
-                    (veh_type_code, veh_type_desc, veh_qty, veh_unavailable, veh_type_flag, max_merg, capacity_total, capacity_max, capacity_min, compartment_qty, unloading_minute, loading_minute, ist_dt) VALUES 
-                    ('${veh_type_code}', '${veh_type_desc}', ${vehQty}, ${vehUnavailable}, '${vehTypeFlag}', ${maxMerge}, ${capacity_total}, ${capacity_max}, ${capacity_min}, ${compartment_qty}, ${unloading_minute}, ${loading_minute}, '${moment().format("YYYY-MM-DD HH:mm:ss")}');`;
+                    (veh_type_code, veh_type_desc, veh_qty, veh_unavailable, veh_type_flag, max_merg, capacity_total, capacity_max, capacity_min, compartment_qty, unloading_minute, loading_minute, ist_dt, veht_sales_org, veht_order_type) VALUES 
+                    ('${veh_type_code}', '${veh_type_desc}', ${vehQty}, ${vehUnavailable}, '${vehTypeFlag}', ${maxMerge}, ${capacity_total}, ${capacity_max}, ${capacity_min}, ${compartment_qty}, ${unloading_minute}, ${loading_minute}, '${moment().format("YYYY-MM-DD HH:mm:ss")}', '${veht_sales_org}', '${veht_order_type}');`;
         let tbl_insert = await pgConn.execute(
           dbPrefix + lic_code,
           scriptInsert,
@@ -1651,30 +1660,32 @@ exports.setVehicleTypeInformation = async (req, res, next) => {
       unloading_minute,
       loading_minute,
       compartment_item,
+      veht_sales_org,
+      veht_order_type,
       action,
     } = req.body[0];
 
-    //เช็คเฉพาะส่วนที่สำคัญ
-    if (
-      !veh_type_code ||
-      !veh_type_desc ||
-      max_merg == undefined ||
-      capacity_total == undefined ||
-      capacity_max == undefined ||
-      capacity_min == undefined ||
-      compartment_qty == undefined ||
-      unloading_minute == undefined ||
-      loading_minute == undefined ||
-      compartment_item == undefined ||
-      !action ||
-      !lic_code
-    ) {
+    //เช็คพารามิเตอร์ที่จำเป็น
+    let missing = [];
+    if (!veh_type_code) missing.push('veh_type_code');
+    if (!veh_type_desc) missing.push('veh_type_desc');
+    if (max_merg == undefined) missing.push('max_merg');
+    if (capacity_total == undefined) missing.push('capacity_total');
+    if (capacity_max == undefined) missing.push('capacity_max');
+    if (capacity_min == undefined) missing.push('capacity_min');
+    if (compartment_qty == undefined) missing.push('compartment_qty');
+    if (unloading_minute == undefined) missing.push('unloading_minute');
+    if (loading_minute == undefined) missing.push('loading_minute');
+    if (compartment_item == undefined) missing.push('compartment_item');
+    if (!action) missing.push('action');
+    if (!lic_code) missing.push('lic_code');
+
+    if (missing.length > 0) {
       let response = [
         {
           status: "error",
           invalid_code: "-1",
-          message:
-            "ไม่สามารถบันทึกข้อมูล, เนื่องจากข้อมูลพารามิเตอร์ไม่ถูกต้อง",
+          message: `ไม่สามารถบันทึกข้อมูล, เนื่องจากข้อมูลพารามิเตอร์ไม่ถูกต้อง (ขาด: ${missing.join(', ')})`,
           data: [],
           response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
         },
@@ -1704,6 +1715,8 @@ exports.setVehicleTypeInformation = async (req, res, next) => {
                 compartment_qty = ${compartment_qty == undefined ? 0 : compartment_qty},
                 unloading_minute = ${unloading_minute == undefined ? 0 : unloading_minute},
                 loading_minute = ${loading_minute == undefined ? 0 : loading_minute},
+                veht_sales_org = '${veht_sales_org}',
+                veht_order_type = '${veht_order_type}',
                 mdf_dt = '${moment().format("YYYY-MM-DD HH:mm:ss")}' 
                 WHERE veh_type_code = '${veh_type_code}';`;
 
