@@ -4093,14 +4093,17 @@ exports.setOrderInformation = async (req, res, next) => {
                     description = $1, 
                     deli_date_req = $2, 
                     deli_time_req = $3,
-                    mdf_dt = $4
-                WHERE id = $5`;
+                    mdf_dt = $4,
+                    created_by_tms = $5,
+                    auto_order = '0'
+                WHERE id = $6`;
 
       let params = [
         description,
         deli_date_req,
         deli_time_req,
         moment().format("YYYY-MM-DD HH:mm:ss"),
+        action[0].id,
         order_no,
       ];
       let tbl_temporary_add_order = await pgConn.getWithParams(
@@ -4586,13 +4589,15 @@ exports.editOrderItem = async (req, res, next) => {
                 UPDATE tbl_order 
                 SET description = $1, 
                     auto_order = $2,
-                    mdf_dt = $3
-                WHERE id = $4
+                    mdf_dt = $4,
+                    created_by_tms = $5
+                WHERE id = $6
             `;
       let paramsOrder = [
         description || "",
         0,
         moment().format("YYYY-MM-DD HH:mm:ss"),
+        action[0].id,
         order_no
       ];
       await pgConn.execute2params(
