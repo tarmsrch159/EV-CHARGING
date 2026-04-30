@@ -863,7 +863,7 @@ exports.getOrderReportInformation = async (req, res, next) => {
       auto_order.toString().toUpperCase() !== "ALL" &&
       auto_order.toString().toUpperCase() !== ""
     ) {
-      conditions.push(`tbl_order.auto_order = '${auto_order}'`);
+      conditions.push(`tbl_order.auto_order = '0'`);
     }
     if (
       order_status.toString().toUpperCase() !== "ALL" &&
