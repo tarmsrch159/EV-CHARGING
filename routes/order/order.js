@@ -905,28 +905,11 @@ exports.getOrderReportInformation = async (req, res, next) => {
     }
 
     if (emp_role_code !== "" && emp_role_code.toString().toUpperCase() !== "ALL") {
-      conditions.push(`(
-        EXISTS (
-          SELECT 1 FROM (
-              SELECT ptrl_code, emp_role_code 
-              FROM tbl_employee 
-              WHERE emp_flag = '1' AND ptrl_code IS NOT NULL AND ptrl_code != ''
-              UNION ALL
-              SELECT p.ptrl_code, e.emp_role_code 
-              FROM tbl_employee e
-              INNER JOIN tbl_employee_petrol_group epg ON e.emp_code = epg.emp_code AND epg.emp_pgrp_flag = 1
-              INNER JOIN tbl_petrol p ON epg.ptrl_group_code = p.ptrl_group_code
-              WHERE e.emp_flag = '1'
-          ) emp_check 
-          WHERE emp_check.ptrl_code = tbl_petrol.ptrl_code 
-            AND emp_check.emp_role_code = '${emp_role_code}'
-        )
-        OR EXISTS (
-          SELECT 1 FROM tbl_employee e2 
-          WHERE e2.emp_code = tbl_order.created_by_tms 
-            AND e2.emp_role_code = '${emp_role_code}' 
-            AND e2.emp_flag = '1'
-        )
+      conditions.push(`EXISTS (
+        SELECT 1 FROM tbl_employee e2 
+        WHERE e2.emp_code = tbl_order.created_by_tms 
+          AND e2.emp_role_code = '${emp_role_code}' 
+          AND e2.emp_flag = '1'
       )`);
     }
 
@@ -1111,9 +1094,7 @@ exports.getOrderReportInformation = async (req, res, next) => {
     let top_orderer = "-";
     let topOrdererScript = `
             SELECT 
-                COALESCE(empc_tms.emp_name, tbl_employee.emp_name, '-') as emp_name,
-                COALESCE(empr_tms.emp_role_desc, empr_st.emp_role_desc) as emp_role_desc, 
-                MAX(tbl_order.ist_dt) as latest_order
+                COALESCE(empr_tms.emp_role_desc, empr_st.emp_role_desc) as emp_role_desc
             FROM tbl_order 
             LEFT JOIN tbl_employee empc_tms ON tbl_order.created_by_tms = empc_tms.emp_code
             LEFT JOIN tbl_employee_role empr_tms ON empc_tms.emp_role_code = empr_tms.emp_role_code
@@ -1137,11 +1118,9 @@ exports.getOrderReportInformation = async (req, res, next) => {
             LEFT JOIN tbl_employee_role empr_st ON tbl_employee.emp_role_code = empr_st.emp_role_code
             LEFT JOIN tbl_order_item ON tbl_order.id = tbl_order_item.order_no
             ${whereClause}
-            GROUP BY 1, 2
-            ORDER BY latest_order DESC 
+            ORDER BY tbl_order.ist_dt DESC 
             LIMIT 1;
         `;
-
 
     let tbl_top_orderer = await pgConn.get(
       dbPrefix + lic_code,
@@ -1153,7 +1132,7 @@ exports.getOrderReportInformation = async (req, res, next) => {
       tbl_top_orderer.data &&
       tbl_top_orderer.data.length > 0
     ) {
-      top_orderer = tbl_top_orderer.data[0].emp_name || tbl_top_orderer.data[0].emp_role_desc || "-";
+      top_orderer = tbl_top_orderer.data[0].emp_role_desc || "-";
     }
 
     // =========================================================
