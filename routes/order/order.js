@@ -797,7 +797,7 @@ exports.getOrderReportInformation = async (req, res, next) => {
     page_index = page_index === undefined ? 1 : page_index;
     page_limit = page_limit === undefined ? 10 : page_limit;
     auto_order =
-      auto_order === undefined || auto_order === "" ? "0" : auto_order;
+      auto_order === undefined || auto_order === "" ? "0" : "0";
     status_deli = status_deli === undefined ? "ALL" : status_deli;
     order_status = order_status === undefined ? "ALL" : order_status;
     ptrl_group_code = ptrl_group_code === undefined ? "ALL" : ptrl_group_code;
