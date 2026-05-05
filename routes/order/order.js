@@ -987,6 +987,7 @@ exports.getOrderReportInformation = async (req, res, next) => {
             ) tbl_employee ON tbl_petrol.ptrl_code = tbl_employee.ptrl_code
             LEFT JOIN tbl_employee_role ON tbl_employee.emp_role_code = tbl_employee_role.emp_role_code
             LEFT JOIN tbl_order_item ON tbl_order.id = tbl_order_item.order_no
+            LEFT JOIN tbl_order_type ON tbl_order.order_type = tbl_order_type.ord_type_code
             ${whereClause} AND tbl_order.auto_order = '0';
         `;
     let tbl_count_manual = await pgConn.get(
@@ -1028,6 +1029,7 @@ exports.getOrderReportInformation = async (req, res, next) => {
             ) tbl_employee ON tbl_petrol.ptrl_code = tbl_employee.ptrl_code
             LEFT JOIN tbl_employee_role empr_st ON tbl_employee.emp_role_code = empr_st.emp_role_code
             LEFT JOIN tbl_order_item ON tbl_order.id = tbl_order_item.order_no
+            LEFT JOIN tbl_order_type ON tbl_order.order_type = tbl_order_type.ord_type_code
             ${whereClause} 
             AND item.rm_dt IS NULL 
             AND item.remark IS NOT NULL 
@@ -1074,6 +1076,7 @@ exports.getOrderReportInformation = async (req, res, next) => {
             ) tbl_employee ON tbl_petrol.ptrl_code = tbl_employee.ptrl_code
             LEFT JOIN tbl_employee_role empr_st ON tbl_employee.emp_role_code = empr_st.emp_role_code
             LEFT JOIN tbl_order_item ON tbl_order.id = tbl_order_item.order_no
+            LEFT JOIN tbl_order_type ON tbl_order.order_type = tbl_order_type.ord_type_code
             ${whereClause} 
             AND item.rm_dt IS NULL;
         `;
@@ -1117,6 +1120,7 @@ exports.getOrderReportInformation = async (req, res, next) => {
             ) tbl_employee ON tbl_petrol.ptrl_code = tbl_employee.ptrl_code
             LEFT JOIN tbl_employee_role empr_st ON tbl_employee.emp_role_code = empr_st.emp_role_code
             LEFT JOIN tbl_order_item ON tbl_order.id = tbl_order_item.order_no
+            LEFT JOIN tbl_order_type ON tbl_order.order_type = tbl_order_type.ord_type_code
             ${whereClause}
             ORDER BY tbl_order.ist_dt DESC 
             LIMIT 1;
