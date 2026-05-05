@@ -71,9 +71,9 @@ exports.getDepotInformation = async (req, res, next) => {
                 script += ` and tbl_depot.dpo_group_code = '${dpo_group_code}'`
             }
 
-            if (off_code.toString().toUpperCase() != 'ALL' && off_code.toString().toUpperCase() != '') {
-                script += ` and tbl_depot.off_code = '${off_code}'`
-            }
+            // if (off_code.toString().toUpperCase() != 'ALL' && off_code.toString().toUpperCase() != '') {
+            //     script += ` and tbl_depot.off_code = '${off_code}'`
+            // }
 
             if (search != '') {
                 script += ` and (dpo_number like '%${search}%' 
@@ -82,9 +82,35 @@ exports.getDepotInformation = async (req, res, next) => {
                 or dpo_address like '%${search}%')`
             }
 
+            // =========================================================================
+            // กรองข้อมูลตามสิทธิ์การเข้าถึง (Role Authorization)
+            // =========================================================================
+            let act_val = action[0]?.value?.toString().toUpperCase() || "ALL";
+            let act_id = action[0]?.id || "";
+
+            if (act_val === "GROUP") {
+
+
+                // กรองตาม Order Type (ZOR1, ZOR2)
+                script += ` and (
+                NOT EXISTS (SELECT 1 FROM tbl_employee_order_type WHERE emp_code = '${act_id}' AND emp_otyp_flag = 1)
+                OR tbl_depot.dpo_order_type IN (
+                    SELECT t2.sales_order_type 
+                    FROM tbl_employee_order_type t1 
+                    JOIN tbl_order_type t2 ON t1.ord_type_code = t2.ord_type_code 
+                    WHERE t1.emp_code = '${act_id}' AND t1.emp_otyp_flag = 1
+                )
+            )`;
+
+                // กรองตาม Sales Org (1000, 1900)
+                script += ` and (NOT EXISTS (SELECT 1 FROM tbl_employee_sales_org WHERE emp_code = '${act_id}' AND emp_sorg_flag = 1)
+                OR tbl_depot.dpo_sales_org IN (SELECT sales_org_code FROM tbl_employee_sales_org WHERE emp_code = '${act_id}' AND emp_sorg_flag = 1)
+            )`;
+            }
+
+
             script += ` order by ist_dt desc `
             script += ` offset (${page_index}*${page_limit}) limit ${page_limit};`
-            console.log(script)
             let tbl_temporary = await pgConn.get(dbPrefix + lic_code, script, config.connectionString());
             if (!tbl_temporary.code) {
                 //debugger
