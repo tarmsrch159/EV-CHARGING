@@ -978,8 +978,8 @@ exports.getOrderReportInformation = async (req, res, next) => {
                     UNION ALL
                     SELECT p.ptrl_code, e.emp_name, e.emp_surname, e.emp_role_code 
                     FROM tbl_employee e
-                    INNER JOIN tbl_employee_petrol_group epg ON e.emp_code = epg.emp_code AND epg.emp_pgrp_flag = 1
-                    INNER JOIN tbl_petrol p ON epg.ptrl_group_code = p.ptrl_group_code
+                    LEFT JOIN tbl_employee_petrol_group epg ON e.emp_code = epg.emp_code AND epg.emp_pgrp_flag = 1
+                    LEFT JOIN tbl_petrol p ON epg.ptrl_group_code = p.ptrl_group_code
                     WHERE e.emp_flag = '1'
                 ) combined_emp
                 ${empRoleFilterSQL}
@@ -1245,7 +1245,7 @@ exports.getOrderReportInformation = async (req, res, next) => {
             ORDER BY tbl_order.ist_dt DESC 
             OFFSET (${page_index} * ${page_limit}) LIMIT ${page_limit};
         `;
-    console.log(script)
+
     let tbl_temporary = await pgConn.get(
       dbPrefix + lic_code,
       script,
@@ -6262,6 +6262,9 @@ exports.getChildOrderInformation = async (req, res, next) => {
       conditions.push(
         `tbl_petrol.ptrl_group_code IN (SELECT ptrl_group_code FROM tbl_employee_petrol_group WHERE emp_code = '${act_id}' AND emp_pgrp_flag = 1)`,
       );
+
+
+
       conditions.push(`tbl_petrol.ptrl_flag = '1'`);
     } else if (act_val !== "ALL") {
       // สิทธิ์พนักงานทั่วไป: มองเห็นเฉพาะ Order ที่ตัวเองเป็นคนสร้าง
