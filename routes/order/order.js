@@ -171,8 +171,8 @@ exports.getOrderInformation = async (req, res, next) => {
     // *มีการ Sub-query tbl_sum_item เพื่อหาผลรวมจำนวนสินค้า (total_qty) ของแต่ละ order_no
     let baseSelectQuery = `
             SELECT 
-                tbl_order.id, tbl_order.order_no, tbl_order.sh_cus_ref as aos_order_no, tbl_order.order_type, tbl_order.order_group, 
-                tbl_order_type.sales_order_type, tbl_petrol_group.ptrl_group_desc, tbl_order.order_status,
+                tbl_order.id, tbl_order.order_no, tbl_order.sh_cus_ref as aos_order_no, tbl_order.order_group, 
+                tbl_order_type.sales_order_type as order_type, tbl_petrol_group.ptrl_group_desc, tbl_order.order_status,
                 tbl_order.chanel, tbl_order.division, tbl_order.sold_to, tbl_order.ship_to, tbl_petrol.ptrl_code,
                 tbl_petrol.ptrl_desc, tbl_order.cus_ref, tbl_order.cus_date_ref, tbl_order.po_name, tbl_order.order_by, 
                 tbl_order.ship_cond, tbl_order.pay_term, tbl_order.deli_date_req as request_date, tbl_master_time.time_value as RequestTime, 
