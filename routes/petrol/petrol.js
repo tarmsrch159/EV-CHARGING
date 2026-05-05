@@ -144,7 +144,8 @@ exports.getPetrolInformation = async (req, res, next) => {
             tbl_petrol.off_code, off_desc, tbl_petrol.ptrl_group_code, ptrl_group_desc,
             ptrl_flag, ptrl_remark, ptrl_sales_group, tbl_order_type.sales_order_type as ptrl_sales_type, auto_order, 
             tbl_petrol.prov_code, tbl_petrol.amph_code, tbl_petrol.tamb_code, 
-            tbl_province.prov_desc, tbl_amphure.amph_desc, tbl_tambon.tamb_desc, tbl_petrol.coverage_days, tbl_petrol.waiting_days, tbl_petrol.stock_provious_days
+            tbl_province.prov_desc, tbl_amphure.amph_desc, tbl_tambon.tamb_desc, tbl_petrol.coverage_days, tbl_petrol.waiting_days, tbl_petrol.stock_provious_days,
+            tbl_petrol.ptrl_sales_type as ptrl_sales_type_code
             FROM tbl_petrol 
             LEFT JOIN tbl_order_type ON tbl_petrol.ptrl_sales_type = tbl_order_type.ord_type_code
             LEFT JOIN tbl_office ON tbl_petrol.off_code = tbl_office.off_code 
