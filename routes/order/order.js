@@ -934,7 +934,7 @@ exports.getOrderReportInformation = async (req, res, next) => {
       conditions.push(`(
         NOT EXISTS (SELECT 1 FROM tbl_employee_order_type WHERE emp_code = '${act_id}' AND emp_otyp_flag = 1)
         OR tbl_order.order_type IN (
-          SELECT tbl_order_type.sales_order_type 
+          SELECT tbl_order_type.ord_type_code 
           FROM tbl_employee_order_type 
           JOIN tbl_order_type  ON tbl_employee_order_type.ord_type_code = tbl_order_type.ord_type_code 
           WHERE tbl_employee_order_type.emp_code = '${act_id}' AND tbl_employee_order_type.emp_otyp_flag = 1

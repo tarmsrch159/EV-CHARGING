@@ -89,9 +89,11 @@ exports.getPetrolInformation = async (req, res, next) => {
     // จัดการเงื่อนไขตามสิทธิ์การเข้าถึง
     if (act_val !== "ALL") {
       if (act_val === "GROUP") {
-        conditions.push(
-          `tbl_petrol.ptrl_group_code IN (SELECT ptrl_group_code FROM tbl_employee_petrol_group WHERE emp_code = '${act_id}' AND emp_pgrp_flag = 1)`,
-        );
+        // กรองตาม Petrol Group (ถ้าไม่ได้ระบุกลุ่มไว้ ให้เห็นตามสิทธิ์พื้นที่)
+        conditions.push(`(
+          NOT EXISTS (SELECT 1 FROM tbl_employee_petrol_group WHERE emp_code = '${act_id}' AND emp_pgrp_flag = 1)
+          OR tbl_petrol.ptrl_group_code IN (SELECT ptrl_group_code FROM tbl_employee_petrol_group WHERE emp_code = '${act_id}' AND emp_pgrp_flag = 1)
+        )`);
 
         // กรองตาม Order Type (ZOR1, ZOR2)
         conditions.push(`(
@@ -372,15 +374,17 @@ exports.getPetrolInformationFilter = async (req, res, next) => {
     // จัดการเงื่อนไขตามสิทธิ์การเข้าถึง
     if (act_val !== "ALL") {
       if (act_val === "GROUP") {
-        conditions.push(
-          `tbl_petrol.ptrl_group_code IN (SELECT ptrl_group_code FROM tbl_employee_petrol_group WHERE emp_code = '${act_id}' AND emp_pgrp_flag = 1)`,
-        );
+        // กรองตาม Petrol Group (ถ้าไม่ได้ระบุกลุ่มไว้ ให้เห็นตามสิทธิ์พื้นที่)
+        conditions.push(`(
+          NOT EXISTS (SELECT 1 FROM tbl_employee_petrol_group WHERE emp_code = '${act_id}' AND emp_pgrp_flag = 1)
+          OR tbl_petrol.ptrl_group_code IN (SELECT ptrl_group_code FROM tbl_employee_petrol_group WHERE emp_code = '${act_id}' AND emp_pgrp_flag = 1)
+        )`);
 
         // กรองตาม Order Type (ZOR1, ZOR2)
         conditions.push(`(
           NOT EXISTS (SELECT 1 FROM tbl_employee_order_type WHERE emp_code = '${act_id}' AND emp_otyp_flag = 1)
           OR tbl_petrol.ptrl_sales_type IN (
-            SELECT t2.sales_order_type 
+            SELECT t2.ord_type_code 
             FROM tbl_employee_order_type t1 
             JOIN tbl_order_type t2 ON t1.ord_type_code = t2.ord_type_code 
             WHERE t1.emp_code = '${act_id}' AND t1.emp_otyp_flag = 1
