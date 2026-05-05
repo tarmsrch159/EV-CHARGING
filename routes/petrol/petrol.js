@@ -364,7 +364,6 @@ exports.getPetrolInformationFilter = async (req, res, next) => {
     ) {
       conditions.push(`tbl_petrol.ptrl_group_code = '${ptrl_group_code}'`);
     }
-
     // ดัก undefined ให้ Action
     let act_val = action?.[0]?.value?.toString().toUpperCase() || "ALL";
     let act_id = action?.[0]?.id || "";
@@ -375,6 +374,23 @@ exports.getPetrolInformationFilter = async (req, res, next) => {
         conditions.push(
           `tbl_petrol.ptrl_group_code IN (SELECT ptrl_group_code FROM tbl_employee_petrol_group WHERE emp_code = '${act_id}' AND emp_pgrp_flag = 1)`,
         );
+
+        // กรองตาม Order Type (ZOR1, ZOR2)
+        conditions.push(`(
+          NOT EXISTS (SELECT 1 FROM tbl_employee_order_type WHERE emp_code = '${act_id}' AND emp_otyp_flag = 1)
+          OR tbl_petrol.ptrl_sales_type IN (
+            SELECT t2.sales_order_type 
+            FROM tbl_employee_order_type t1 
+            JOIN tbl_order_type t2 ON t1.ord_type_code = t2.ord_type_code 
+            WHERE t1.emp_code = '${act_id}' AND t1.emp_otyp_flag = 1
+          )
+        )`);
+
+        // กรองตาม Sales Org (1000, 1900)
+        conditions.push(`(
+          NOT EXISTS (SELECT 1 FROM tbl_employee_sales_org WHERE emp_code = '${act_id}' AND emp_sorg_flag = 1)
+          OR tbl_petrol.ptrl_sales_group IN (SELECT sales_org_code FROM tbl_employee_sales_org WHERE emp_code = '${act_id}' AND emp_sorg_flag = 1)
+        )`);
       } else {
         conditions.push(
           `tbl_petrol.ptrl_code IN (SELECT ptrl_code FROM tbl_employee WHERE emp_code = '${act_id}' AND emp_flag = '1')`,
