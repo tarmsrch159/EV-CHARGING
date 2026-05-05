@@ -140,10 +140,11 @@ exports.getPetrolInformation = async (req, res, next) => {
             SELECT ptrl_code, ptrl_number, ptrl_sitecode, ptrl_desc, ptrl_short_desc, ptrl_address, ptrl_zip_code, ptrl_country_code,
             ptrl_unloading_minute, ptrl_expenses_per_km, ptrl_area, ptrl_option_pump, ptrl_option_mrge_orders, ptrl_lat, ptrl_lon,
             tbl_petrol.off_code, off_desc, tbl_petrol.ptrl_group_code, ptrl_group_desc,
-            ptrl_flag, ptrl_remark, ptrl_sales_group, ptrl_sales_type, auto_order, 
+            ptrl_flag, ptrl_remark, ptrl_sales_group, tbl_order_type.sales_order_type as ptrl_sales_type, auto_order, 
             tbl_petrol.prov_code, tbl_petrol.amph_code, tbl_petrol.tamb_code, 
             tbl_province.prov_desc, tbl_amphure.amph_desc, tbl_tambon.tamb_desc, tbl_petrol.coverage_days, tbl_petrol.waiting_days, tbl_petrol.stock_provious_days
             FROM tbl_petrol 
+            LEFT JOIN tbl_order_type ON tbl_petrol.ptrl_sales_type = tbl_order_type.ord_type_code
             LEFT JOIN tbl_office ON tbl_petrol.off_code = tbl_office.off_code 
             LEFT JOIN tbl_petrol_group ON tbl_petrol.ptrl_group_code = tbl_petrol_group.ptrl_group_code 
             LEFT JOIN tbl_province ON tbl_petrol.prov_code = tbl_province.prov_code 
