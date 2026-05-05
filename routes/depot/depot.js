@@ -95,7 +95,7 @@ exports.getDepotInformation = async (req, res, next) => {
                 script += ` and (
                 NOT EXISTS (SELECT 1 FROM tbl_employee_order_type WHERE emp_code = '${act_id}' AND emp_otyp_flag = 1)
                 OR tbl_depot.dpo_order_type IN (
-                    SELECT t2.sales_order_type 
+                    SELECT t2.ord_type_code 
                     FROM tbl_employee_order_type t1 
                     JOIN tbl_order_type t2 ON t1.ord_type_code = t2.ord_type_code 
                     WHERE t1.emp_code = '${act_id}' AND t1.emp_otyp_flag = 1
