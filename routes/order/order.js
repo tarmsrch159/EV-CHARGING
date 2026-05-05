@@ -127,12 +127,12 @@ exports.getOrderInformation = async (req, res, next) => {
     let act_id = action[0].id;
 
     if (act_val === "GROUP") {
-      // สิทธิ์ GROUP (เช่น Planner/CS): มองเห็นเฉพาะ Order ของปั๊มที่อยู่ในความดูแลของตัวเอง
+      // ======================= สิทธิ์ GROUP (เช่น Planner/CS): มองเห็นเฉพาะ Order ของปั๊มที่อยู่ในความดูแลของตัวเอง =======================
       conditions.push(
         `tbl_petrol.ptrl_group_code IN (SELECT ptrl_group_code FROM tbl_employee_petrol_group WHERE emp_code = '${act_id}' AND emp_pgrp_flag = 1)`,
       );
       conditions.push(`tbl_petrol.ptrl_flag = '1'`);
-      // กรองตาม Order Type (ZOR1, ZOR2)
+      // ======================= กรองตาม Order Type (ZOR1, ZOR2) =======================
       conditions.push(`(
           NOT EXISTS (SELECT 1 FROM tbl_employee_order_type WHERE emp_code = '${act_id}' AND emp_otyp_flag = 1)
           OR tbl_order.order_type IN (
@@ -143,13 +143,13 @@ exports.getOrderInformation = async (req, res, next) => {
           )
         )`);
 
-      // กรองตาม Sales Org (1000, 1900)
+      // ======================= กรองตาม Sales Org (1000, 1900) =======================
       conditions.push(`(
           NOT EXISTS (SELECT 1 FROM tbl_employee_sales_org WHERE emp_code = '${act_id}' AND emp_sorg_flag = 1)
           OR tbl_order.order_group IN (SELECT sales_org_code FROM tbl_employee_sales_org WHERE emp_code = '${act_id}' AND emp_sorg_flag = 1)
         )`);
     } else if (act_val !== "ALL") {
-      // สิทธิ์พนักงานทั่วไป: มองเห็นเฉพาะ Order ที่ตัวเองเป็นคนสร้าง
+      // ======================= สิทธิ์พนักงานทั่วไป: มองเห็นเฉพาะ Order ที่ตัวเองเป็นคนสร้าง =======================
       conditions.push(`tbl_order.ship_to IN (SELECT ptrl_number FROM tbl_petrol WHERE ptrl_code IN (SELECT ptrl_code FROM tbl_employee WHERE emp_code = '${act_id}' AND emp_flag = '1'))`);
     }
 
@@ -2021,8 +2021,14 @@ const getConfirmOrder = async (lic_code, order_id, action) => {
   }
 
   return (async () => {
-    // ================ ดึงข้อมูล tbl_order ==================
-    let orderScript = `SELECT * FROM tbl_order WHERE id = '${order_id}' AND order_flag = '1' LIMIT 1`;
+    // ================ ดึงข้อมูล tbl_order และ JOIN tbl_order_type เพื่อเอารหัส SAP ==================
+    let orderScript = `
+        SELECT tbl_order.*, tbl_order_type.sales_order_type 
+        FROM tbl_order 
+        LEFT JOIN tbl_order_type ON tbl_order.order_type = tbl_order_type.ord_type_code 
+        WHERE tbl_order.id = '${order_id}' AND tbl_order.order_flag = '1' 
+        LIMIT 1
+    `;
     let orderResult = await pgConn.get(
       dbPrefix + lic_code,
       orderScript,
@@ -2109,7 +2115,7 @@ const getConfirmOrder = async (lic_code, order_id, action) => {
     let payloadData = JSON.stringify({
       SalesDocuments: [
         {
-          SalesOrderType: orderData.order_type,
+          SalesOrderType: orderData.sales_order_type || orderData.order_type,
           SalesOrganization: orderData.order_group,
           DistributionChannel: orderData.chanel || "01",
           OrganizationDivision: orderData.division || "04",
@@ -2185,7 +2191,7 @@ const getConfirmOrder = async (lic_code, order_id, action) => {
           "success",
           action[0].value,
         );
-
+        // =============== ถ้าส่งเข้า SAP สำเร็จ (statusRes !== "E") ให้เปลี่ยนสถานะ order ในฐานข้อมูลเป็น "1" (ส่งเข้า SAP แล้ว) ===============
         let update_order_status_script = `update tbl_order set order_status = '1', mdf_dt = '${moment().format("YYYY-MM-DD HH:mm:ss")}' `;
         update_order_status_script += ` where id = '${order_id}'`;
         await pgConn.execute(
@@ -3264,7 +3270,7 @@ exports.getOrderInformationHanaBackUp = async (req, res, next) => {
   });
 };
 
-// =========== ส่งคำขอยกเลิกคำสั่งซื้อ ไปที่ HANA
+// =========== ส่งคำขอยกเลิกคำสั่งซื้อ ไปที่ HANA =============
 exports.cancelOrderInformationHana = async (req, res, next) => {
   return (async () => {
     let lic_code = req.header("lic_code");
@@ -3286,11 +3292,11 @@ exports.cancelOrderInformationHana = async (req, res, next) => {
       return;
     }
 
-    // ========== เช็ีคก่อนว่ามี order มั้ย ================
+    // ========== เช็ีคก่อนว่ามี order มั้ย และสถานะต้องเป็น 1 ถึงจะยกเลิกได้ ================
     let payloadData = [];
     for (let id of order_id) {
       var script_check_sales_order = `
-                SELECT ti.sales_order_item, tod.order_no
+                SELECT ti.sales_order_item, tod.order_no, tod.order_status
                 FROM tbl_order_item ti
                 INNER JOIN tbl_order tod ON ti.order_no = tod.id
                 WHERE tod.id = ${id} AND tod.order_no IS NOT NULL
@@ -3307,6 +3313,23 @@ exports.cancelOrderInformationHana = async (req, res, next) => {
             status: "error",
             invalid_code: "-2",
             message: "ไม่พบข้อมูลคำสั่งซื้อ",
+            data: [],
+            response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+          },
+        ];
+        res.status(200).send(response);
+        return;
+      }
+
+      // ตรวจสอบสถานะ Order (ต้องเป็น 1 เท่านั้นถึงจะส่งยกเลิกไป SAP ได้)
+      let currentStatus = check_sales_order.data[0].order_status;
+      if (currentStatus !== '1') {
+        let statusMsg = currentStatus === '2' ? "ออเดอร์นี้ถูกยกเลิกไปแล้ว" : "สถานะออเดอร์ไม่ถูกต้อง ไม่สามารถส่งคำขอยกเลิกไปที่ SAP ได้";
+        let response = [
+          {
+            status: "error",
+            invalid_code: "-3",
+            message: statusMsg,
             data: [],
             response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
           },
