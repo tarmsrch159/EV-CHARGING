@@ -1097,7 +1097,8 @@ exports.getOrderReportInformation = async (req, res, next) => {
     let top_orderer = "-";
     let topOrdererScript = `
             SELECT 
-                COALESCE(empr_tms.emp_role_desc, empr_st.emp_role_desc) as emp_role_desc
+                COALESCE(empr_tms.emp_role_desc, empr_st.emp_role_desc) as emp_role_desc,
+                COUNT(DISTINCT tbl_order.id) as order_count
             FROM tbl_order 
             LEFT JOIN tbl_employee empc_tms ON tbl_order.created_by_tms = empc_tms.emp_code
             LEFT JOIN tbl_employee_role empr_tms ON empc_tms.emp_role_code = empr_tms.emp_role_code
@@ -1121,8 +1122,11 @@ exports.getOrderReportInformation = async (req, res, next) => {
             LEFT JOIN tbl_employee_role empr_st ON tbl_employee.emp_role_code = empr_st.emp_role_code
             LEFT JOIN tbl_order_item ON tbl_order.id = tbl_order_item.order_no
             LEFT JOIN tbl_order_type ON tbl_order.order_type = tbl_order_type.ord_type_code
-            ${whereClause}
-            ORDER BY tbl_order.ist_dt DESC 
+            ${whereClause} 
+            AND COALESCE(empr_tms.emp_role_desc, empr_st.emp_role_desc) IS NOT NULL 
+            AND TRIM(COALESCE(empr_tms.emp_role_desc, empr_st.emp_role_desc)) <> ''
+            GROUP BY COALESCE(empr_tms.emp_role_desc, empr_st.emp_role_desc)
+            ORDER BY order_count DESC 
             LIMIT 1;
         `;
 
