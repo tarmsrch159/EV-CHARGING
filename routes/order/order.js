@@ -345,8 +345,7 @@ exports.getOrderInformationByID = async (req, res, next) => {
 
     // ======== คำสั่ง SQL สำหรับดึงข้อมูลของออเดอร์ และ Join ข้อมูลพื้นฐานที่เกี่ยวข้อง ========
     let orderScript = `SELECT 
-                tbl_order.id, tbl_order.order_no, tbl_order.sh_cus_ref as aos_order_no, tbl_order.order_type, tbl_order.order_group, 
-                tbl_order_type.ord_type_desc,
+                tbl_order.id, tbl_order.order_no, tbl_order.sh_cus_ref as aos_order_no, tbl_order_type.sales_order_type as order_type, tbl_order.order_group, 
                 tbl_petrol_group.ptrl_group_desc,
                 tbl_order.order_status,
                 tbl_order.chanel, tbl_order.division, tbl_order.sold_to, tbl_order.ship_to, 
