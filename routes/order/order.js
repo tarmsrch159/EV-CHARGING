@@ -856,7 +856,8 @@ exports.getOrderReportInformation = async (req, res, next) => {
       order_type.toString().toUpperCase() !== "ALL" &&
       order_type.toString().toUpperCase() !== ""
     ) {
-      conditions.push(`tbl_order.order_type = '${order_type}'`);
+      // ปรับให้รองรับทั้งการส่งรหัส SAP (ZOR1) และรหัสภายใน (otyp-xxx)
+      conditions.push(`tbl_order.order_type IN (SELECT ord_type_code FROM tbl_order_type WHERE sales_order_type = '${order_type}' OR ord_type_code = '${order_type}')`);
     }
     if (
       auto_order.toString().toUpperCase() !== "ALL" &&
@@ -2530,10 +2531,18 @@ exports.getOrderInformationHana = async (req, res, next) => {
             if (rejection === "C") current_order_status = 2;
 
             // ================ อัพเดต tbl_order ==================
+            // Lookup internal code for order_type (SAP code -> Internal code)
+            let current_sap_order_type_upd = salesOrder.SalesOrderType || "";
+            let checkOrderType_sap_upd = await pgConn.get(dbPrefix + lic_code, `SELECT ord_type_code FROM tbl_order_type WHERE sales_order_type = '${current_sap_order_type_upd}' OR ord_type_code = '${current_sap_order_type_upd}' LIMIT 1`, config.connectionString());
+            let final_order_type_upd = current_sap_order_type_upd;
+            if (!checkOrderType_sap_upd.code && checkOrderType_sap_upd.data.length > 0) {
+              final_order_type_upd = checkOrderType_sap_upd.data[0].ord_type_code;
+            }
+
             console.log(`   🔄  กำลังอัปเดต tbl_order และ tbl_order_item...`);
             let update_script_order = `UPDATE tbl_order SET 
                             order_no = '${salesOrder.SalesOrder || ""}',
-                            order_type = '${salesOrder.SalesOrderType || ""}',
+                            order_type = '${final_order_type_upd}',
                             order_group = '${salesOrder.SalesOrganization || ""}',
                             sold_to = '${salesOrder.SoldToParty || ""}',
                             ship_to = '${salesOrder.ShipToParty || ""}',
@@ -2620,6 +2629,14 @@ exports.getOrderInformationHana = async (req, res, next) => {
 
             // ================ Insert ข้อมูลออร์เดอของ SAP ลงใน tbl_order ==================
 
+            // Lookup internal code for order_type (SAP code -> Internal code)
+            let current_sap_order_type = salesOrder.SalesOrderType || "";
+            let checkOrderType_sap = await pgConn.get(dbPrefix + lic_code, `SELECT ord_type_code FROM tbl_order_type WHERE sales_order_type = '${current_sap_order_type}' OR ord_type_code = '${current_sap_order_type}' LIMIT 1`, config.connectionString());
+            let final_order_type = current_sap_order_type;
+            if (!checkOrderType_sap.code && checkOrderType_sap.data.length > 0) {
+              final_order_type = checkOrderType_sap.data[0].ord_type_code;
+            }
+
             let insert_order_script = `INSERT INTO tbl_order
                             (order_no, order_type, order_group, chanel, division, sold_to, ship_to,
                                 cus_ref, cus_date_ref, po_name, order_by, ship_cond, pay_term,
@@ -2628,7 +2645,7 @@ exports.getOrderInformationHana = async (req, res, next) => {
                                 cus_group, hana_created, hana_time, created_by,
                                 ist_dt, order_flag, auto_order, order_status)
                             VALUES
-                            ('${salesOrder.SalesOrder || ""}', '${salesOrder.SalesOrderType || ""}', '${salesOrder.SalesOrganization || ""}', 
+                            ('${salesOrder.SalesOrder || ""}', '${final_order_type}', '${salesOrder.SalesOrganization || ""}', 
                              '${salesOrder.DistributionChannel || ""}', '${salesOrder.OrganizationDivision || ""}',
                              '${salesOrder.SoldToParty || ""}', '${salesOrder.ShipToParty || ""}', 
                              '${(salesOrder.CustomerReference || "").replace(/'/g, "''")}', ${salesOrder.CustomerReferenceDate ? `'${salesOrder.CustomerReferenceDate}'` : "NULL"},
@@ -3743,6 +3760,12 @@ exports.addOrderInformation = async (req, res, next) => {
     }
 
     sh_cus_ref = "AOS" + req_date_str + String(running_number).padStart(4, "0");
+
+    // Lookup internal code for order_type (SAP code -> Internal code)
+    let checkOrderType = await pgConn.get(dbPrefix + lic_code, `SELECT ord_type_code FROM tbl_order_type WHERE sales_order_type = '${order_type}' OR ord_type_code = '${order_type}' LIMIT 1`, config.connectionString());
+    if (!checkOrderType.code && checkOrderType.data.length > 0) {
+      order_type = checkOrderType.data[0].ord_type_code;
+    }
 
     // ====================== เพิ่มข้อมูลลงใน tbl_order ======================
     script = `INSERT INTO public.tbl_order
