@@ -2048,6 +2048,8 @@ const getConfirmOrder = async (lic_code, order_id, action) => {
 
     let orderData = orderResult.data[0];
 
+    console.log(orderData)
+
     // ================ ดึงข้อมูล tbl_order_item ==================
     let itemScript = `
             SELECT i.item_no, i.item_qty, i.long_text_id, i.long_text, t.itm_material_number, i.sales_order_item
@@ -2115,8 +2117,8 @@ const getConfirmOrder = async (lic_code, order_id, action) => {
     let payloadData = JSON.stringify({
       SalesDocuments: [
         {
-          SalesOrderType: orderData.sales_order_type || orderData.order_type,
-          SalesOrganization: orderData.order_group,
+          SalesOrderType: orderData.sales_order_type,
+          SalesOrganization: `${orderData.order_group}/${orderData.chanel}/${orderData.division}`,
           DistributionChannel: orderData.chanel || "01",
           OrganizationDivision: orderData.division || "04",
           ShipToParty: orderData.ship_to || "",
@@ -2136,6 +2138,29 @@ const getConfirmOrder = async (lic_code, order_id, action) => {
         },
       ],
     });
+
+    let logSalesDoc = {
+      SalesOrderType: orderData.sales_order_type,
+      SalesOrganization: `${orderData.order_group}/${orderData.chanel}/${orderData.division}`,
+      DistributionChannel: orderData.chanel || "01",
+      OrganizationDivision: orderData.division || "04",
+      ShipToParty: orderData.ship_to || "",
+      CustomerReference: orderData.cus_ref || "",
+      CustomerPurchaseOrderType: orderData.po_name || "AOS",
+      CustomerReferenceDate: cus_date_ref_formatted,
+      NameofOrderer: orderData.order_by || "AOS",
+      ShippingCondition: orderData.ship_cond || "T1",
+      CustomerPaymentTerms: orderData.pay_term,
+      RequestedDeliveryDate: deli_date_req_formatted,
+      DeliveryTime: orderData.deli_time_req || "Z05",
+      Description: orderData.description || "",
+      SHCustomerReference: orderData.sh_cus_ref || "",
+      SHCustomerReferenceDate: sh_cus_date_ref_formatted,
+      HeaderText: [],
+      Items: sapItems,
+    }
+
+    console.log("logSalesDoc", logSalesDoc)
 
     try {
       // ============ SAP API =============
@@ -2258,20 +2283,23 @@ const getConfirmOrder = async (lic_code, order_id, action) => {
                 config.connectionString(),
               );
 
-              // ===== Update Items =====
-              // if (sap_order.Items && Array.isArray(sap_order.Items)) {
-              //     for (let sapItem of sap_order.Items) {
-              //         let updateItemScript = `
-              //             UPDATE public.tbl_order_item
-              //             SET
-              //                 order_no = ${orderId},
-              //                 sales_order_item = '${sapItem.SalesOrderItem}'
-              //             WHERE order_no = ${orderId}
-              //             AND item_no IN(SELECT itm_code FROM tbl_item WHERE itm_material_number = '${sapItem.Material}')
-              //         `;
-              //         await pgConn.execute(dbPrefix + lic_code, updateItemScript, config.connectionString());
-              //     }
-              // }
+              // ===== Update Items (บันทึกเลขไอเทมที่ SAP กำหนดให้) =====
+              if (sap_order.Items && Array.isArray(sap_order.Items)) {
+                for (let sapItem of sap_order.Items) {
+                  let updateItemScript = `
+                                        UPDATE public.tbl_order_item
+                                        SET
+                                            sales_order_item = '${sapItem.SalesOrderItem}'
+                                        WHERE order_no = '${existing_id}'
+                                        AND item_no IN (SELECT itm_code FROM tbl_item WHERE itm_material_number = '${sapItem.Material}')
+                                    `;
+                  await pgConn.execute(
+                    dbPrefix + lic_code,
+                    updateItemScript,
+                    config.connectionString(),
+                  );
+                }
+              }
             }
           }
         }
@@ -3323,8 +3351,9 @@ exports.cancelOrderInformationHana = async (req, res, next) => {
 
       // ตรวจสอบสถานะ Order (ต้องเป็น 1 เท่านั้นถึงจะส่งยกเลิกไป SAP ได้)
       let currentStatus = check_sales_order.data[0].order_status;
-      if (currentStatus !== '1') {
-        let statusMsg = currentStatus === '2' ? "ออเดอร์นี้ถูกยกเลิกไปแล้ว" : "สถานะออเดอร์ไม่ถูกต้อง ไม่สามารถส่งคำขอยกเลิกไปที่ SAP ได้";
+      console.log(currentStatus)
+      if (currentStatus != "1") {
+        let statusMsg = currentStatus === "2" ? "ออเดอร์นี้ถูกยกเลิกไปแล้ว" : "สถานะออเดอร์ไม่ถูกต้อง ไม่สามารถส่งคำขอยกเลิกไปที่ SAP ได้";
         let response = [
           {
             status: "error",
