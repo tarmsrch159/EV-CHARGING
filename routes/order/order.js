@@ -3948,22 +3948,6 @@ exports.addOrderInformation = async (req, res, next) => {
 
     let invalid_material_item = [];
 
-    // ====================== หาค่า sales_order_item ล่าสุด ======================
-    let script_max_sales_order_item = `SELECT MAX(CAST(sales_order_item AS INTEGER)) as last_running FROM public.tbl_order_item`;
-    let check_max_result = await pgConn.get(
-      dbPrefix + lic_code,
-      script_max_sales_order_item,
-      config.connectionString(),
-    );
-    let last_sales_order_item = 0;
-    if (
-      !check_max_result.code &&
-      check_max_result.data.length > 0 &&
-      check_max_result.data[0].last_running !== null
-    ) {
-      last_sales_order_item = parseInt(check_max_result.data[0].last_running);
-    }
-
     // ====================== เพิ่มข้อมูลลงใน tbl_order_item จาก order_item array ======================
     if (order_item && Array.isArray(order_item) && order_item.length > 0) {
       console.log(
@@ -3971,8 +3955,7 @@ exports.addOrderInformation = async (req, res, next) => {
       );
 
       for (var i = 0; i < order_item.length; i++) {
-        last_sales_order_item += 10;
-        let sales_order_item = String(last_sales_order_item);
+        let sales_order_item = String((i + 1) * 10);
         var itm_code = order_item[i].itm_code;
         var item_quantity = parseFloat(order_item[i].item_quantity) || 0;
         var itm_material_number = (
