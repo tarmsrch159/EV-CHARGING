@@ -786,6 +786,24 @@ exports.setPetrolInformation = async (req, res, next) => {
         config.connectionString(),
       );
       if (!tbl_temporary.code) {
+        // ===== อัปเดตข้อมูล order_type และ order_group ของออเดอร์ที่ยังค้างอยู่ (order_status = '0') ให้ตรงตามประเภทปั๊มใหม่ =====
+        let updatePendingOrdersScript = `
+            UPDATE tbl_order 
+            SET 
+                order_type = '${ptrl_sales_type}',
+                order_group = '${ptrl_sales_group}',
+                mdf_dt = '${moment().format("YYYY-MM-DD HH:mm:ss")}'
+            WHERE ship_to = '${ptrl_number}' 
+            AND order_status = '0' 
+            AND order_flag = '1' 
+            AND rm_dt IS NULL
+        `;
+        await pgConn.execute(
+          dbPrefix + lic_code,
+          updatePendingOrdersScript,
+          config.connectionString()
+        );
+
         //debugger
         let response = [
           {

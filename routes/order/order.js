@@ -129,13 +129,17 @@ exports.getOrderInformation = async (req, res, next) => {
     if (act_val === "GROUP") {
       // ======================= สิทธิ์ GROUP (เช่น Planner/CS): มองเห็นเฉพาะ Order ของปั๊มที่อยู่ในความดูแลของตัวเอง =======================
       conditions.push(
-        `tbl_petrol.ptrl_group_code IN (SELECT ptrl_group_code FROM tbl_employee_petrol_group WHERE emp_code = '${act_id}' AND emp_pgrp_flag = 1)`,
+        `
+        (
+        NOT EXISTS (SELECT 1 FROM tbl_employee_petrol_group WHERE emp_code = '${act_id}' AND emp_pgrp_flag = 1)
+        OR tbl_petrol.ptrl_group_code IN (SELECT ptrl_group_code FROM tbl_employee_petrol_group WHERE emp_code = '${act_id}' AND emp_pgrp_flag = 1)
+        )`,
       );
       conditions.push(`tbl_petrol.ptrl_flag = '1'`);
       // ======================= กรองตาม Order Type (ZOR1, ZOR2) =======================
       conditions.push(`(
           NOT EXISTS (SELECT 1 FROM tbl_employee_order_type WHERE emp_code = '${act_id}' AND emp_otyp_flag = 1)
-          OR tbl_order.order_type IN (
+          OR COALESCE(tbl_petrol.ptrl_sales_type, tbl_order.order_type) IN (
             SELECT t2.ord_type_code
             FROM tbl_employee_order_type t1 
             JOIN tbl_order_type t2 ON t1.ord_type_code = t2.ord_type_code 
@@ -146,7 +150,7 @@ exports.getOrderInformation = async (req, res, next) => {
       // ======================= กรองตาม Sales Org (1000, 1900) =======================
       conditions.push(`(
           NOT EXISTS (SELECT 1 FROM tbl_employee_sales_org WHERE emp_code = '${act_id}' AND emp_sorg_flag = 1)
-          OR tbl_order.order_group IN (SELECT sales_org_code FROM tbl_employee_sales_org WHERE emp_code = '${act_id}' AND emp_sorg_flag = 1)
+          OR COALESCE(tbl_petrol.ptrl_sales_group, tbl_order.order_group) IN (SELECT sales_org_code FROM tbl_employee_sales_org WHERE emp_code = '${act_id}' AND emp_sorg_flag = 1)
         )`);
     } else if (act_val !== "ALL") {
       // ======================= สิทธิ์พนักงานทั่วไป: มองเห็นเฉพาะ Order ที่ตัวเองเป็นคนสร้าง =======================
@@ -206,6 +210,8 @@ exports.getOrderInformation = async (req, res, next) => {
             ORDER BY tbl_order.ist_dt DESC 
             OFFSET (${page_index} * ${page_limit}) LIMIT ${page_limit};
         `;
+
+    console.log(dataScript);
 
     // =========================================================================
     // Execute Query หลัก และประมวลผลผลลัพธ์เพื่อส่ง Response
