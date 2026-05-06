@@ -25,6 +25,7 @@ router.delete('/information/remove', order.removeOrderInformationById);
 
 // ============= Order - SAP =============
 router.post('/confirm/information', order.getConfirmOrder);
+router.post('/confirm/payload', order.getConfirmOrderPayload);
 router.post('/order-hana/information', order.getOrderInformationHana);
 router.post('/order-sap-logs/information', order_sap_logs.getSapOrderErrorLogsInformation);
 router.post('/cancel-hana/information', order.cancelOrderInformationHana);

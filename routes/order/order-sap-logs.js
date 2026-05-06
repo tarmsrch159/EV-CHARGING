@@ -61,7 +61,8 @@ exports.getSapOrderErrorLogsInformation = async (req, res, next) => {
     // =========================================================================
     // สร้าง Dynamic WHERE Clause สำหรับ Query หลัก (ดึงข้อมูล Order)
     // =========================================================================
-    let conditions = ["tbl_action_logs.rm_dt IS NULL", `tbl_action_logs.action_desc = 'confirm_order_sap_msg'`];
+    let conditions = ["tbl_action_logs.rm_dt IS NULL", `tbl_action_logs.action_desc = 'confirm_order_api_error'`];
+    // let conditions = ["tbl_action_logs.rm_dt IS NULL", `tbl_action_logs.action_desc = 'confirm_order_sap_msg'`];
 
     if (order_id.toString().toUpperCase() !== "ALL") {
       conditions.push(`tbl_action_logs.action_body ILIKE '%"order_id":%${order_id}%'`);
@@ -76,6 +77,7 @@ exports.getSapOrderErrorLogsInformation = async (req, res, next) => {
     // *มีการ Sub-query tbl_sum_item เพื่อหาผลรวมจำนวนสินค้า (total_qty) ของแต่ละ order_no
     let baseSelectQuery = `
             SELECT 
+                tbl_action_logs.action_log_code,
                 tbl_action_logs.action_result,
                 tbl_action_logs.ist_dt
             FROM tbl_action_logs  

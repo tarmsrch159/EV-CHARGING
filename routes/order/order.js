@@ -2013,6 +2013,49 @@ exports.getOrderRunout = async (req, res, next) => {
   });
 };
 
+// ======= ดึงเฉพาะข้อมูล Payload ของ Confirm Order จาก Logs =======
+const getConfirmOrderPayload = async (lic_code, order_id, action_log_code) => {
+
+  // ======= 1. ดึงจากประวัติส่ง (tbl_action_logs) ด้วยรหัส action_log_code (หน้าบ้านคลิกรายอัน) =======
+  if (action_log_code) {
+    let logScript = `SELECT action_desc, action_body FROM tbl_action_logs WHERE action_log_code = '${action_log_code}' LIMIT 1`;
+    let logResult = await pgConn.get(dbPrefix + lic_code, logScript, config.connectionString());
+
+    if (!logResult.code && logResult.data.length > 0) {
+      try {
+        let parsedLog = JSON.parse(logResult.data[0].action_body);
+
+        // ========== ถ้าแถวที่เลือกเก็บ Payload ตรงๆ (confirm_order_sap) ==========
+        if (logResult.data[0].action_desc === 'confirm_order_api_error') {
+          const { order_id: _, reason: __, ...sapPayload } = parsedLog;
+          return { status: "success", payload: sapPayload };
+        }
+
+        // ========== แถวที่เลือกเก็บผลลัพธ์ส่ง (confirm_order_sap_msg) ========== ให้ค้นประวัติ Payload ของ order_id นั้นมาคืน
+        let resolvedOrderId = parsedLog.order_id || parsedLog.id;
+        if (resolvedOrderId) {
+          let payloadLogScript = `
+              SELECT action_body FROM tbl_action_logs 
+              WHERE action_desc = 'confirm_order_sap' AND action_body LIKE '%"order_id":"${resolvedOrderId}"%'
+              ORDER BY ist_dt DESC LIMIT 1
+          `;
+          let payloadLogResult = await pgConn.get(dbPrefix + lic_code, payloadLogScript, config.connectionString());
+
+          if (!payloadLogResult.code && payloadLogResult.data.length > 0) {
+            let parsedPayload = JSON.parse(payloadLogResult.data[0].action_body);
+            const { order_id: _, reason: __, ...sapPayload } = parsedPayload;
+            return { status: "success", payload: sapPayload };
+          }
+        }
+      } catch (e) {
+        console.error("Error parsing direct logged payload:", e);
+      }
+    }
+  }
+
+  return { status: "error", message: "ไม่พบข้อมูลประวัติ Payload ในระบบ" };
+};
+
 // =========== ดึงข้อมูลรายการสั่งซื้อ ที่มีการยืนยันจาก HANA ===========
 const getConfirmOrder = async (lic_code, order_id, action) => {
   if (!order_id || !action) {
@@ -2160,19 +2203,22 @@ const getConfirmOrder = async (lic_code, order_id, action) => {
           message: api_response.data,
         });
 
-        let messageSub = api_response.data.SalesDocuments[0].Messages
+        let messagesForLog = api_response.data.SalesDocuments[0].Messages
           .filter(m => m.SubMessageType === 'E')
-          .map(m => ({
-            type: m.SubMessageType,
-            text: m.SubMessageText
-          }));
+          .map(m => m.SubMessageText)
+          .join(", ");
+
+        let logPayload = {
+          order_id: order_id,
+          ...JSON.parse(payloadData),
+        };
 
         await xglobal.action_logs(
           lic_code,
           action[0].id,
           "confirm_order_api_error",
-          JSON.stringify({ order_id: order_id }),
-          JSON.stringify({ message_sub: messageSub }).substring(0, 200),
+          JSON.stringify(logPayload),
+          messagesForLog.substring(0, 200),
           action[0].value,
         );
 
@@ -2347,6 +2393,57 @@ const getConfirmOrder = async (lic_code, order_id, action) => {
     ];
     return response;
   });
+};
+
+exports.getConfirmOrderPayload = async (req, res, next) => {
+  try {
+    let lic_code = req.header("lic_code");
+    let { order_id, action_log_code } = req.body[0] || {};
+
+    if (!order_id && !action_log_code) {
+      return res.status(200).send([
+        {
+          status: "error",
+          invalid_code: "-1",
+          message: "กรุณาระบุ order_id หรือ action_log_code",
+          response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+        }
+      ]);
+    }
+
+    let result = await getConfirmOrderPayload(lic_code, order_id, action_log_code);
+
+    if (result.status === "error") {
+      return res.status(200).send([
+        {
+          status: "error",
+          invalid_code: "-2",
+          message: result.message,
+          response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+        }
+      ]);
+    }
+
+    return res.status(200).send([
+      {
+        status: "success",
+        invalid_code: "0",
+        message: "ดึงข้อมูล Payload สำเร็จ",
+        data: result.payload,
+        response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+      }
+    ]);
+  } catch (err) {
+    console.error(err);
+    return res.status(200).send([
+      {
+        status: "error",
+        invalid_code: "-4",
+        message: "เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์",
+        response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+      }
+    ]);
+  }
 };
 
 exports.getConfirmOrder = async (req, res, next) => {
