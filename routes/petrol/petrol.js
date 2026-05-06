@@ -747,6 +747,12 @@ exports.setPetrolInformation = async (req, res, next) => {
         ptrl_remark = "";
       }
 
+      // Lookup internal code for order_type (SAP code -> Internal code)
+      let checkOrderType = await pgConn.get(dbPrefix + lic_code, `SELECT ord_type_code FROM tbl_order_type WHERE sales_order_type = '${ptrl_sales_type}' OR ord_type_code = '${ptrl_sales_type}' LIMIT 1`, config.connectionString());
+      if (!checkOrderType.code && checkOrderType.data.length > 0) {
+        ptrl_sales_type = checkOrderType.data[0].ord_type_code;
+      }
+
       let script = ``;
       script = `update tbl_petrol set
                 ptrl_number = '${ptrl_number}',
