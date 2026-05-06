@@ -438,7 +438,7 @@ exports.setEmployeeInformation = async (req, res, next) => {
             script += `DELETE FROM tbl_employee_order_type WHERE emp_code = '${emp_code}';\n`;
             if (Array.isArray(order_type) && order_type.length > 0) {
                 for (const code of order_type) {
-                    let otyp_id = 'otyp-' + moment().format('YYYYMMDD') + Math.floor(100000 + Math.random() * 900000);
+                    let otyp_id = 'empotyp-' + moment().format('YYYYMMDD') + Math.floor(100000 + Math.random() * 900000);
                     script += `INSERT INTO tbl_employee_order_type (emp_otyp_id, emp_code, ord_type_code, emp_otyp_flag, ist_dt) VALUES ('${otyp_id}', '${emp_code}', '${code}', 1, '${now_dt}');\n`;
                 }
             }
@@ -706,7 +706,7 @@ exports.addEmployeeInformation = async (req, res, next) => {
             // 3) Insert ข้อมูล order type ที่ relate กับพนักงาน (รองรับหลายรายการ)
             if (Array.isArray(order_type) && order_type.length > 0) {
                 for (const code of order_type) {
-                    let otyp_id = 'otyp-' + moment().format('YYYYMMDD') + Math.floor(100000 + Math.random() * 900000);
+                    let otyp_id = 'empotyp-' + moment().format('YYYYMMDD') + Math.floor(100000 + Math.random() * 900000);
                     script += `INSERT INTO tbl_employee_order_type (emp_otyp_id, emp_code, ord_type_code, emp_otyp_flag, ist_dt) VALUES ('${otyp_id}', '${emp_code}', '${code}', 1, '${now_dt}');\n`;
                 }
             }
