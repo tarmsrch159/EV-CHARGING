@@ -863,7 +863,7 @@ exports.getOrderReportInformation = async (req, res, next) => {
       order_type.toString().toUpperCase() !== ""
     ) {
       // ปรับให้รองรับทั้งการส่งรหัส SAP (ZOR1) และรหัสภายใน (otyp-xxx)
-      conditions.push(`tbl_order.order_type IN (SELECT ord_type_code FROM tbl_order_type WHERE sales_order_type = '${order_type}' OR ord_type_code = '${order_type}')`);
+      conditions.push(`COALESCE(tbl_petrol.ptrl_sales_type, tbl_order.order_type) IN (SELECT ord_type_code FROM tbl_order_type WHERE sales_order_type = '${order_type}' OR ord_type_code = '${order_type}')`);
     }
     if (
       auto_order.toString().toUpperCase() !== "ALL" &&
@@ -937,10 +937,10 @@ exports.getOrderReportInformation = async (req, res, next) => {
       );
       conditions.push(`tbl_petrol.ptrl_flag = '1'`);
 
-      // กรองตาม Order Type (ถ้ามีการตั้งค่าไว้ ถ้าไม่ตั้งจะเห็นทั้งหมด)
+      // กรองตาม Order Type  (ถ้ามีการตั้งค่าไว้ โดยอ้างอิง ตามลำดับ ปั๊ม -> ออเดอร์)
       conditions.push(`(
         NOT EXISTS (SELECT 1 FROM tbl_employee_order_type WHERE emp_code = '${act_id}' AND emp_otyp_flag = 1)
-        OR tbl_order.order_type IN (
+        OR COALESCE(tbl_petrol.ptrl_sales_type, tbl_order.order_type) IN (
           SELECT tbl_order_type.ord_type_code 
           FROM tbl_employee_order_type 
           JOIN tbl_order_type  ON tbl_employee_order_type.ord_type_code = tbl_order_type.ord_type_code 
@@ -948,10 +948,10 @@ exports.getOrderReportInformation = async (req, res, next) => {
         )
       )`);
 
-      // กรองตาม Sales Org (ถ้ามีการตั้งค่าไว้ ถ้าไม่ตั้งจะเห็นทั้งหมด)
+      // กรองตาม Sales Org (ถ้ามีการตั้งค่าไว้ โดยอ้างอิง ตามลำดับ ปั๊ม -> ออเดอร์)
       conditions.push(`(
         NOT EXISTS (SELECT 1 FROM tbl_employee_sales_org WHERE emp_code = '${act_id}' AND emp_sorg_flag = 1)
-        OR tbl_order.order_group IN (SELECT sales_org_code FROM tbl_employee_sales_org WHERE emp_code = '${act_id}' AND emp_sorg_flag = 1)
+        OR COALESCE(tbl_petrol.ptrl_sales_group, tbl_order.order_group) IN (SELECT sales_org_code FROM tbl_employee_sales_org WHERE emp_code = '${act_id}' AND emp_sorg_flag = 1)
       )`);
     } else if (act_val !== "ALL") {
       // สิทธิ์พนักงานทั่วไป: มองเห็นเฉพาะ Order ที่ตัวเองเป็นคนสร้าง
