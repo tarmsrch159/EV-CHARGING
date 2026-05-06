@@ -2099,7 +2099,7 @@ const getConfirmOrder = async (lic_code, order_id, action) => {
 
     // ================ ดึงข้อมูล tbl_order_item ==================
     let itemScript = `
-            SELECT i.item_no, i.item_qty, i.long_text_id, i.long_text, t.itm_material_number, i.sales_order_item, dp.dpo_number as delivery_plant
+            SELECT i.item_no, i.item_qty, i.long_text_id, i.long_text, t.itm_material_number, t.itm_desc,i.sales_order_item, dp.dpo_number as delivery_plant
             FROM tbl_order_item i
             LEFT JOIN tbl_item t ON i.item_no = t.itm_code
             LEFT JOIN tbl_depot dp ON dp.dpo_code = i.deli_plant
@@ -2132,8 +2132,8 @@ const getConfirmOrder = async (lic_code, order_id, action) => {
 
         if (item.long_text_id && item.long_text) {
           sapItemObj.ItemText.push({
-            LongTextID: item.long_text_id,
-            LongText: item.long_text,
+            LongTextID: item.itm_material_number,
+            LongText: item.itm_desc,
           });
         }
 
