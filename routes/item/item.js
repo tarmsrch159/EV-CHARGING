@@ -52,9 +52,8 @@ exports.getItemInformation = async (req, res, next) => {
                 tbl_item.itm_flag,
                 tbl_item.itm_weight_litr_per_kg,
                 tbl_item.itm_sales_org,
-                tbl_item.itm_order_type,
                 tbl_order_type.ord_type_desc,
-                tbl_order_type.sales_order_type,
+                tbl_order_type.sales_order_type as itm_order_type,
                 tbl_item.ist_dt,
                 tbl_item.mdf_dt,
                 tbl_item.rm_dt 
@@ -78,9 +77,8 @@ exports.getItemInformation = async (req, res, next) => {
                 tbl_item.itm_flag,
                 tbl_item.itm_weight_litr_per_kg,
                 tbl_item.itm_sales_org,
-                tbl_item.itm_order_type,
                 tbl_order_type.ord_type_desc,
-                tbl_order_type.sales_order_type,
+                tbl_order_type.sales_order_type as itm_order_type,
                 tbl_item.ist_dt,
                 tbl_item.mdf_dt,
                 tbl_item.rm_dt 
@@ -348,6 +346,12 @@ exports.setItemInformation = async (req, res, next) => {
             return res.status(200).send(response);
         } else {
 
+            // Lookup internal code for order_type (SAP code -> Internal code)
+            let checkOrderType = await pgConn.get(dbPrefix + lic_code, `SELECT ord_type_code FROM tbl_order_type WHERE sales_order_type = '${itm_order_type}' OR ord_type_code = '${itm_order_type}' LIMIT 1`, config.connectionString());
+            if (!checkOrderType.code && checkOrderType.data.length > 0) {
+                itm_order_type = checkOrderType.data[0].ord_type_code;
+            }
+
             let script = ``;
             script = `update tbl_item set
             itm_desc = '${itm_desc}',
@@ -451,6 +455,7 @@ exports.addItemInformation = async (req, res, next) => {
             return res.status(200).send(response);
         } else {
 
+
             let script = ``;
             script = `select itm_code from tbl_item where (itm_desc = '${itm_desc}' or itm_short_desc = '${itm_short_desc}' or itm_material_number = '${itm_material_number}') and itm_flag = '1';`
             let tbl_temporary0 = await pgConn.get(dbPrefix + lic_code, script, config.connectionString());
@@ -468,6 +473,12 @@ exports.addItemInformation = async (req, res, next) => {
                     await xglobal.action_logs(lic_code, action[0].id, 'เพิ่มข้อมูลสินค้า', JSON.stringify(req.body[0]), 'ไม่สามารถบันทึกข้อมูลได้, เนื่องจากข้อมูลสินค้าซ้ำ', action[0].value);
                     return;
                 }
+            }
+
+            // Lookup internal code for order_type (SAP code -> Internal code)
+            let checkOrderType = await pgConn.get(dbPrefix + lic_code, `SELECT ord_type_code FROM tbl_order_type WHERE sales_order_type = '${itm_order_type}' OR ord_type_code = '${itm_order_type}' LIMIT 1`, config.connectionString());
+            if (!checkOrderType.code && checkOrderType.data.length > 0) {
+                itm_order_type = checkOrderType.data[0].ord_type_code;
             }
 
             let itm_code = 'itm-' + moment().format('x');
