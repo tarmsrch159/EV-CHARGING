@@ -2127,15 +2127,20 @@ const getConfirmOrder = async (lic_code, order_id, action) => {
           Material: item.itm_material_number,
           OrderQuantity: qty,
           DeliveryPlant: item.delivery_plant,
-          ItemText: [],
+          ItemText: [
+            {
+              LongTextID: item.itm_material_number,
+              LongText: item.itm_desc,
+            }
+          ],
         };
 
-        if (item.long_text_id && item.long_text) {
-          sapItemObj.ItemText.push({
-            LongTextID: item.itm_material_number,
-            LongText: item.itm_desc,
-          });
-        }
+        // if (item.long_text_id && item.long_text) {
+        //   sapItemObj.ItemText.push({
+        //     LongTextID: item.itm_material_number,
+        //     LongText: item.itm_desc,
+        //   });
+        // }
 
         return sapItemObj;
       });
