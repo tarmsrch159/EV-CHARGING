@@ -2099,10 +2099,11 @@ const getConfirmOrder = async (lic_code, order_id, action) => {
 
     // ================ ดึงข้อมูล tbl_order_item ==================
     let itemScript = `
-            SELECT i.item_no, i.item_qty, i.long_text_id, i.long_text, t.itm_material_number, i.sales_order_item
+            SELECT i.item_no, i.item_qty, i.long_text_id, i.long_text, t.itm_material_number, i.sales_order_item, dp.dpo_number as delivery_plant
             FROM tbl_order_item i
             LEFT JOIN tbl_item t ON i.item_no = t.itm_code
-            WHERE i.order_no = '${orderData.id}' AND i.order_item_flag = '1' AND i.order_item_flag = '1'
+            LEFT JOIN tbl_depot dp ON dp.dpo_code = i.deli_plant
+            WHERE i.order_no = '${orderData.id}' AND i.order_item_flag = '1'
             ORDER BY i.id ASC
         `;
     let itemResult = await pgConn.get(
@@ -2125,7 +2126,7 @@ const getConfirmOrder = async (lic_code, order_id, action) => {
           SalesOrderItem: salesOrderItem,
           Material: item.itm_material_number,
           OrderQuantity: qty,
-          DeliveryPlant: "",
+          DeliveryPlant: item.delivery_plant,
           ItemText: [],
         };
 
