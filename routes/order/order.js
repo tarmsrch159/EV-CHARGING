@@ -4653,15 +4653,16 @@ exports.editOrderItem = async (req, res, next) => {
         let ptrl_tank_code = item.ptrl_tank_code;
 
         if (item_quantity > 0) {
+          let sales_order_item = String((i + 1) * 10);
           let insertScript = `
               INSERT INTO tbl_order_item (
                   order_no, item_no, item_qty, remark, ptrl_tank_code, 
-                  ist_dt, auto_order, deli_plant, order_item_flag
-              ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                  ist_dt, auto_order, deli_plant, order_item_flag, sales_order_item
+              ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
           `;
           let insertParams = [
             order_no, item_no, item_quantity, remark, ptrl_tank_code,
-            moment().format("YYYY-MM-DD HH:mm:ss"), 0, default_deli_plant, '1'
+            moment().format("YYYY-MM-DD HH:mm:ss"), 0, default_deli_plant, '1', sales_order_item
           ];
           await pgConn.execute2params(
             dbPrefix + lic_code,
