@@ -257,7 +257,7 @@ exports.getPetrolGroupInformationFilter = async (req, res, next) => {
 
     return (async () => {
         let lic_code = req.header("lic_code");
-        let { ptrl_group_code, action } = req.body[0] || {};
+        let { ptrl_group_code, action, ptrl_group_sales_org, ptrl_group_order_type } = req.body[0] || {};
 
         // เช็คเฉพาะส่วนที่สำคัญ
         if (
@@ -289,6 +289,21 @@ exports.getPetrolGroupInformationFilter = async (req, res, next) => {
             conditions.push(
                 `tbl_petrol_group.ptrl_group_code = '${ptrl_group_code}'`,
             );
+        }
+
+        // กรองเพิ่มเติมตาม array ptrl_group_sales_org
+        if (ptrl_group_sales_org && Array.isArray(ptrl_group_sales_org) && ptrl_group_sales_org.length > 0) {
+            const salesOrg = ptrl_group_sales_org.map(val => `'${String(val).replace(/'/g, "''")}'`).join(", ");
+            conditions.push(`tbl_petrol_group.ptrl_group_sales_org IN (${salesOrg})`);
+        }
+
+        // กรองเพิ่มเติมตาม array ptrl_group_order_type (รองรับทั้ง ord_type_code และ sales_order_type)
+        if (ptrl_group_order_type && Array.isArray(ptrl_group_order_type) && ptrl_group_order_type.length > 0) {
+            const orderTypes = ptrl_group_order_type.map(val => `'${String(val).replace(/'/g, "''")}'`).join(", ");
+            conditions.push(`(
+                tbl_petrol_group.ptrl_group_order_type IN (${orderTypes})
+                OR tbl_petrol_group.ptrl_group_order_type IN (SELECT ord_type_code FROM tbl_order_type WHERE sales_order_type IN (${orderTypes}))
+            )`);
         }
 
         // =========================================================================
