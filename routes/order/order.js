@@ -6154,7 +6154,7 @@ exports.getLinkedOrderList = async (req, res, next) => {
           ORDER BY tank_number ASC
         `;
       } else {
-        // --- กรณี Child: โชว์เฉพาะถังที่มีการสั่งจริงตามที่พี่ต้องการครับ ---
+        // --- กรณี Child: โชว์เฉพาะถังที่มีการสั่งจริง ---
         itemScript = `
           SELECT DISTINCT ON (tbl_order_item.ptrl_tank_code)
             tbl_order_item.id, 
@@ -6179,8 +6179,8 @@ exports.getLinkedOrderList = async (req, res, next) => {
           LEFT JOIN (
               SELECT ptrl_code, tank_code,
                   MAX(tnk_capacity) as tnk_capacity, MAX(tnk_deadstock) as tnk_deadstock,
-                  MAX(CASE WHEN stock_at::date = '${moment(order.ist_dt).format('YYYY-MM-DD')}'::date - INTERVAL '1 day' THEN stock END) as current_stock,
-                  MAX(CASE WHEN stock_at::date = '${moment(order.ist_dt).format('YYYY-MM-DD')}'::date - INTERVAL '2 day' THEN stock END) as yesterday_stock
+                  MAX(CASE WHEN stock_at::date = '${moment(order.ist_dt).format('YYYY-MM-DD')}'::date THEN stock END) as current_stock,
+                  MAX(CASE WHEN stock_at::date = '${moment(order.ist_dt).format('YYYY-MM-DD')}'::date - INTERVAL '1 day' THEN stock END) as yesterday_stock
               FROM tbl_automatics_tanks_information GROUP BY ptrl_code, tank_code
           ) auto_tank ON tbl_petrol.ptrl_code = auto_tank.ptrl_code AND tbl_petrol_tank.ptrl_tank_code = auto_tank.tank_code
           LEFT JOIN (
@@ -6191,7 +6191,7 @@ exports.getLinkedOrderList = async (req, res, next) => {
               GROUP BY ptrl_code, tank_code
           ) auto_sales ON tbl_petrol.ptrl_code = auto_sales.ptrl_code AND tbl_petrol_tank.ptrl_tank_code = auto_sales.tank_code
           WHERE tbl_order_item.order_no = '${order.id}' AND tbl_order_item.rm_dt IS NULL
-          ORDER BY tbl_order_item.ptrl_tank_code, tbl_petrol_tank.tank_number ASC
+          ORDER BY tbl_order_item.ptrl_tank_code, tbl_petrol_tank.tnk_number ASC
         `;
       }
 
@@ -6506,7 +6506,7 @@ exports.getChildOrderInformation = async (req, res, next) => {
                 GROUP BY ptrl_code, tank_code
             ) auto_sales ON tbl_petrol.ptrl_code = auto_sales.ptrl_code AND tbl_petrol_tank.ptrl_tank_code = auto_sales.tank_code
             WHERE tbl_order_item.order_no = '${order.id}' AND tbl_order_item.rm_dt IS NULL
-            ORDER BY tbl_order_item.ptrl_tank_code, tbl_petrol_tank.tank_number ASC
+            ORDER BY tbl_order_item.ptrl_tank_code, tbl_petrol_tank.tnk_number ASC
           `;
 
           let itemResult = await pgConn.get(dbPrefix + lic_code, itemScript, config.connectionString());
