@@ -215,8 +215,8 @@ exports.getReportStock = async (req, res, next) => {
                     tank_code,
                     MAX(tnk_capacity) as tnk_capacity,
                     MAX(tnk_deadstock) as tnk_deadstock,
-                    MAX(CASE WHEN stock_at::date = $1::date - INTERVAL '2 day' THEN stock END) as tank_start,
-                    MAX(CASE WHEN stock_at::date = $1::date - INTERVAL '1 day' THEN stock END) as tank_end
+                    MAX(CASE WHEN stock_at::date = $1::date - INTERVAL '1 day' THEN stock END) as tank_start,
+                    MAX(CASE WHEN stock_at::date = $1::date THEN stock END) as tank_end
                 FROM tbl_automatics_tanks_information
                 GROUP BY ptrl_code, tank_code
             ) auto_tank ON tpr.ptrl_code = auto_tank.ptrl_code AND tpt.ptrl_tank_code = auto_tank.tank_code
@@ -226,7 +226,7 @@ exports.getReportStock = async (req, res, next) => {
                     tank_code, 
                     MAX(sale_previous) as total_sales
                 FROM tbl_automatics_sales_previous_information
-                WHERE sale_at_previous::date = $1::date - INTERVAL '1 day'
+                WHERE sale_at_previous::date = $1::date
                 GROUP BY ptrl_code, tank_code
             ) auto_sales ON tpr.ptrl_code = auto_sales.ptrl_code AND tpt.ptrl_tank_code = auto_sales.tank_code
             WHERE tpr.ptrl_sitecode = $2

@@ -5736,7 +5736,7 @@ exports.addLinkedOrderInformation = async (req, res, next) => {
 
     // ======= 2. รัน Transaction =======
     const transactionResult = await pgConn.runTransaction(dbPrefix + lic_code, async (client) => {
-      const consignment_no = 'CSMN-' + moment().format('YYYYMMDD') + Math.floor(100000 + Math.random() * 900000);
+      const consignment_no = 'csmn-' + moment().format('YYYYMMDD') + Math.floor(100000 + Math.random() * 900000);
 
       // (2.1) จัดการ sh_cus_ref และ sh_cus_date_ref (เหมือน addOrderInformation)
       let final_sh_cus_ref = sh_cus_ref;
@@ -5793,18 +5793,18 @@ exports.addLinkedOrderInformation = async (req, res, next) => {
 
       // (2.3) บันทึกรายการสินค้า
       let invalid_material_item = [];
-      for (const itm of order_item) {
+      for (let i = 0; i < order_item.length; i++) {
+        const itm = order_item[i];
         const getItmRes = await client.query(`SELECT itm_code FROM tbl_item WHERE itm_material_number = $1 LIMIT 1`, [itm.itm_material_number]);
         if (getItmRes.rows.length > 0) {
           const itm_code = getItmRes.rows[0].itm_code;
-          const maxRes = await client.query(`SELECT MAX(CAST(sales_order_item AS INTEGER)) as last_running FROM public.tbl_order_item`);
-          const nextRunning = (maxRes.rows[0].last_running ? parseInt(maxRes.rows[0].last_running) : 0) + 1;
+          const sales_order_item = String((i + 1) * 10);
 
           const insertItemScript = `
             INSERT INTO public.tbl_order_item(order_no, item_no, item_qty, ist_dt, order_item_flag, auto_order, deli_plant, sales_order_item, remark, ptrl_tank_code)
             VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
           `;
-          const itemParams = [master_id, itm_code, itm.item_quantity, now, '1', 0, itm.deli_plant || "", nextRunning, itm.remark || "", itm.ptrl_tank_code || ""];
+          const itemParams = [master_id, itm_code, itm.item_quantity, now, '1', 0, itm.deli_plant || "", sales_order_item, itm.remark || "", itm.ptrl_tank_code || ""];
           await client.query(insertItemScript, itemParams);
         } else {
           invalid_material_item.push(itm.itm_material_number);
@@ -5863,22 +5863,23 @@ exports.setLinkedOrderInformation = async (req, res, next) => {
       // ดึง consignment_no จากออเดอร์หลัก
       const getConsignmentNoRes = await client.query(`SELECT consignment_no FROM tbl_order WHERE id = $1 AND rm_dt IS NULL`, [order_id]);
       if (!getConsignmentNoRes.rows.length) {
-        return { code: '-3', message: 'ไม่พบข้อมูลออเดอร์หลัก หรือออเดอร์หลักไม่มี consignment_no' };
+        return { code: '-3', message: 'ไม่พบข้อมูลออเดอร์หลัก' };
       }
-      const consignment_no = getConsignmentNoRes.rows[0].consignment_no;
 
+      let consignment_no = getConsignmentNoRes.rows[0].consignment_no;
 
       if (!consignment_no) {
-        return { code: '-4', message: 'ออเดอร์หลักนี้ยังไม่มีการตั้งเลข consignment_no' };
+        // เจนเนอเรต consignment_no ใหม่หากไม่มี (กรณีเริ่มพ่วงจากออเดอร์ปกติ)
+        consignment_no = 'csmn-' + moment().format('YYYYMMDD') + Math.floor(100000 + Math.random() * 900000);
       }
 
-      //  ยืนยันตัวหลักเป็น Master
+      //  ยืนยันตัวหลักเป็น Master และตั้งเลข consignment_no ให้ด้วย
       const updateMasterScript = `
         UPDATE tbl_order 
-        SET master_order_id = 1, mdf_dt = $1
-        WHERE id = $2 AND rm_dt IS NULL
+        SET master_order_id = 1, consignment_no = $1, mdf_dt = $2
+        WHERE id = $3 AND rm_dt IS NULL
       `;
-      await client.query(updateMasterScript, [now, order_id]);
+      await client.query(updateMasterScript, [consignment_no, now, order_id]);
 
       //  อัปเดตออเดอร์ตัวอื่นๆ ให้มาเป็นออเดอร์พ่วง ของกลุ่มนี้
       if (child_order_id.length > 0) {
