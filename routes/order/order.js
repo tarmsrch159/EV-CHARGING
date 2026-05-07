@@ -5738,6 +5738,13 @@ exports.addLinkedOrderInformation = async (req, res, next) => {
     const transactionResult = await pgConn.runTransaction(dbPrefix + lic_code, async (client) => {
       const consignment_no = 'csmn-' + moment().format('YYYYMMDD') + Math.floor(100000 + Math.random() * 900000);
 
+      // Lookup internal code for order_type (SAP code -> Internal code)
+      let final_order_type = order_type;
+      const checkOrderType = await client.query(`SELECT ord_type_code FROM tbl_order_type WHERE sales_order_type = $1 OR ord_type_code = $1 LIMIT 1`, [order_type]);
+      if (checkOrderType.rows.length > 0) {
+        final_order_type = checkOrderType.rows[0].ord_type_code;
+      }
+
       // (2.1) จัดการ sh_cus_ref และ sh_cus_date_ref (เหมือน addOrderInformation)
       let final_sh_cus_ref = sh_cus_ref;
       let req_date_str = moment(deli_date_req).format("YYYYMMDD");
@@ -5768,7 +5775,7 @@ exports.addLinkedOrderInformation = async (req, res, next) => {
         RETURNING id
       `;
       const mainParams = [
-        order_type, order_group, chanel || '01', division || '04',
+        final_order_type, order_group, chanel || '01', division || '04',
         sold_to, ship_to, cus_ref || "",
         cus_date_ref ? moment(cus_date_ref).format("YYYY-MM-DD HH:mm:ss") : null,
         po_name || "AOS", order_by || "AOS", ship_cond || "T1", pay_term || "",
