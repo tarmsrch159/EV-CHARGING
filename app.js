@@ -397,11 +397,11 @@ app.use(function (err, req, res, next) {
 // =========================================================
 //  เริ่มระบบ Auto Order Mail Background Loop
 // =========================================================
-// autoOrderMailsScheduler.startAutoOrderMailLoop(); // Production รันทุกๆ 10 นาที
+autoOrderMailsScheduler.startAutoOrderMailLoop(); // Production รันทุกๆ 10 นาที
 // autoOrderMailsScheduler.startAutoOrderMailLoopTest(); // Test รันทุกๆ 10 วินาที
 // autoOrderMailsScheduler.startAutoOrderMailLoopCustom("15:25", "17:00", 1); // Custom เวลาได้
 
 // เริ่มต้น Background Scheduler สำหรับแจ้งเตือน Low Stock
-// lowStockAlertScheduler.startLowStockLoop();
+lowStockAlertScheduler.startLowStockLoop();
 
 module.exports = app;
