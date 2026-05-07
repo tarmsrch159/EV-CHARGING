@@ -2167,6 +2167,14 @@ const getConfirmOrder = async (lic_code, order_id, action) => {
       return response;
     }
 
+    let sapHeaders = [];
+    if (!itemResult.code && itemResult.data.length > 0) {
+      sapHeaders = itemResult.data.map(item => ({
+        LongTextID: item.itm_material_number,
+        LongText: item.itm_desc,
+      }));
+    }
+
     let payloadData = JSON.stringify({
       SalesDocuments: [
         {
@@ -2180,13 +2188,13 @@ const getConfirmOrder = async (lic_code, order_id, action) => {
           CustomerReferenceDate: cus_date_ref_formatted,
           NameofOrderer: orderData.order_by || "AOS",
           ShippingCondition: orderData.ship_cond || "T1",
-          CustomerPaymentTerms: orderData.pay_term,
+          CustomerPaymentTerms: orderData.pay_term || "Z001",
           RequestedDeliveryDate: deli_date_req_formatted,
           DeliveryTime: orderData.deli_time_req || "Z05",
           Description: orderData.description || "",
           SHCustomerReference: orderData.sh_cus_ref || "",
           SHCustomerReferenceDate: sh_cus_date_ref_formatted,
-          HeaderText: [],
+          HeaderText: sapHeaders,
           Items: sapItems,
         },
       ],
@@ -3916,7 +3924,7 @@ exports.addOrderInformation = async (req, res, next) => {
         VALUES
             (NULL, '${order_type}', '${order_group}', '${chanel}', '${division}',
                 '${sold_to}', '${ship_to}', '${(cus_ref || "").replace(/'/g, "''")}', ${cus_date_ref ? "'" + moment(cus_date_ref).format("YYYY-MM-DD HH:mm:ss") + "'" : "NULL"},
-                '${(po_name || "AOS").replace(/'/g, "''")}', '${(order_by || "AOS").replace(/'/g, "''")}', '${ship_cond || "T1"}', '${pay_term || ""}',
+                '${(po_name || "AOS").replace(/'/g, "''")}', '${(order_by || "AOS").replace(/'/g, "''")}', '${ship_cond || "T1"}', '${pay_term || "Z001"}',
                 ${deli_date_req ? "'" + moment(deli_date_req).format("YYYY-MM-DD HH:mm:ss") + "'" : "NULL"}, '${deli_time_req || ""}',
                 '${(description || "").replace(/'/g, "''")}', '${sh_cus_ref || ""}', ${sh_cus_date_ref ? "'" + moment(sh_cus_date_ref).format("YYYY-MM-DD HH:mm:ss") + "'" : "NULL"},
                 'A', '${moment().format("YYYY-MM-DD HH:mm:ss")}', '1', 0, 0, '${action[0].id}') RETURNING id`;
@@ -4001,7 +4009,7 @@ exports.addOrderInformation = async (req, res, next) => {
               var item_text = order_item[i].item_text[k];
               let script_item = `INSERT INTO public.tbl_order_item
                         (order_no, item_no, item_qty, long_text_id, long_text, ist_dt, order_item_flag, auto_order, deli_plant, sales_order_item, remark, ptrl_tank_code)
-                        VALUES(${order_id}, '${itm_code}', ${item_quantity}, '${(item_text.long_text_id || "").replace(/'/g, "''")}', '${(item_text.long_text || "").replace(/'/g, "''")}',
+                        VALUES(${order_id}, '${itm_code}', ${item_quantity}, '${(item_text.long_text_id || itm_code).replace(/'/g, "''")}', '${(item_text.long_text || "").replace(/'/g, "''")}',
                         '${moment().format("YYYY-MM-DD HH:mm:ss")}', '1', 0, '${deli_plant || ""}', '${sales_order_item}', '${remark || ""}', '${ptrl_tank_code || ""}')`;
 
               console.log(
