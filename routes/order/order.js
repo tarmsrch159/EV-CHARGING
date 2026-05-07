@@ -2167,13 +2167,17 @@ const getConfirmOrder = async (lic_code, order_id, action) => {
       return response;
     }
 
-    let sapHeaders = [];
-    if (!itemResult.code && itemResult.data.length > 0) {
-      sapHeaders = itemResult.data.map(item => ({
-        LongTextID: item.itm_material_number,
-        LongText: item.itm_desc,
-      }));
-    }
+    // let sapHeaders = [];
+    // if (!itemResult.code && itemResult.data.length > 0) {
+    //   sapHeaders = itemResult.data.map(item => ({
+    //     "LongTextID": "ZT02",
+    //     "LongText": "Driver Name"
+    //   },
+    //   {
+    //     "LongTextID": "ZT03",
+    //     "LongText": "Truck License"
+    //   }));
+    // }
 
     let payloadData = JSON.stringify({
       SalesDocuments: [
@@ -2194,7 +2198,16 @@ const getConfirmOrder = async (lic_code, order_id, action) => {
           Description: orderData.description || "",
           SHCustomerReference: orderData.sh_cus_ref || "",
           SHCustomerReferenceDate: sh_cus_date_ref_formatted,
-          HeaderText: sapHeaders,
+          HeaderText: [
+            {
+              "LongTextID": "ZT02",
+              "LongText": "Driver Name"
+            },
+            {
+              "LongTextID": "ZT03",
+              "LongText": "Truck License"
+            }
+          ],
           Items: sapItems,
         },
       ],
@@ -4009,7 +4022,7 @@ exports.addOrderInformation = async (req, res, next) => {
               var item_text = order_item[i].item_text[k];
               let script_item = `INSERT INTO public.tbl_order_item
                         (order_no, item_no, item_qty, long_text_id, long_text, ist_dt, order_item_flag, auto_order, deli_plant, sales_order_item, remark, ptrl_tank_code)
-                        VALUES(${order_id}, '${itm_code}', ${item_quantity}, '${(item_text.long_text_id || itm_code).replace(/'/g, "''")}', '${(item_text.long_text || "").replace(/'/g, "''")}',
+                        VALUES(${order_id}, '${itm_code}', ${item_quantity}, '${(item_text.long_text_id || 'ZT01').replace(/'/g, "''")}', '${(item_text.long_text || "Compartment").replace(/'/g, "''")}',
                         '${moment().format("YYYY-MM-DD HH:mm:ss")}', '1', 0, '${deli_plant || ""}', '${sales_order_item}', '${remark || ""}', '${ptrl_tank_code || ""}')`;
 
               console.log(
