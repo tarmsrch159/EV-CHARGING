@@ -61,11 +61,13 @@ exports.getSapOrderErrorLogsInformation = async (req, res, next) => {
     // =========================================================================
     // สร้าง Dynamic WHERE Clause สำหรับ Query หลัก (ดึงข้อมูล Order)
     // =========================================================================
-    let conditions = ["tbl_action_logs.rm_dt IS NULL", `tbl_action_logs.action_desc = 'confirm_order_api_error'`];
-    // let conditions = ["tbl_action_logs.rm_dt IS NULL", `tbl_action_logs.action_desc = 'confirm_order_sap_msg'`];
+    let conditions = [
+      "tbl_action_logs.rm_dt IS NULL", 
+      "tbl_action_logs.action_desc IN ('confirm_order_api_error', 'confirm_order_sap_msg')"
+    ];
 
     if (order_id.toString().toUpperCase() !== "ALL") {
-      conditions.push(`tbl_action_logs.action_body ILIKE '%"order_id":%${order_id}%'`);
+      conditions.push(`(tbl_action_logs.action_body ILIKE '%"order_id":%${order_id}%' OR tbl_action_logs.action_result ILIKE '%"order_id":%${order_id}%')`);
     }
 
 
@@ -78,6 +80,8 @@ exports.getSapOrderErrorLogsInformation = async (req, res, next) => {
     let baseSelectQuery = `
             SELECT 
                 tbl_action_logs.action_log_code,
+                tbl_action_logs.action_desc,
+                tbl_action_logs.action_body,
                 tbl_action_logs.action_result,
                 tbl_action_logs.ist_dt
             FROM tbl_action_logs  
@@ -103,6 +107,22 @@ exports.getSapOrderErrorLogsInformation = async (req, res, next) => {
     // ตรวจสอบว่า Query สำเร็จหรือไม่
     if (!tbl_temporary.code) {
       if (tbl_temporary.data.length > 0) {
+        tbl_temporary.data = tbl_temporary.data.map(item => {
+          let errorMsg = "";
+          if (item.action_desc === 'confirm_order_api_error') {
+            errorMsg = item.action_body;
+          } else if (item.action_desc === 'confirm_order_sap_msg') {
+            errorMsg = item.action_result;
+          } else {
+            errorMsg = item.action_result || item.action_body || "";
+          }
+          return {
+            action_log_code: item.action_log_code,
+            action_result: errorMsg,
+            ist_dt: item.ist_dt
+          };
+        });
+
         tbl_temporary.data = JSON.parse(
           JSON.stringify(tbl_temporary.data).replace(/\:null/gi, '\:""'),
         );

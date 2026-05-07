@@ -2023,9 +2023,14 @@ const getConfirmOrderPayload = async (lic_code, order_id, action_log_code) => {
 
     if (!logResult.code && logResult.data.length > 0) {
       try {
-        let parsedLog = JSON.parse(logResult.data[0].action_body);
+        let parsedLog;
+        try {
+          parsedLog = JSON.parse(logResult.data[0].action_body);
+        } catch (errParse) {
+          parsedLog = { error_message: logResult.data[0].action_body };
+        }
 
-        // ========== ถ้าแถวที่เลือกเก็บ Payload ตรงๆ (confirm_order_sap) ==========
+        // ========== ถ้าแถวที่เลือกเก็บ Payload ตรงๆ (confirm_order_api_error) ==========
         if (logResult.data[0].action_desc === 'confirm_order_api_error') {
           const { order_id: _, reason: __, ...sapPayload } = parsedLog;
           return { status: "success", payload: sapPayload };
@@ -2259,7 +2264,7 @@ const getConfirmOrder = async (lic_code, order_id, action) => {
 
         let logPayload = {
           order_id: order_id,
-          reason: req.body[0].reason || req.body[0].description || "",
+          reason: "",
           ...JSON.parse(payloadData),
         };
         await xglobal.action_logs(
