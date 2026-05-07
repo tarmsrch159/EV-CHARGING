@@ -349,7 +349,7 @@ exports.getPetrolGroupInformationFilter = async (req, res, next) => {
                 tbl_petrol_group.ptrl_group_short_desc,
                 tbl_petrol_group.ptrl_group_sales_org,
                 tbl_petrol_group.ptrl_group_order_type,
-                ot.ord_type_desc
+                ot.sales_order_type
             FROM tbl_petrol_group 
             LEFT JOIN tbl_order_type ot ON tbl_petrol_group.ptrl_group_order_type = ot.ord_type_code
             ${whereClause}
