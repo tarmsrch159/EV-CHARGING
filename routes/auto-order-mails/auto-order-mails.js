@@ -382,8 +382,8 @@ exports.runAutoOrderMailTask = async () => {
             if (autoOrderInfo) {
                 console.log(`📧 [SEND] กำลังส่งเมล: ${autoOrderInfo.manager_email}`);
                 if (await sendAutoOrderEmail(autoOrderInfo)) {
-                    // const updateQuery = `UPDATE tbl_automatics_orders SET automatic_status = '2', mdf_dt = NOW() WHERE automatic_code = $1`;
-                    // await pgConn.getWithParams(dbPrefix + lic_code, updateQuery, [item.automatic_code], config.connectionString());
+                    const updateQuery = `UPDATE tbl_automatics_orders SET automatic_status = '2', mdf_dt = NOW() WHERE automatic_code = $1`;
+                    await pgConn.getWithParams(dbPrefix + lic_code, updateQuery, [item.automatic_code], config.connectionString());
                     console.log(`✅ [UPDATE] เรียบร้อย (${item.automatic_code})`);
                 }
             }
