@@ -28,7 +28,7 @@ const checkInTimeWindow = (startTimeStr, endTimeStr) => {
  * function กำหนดเวลาการทำงานของ ฺBackground Process
  */
 const executeLoop = async (startTimeStr, endTimeStr, pauseMinutes) => {
-    console.log(`🚀 [Auto Order Mail] เริ่มต้นระบบ Background Loop (${startTimeStr} - ${endTimeStr}, พัก ${pauseMinutes} นาที)...`);
+    console.log(`[Auto Order Mail] เริ่มต้นระบบ Background Loop (${startTimeStr} - ${endTimeStr}, พัก ${pauseMinutes} นาที)...`);
 
     while (true) {
         try {
