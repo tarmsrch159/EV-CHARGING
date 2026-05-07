@@ -12,10 +12,37 @@ const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
  */
 const executeLoop = async () => {
     try {
+        const lic_code = "aos01";
+        const dbName = config.dbPrefix() + lic_code;
         const currentTime = moment();
+        const currentHHmm = currentTime.format('HH:mm');
+
         console.log(`\n[${currentTime.format('HH:mm:ss')}] 🔋 Low Stock Alert: เริ่มต้นรอบการทำงาน...`);
 
-        await lowStockAlertController.processLowStockAlerts("aos01");
+        // ดึงรายการ office เฉพาะที่มีการเชื่อมโยงกับปั๊มที่เปิดใช้งานอยู่ในระบบ เพื่อตรวจสอบเวลา Cut-off
+        const sql = `
+            SELECT DISTINCT o.off_code, o.order_cutoff_time 
+            FROM tbl_office o
+            INNER JOIN tbl_petrol p ON o.off_code = p.off_code
+            WHERE o.off_flag = '1' AND o.rm_dt IS NULL AND o.order_cutoff_time IS NOT NULL
+              AND p.ptrl_flag = '1' AND p.rm_dt IS NULL
+        `;
+        const result = await pgConn.get(dbName, sql, config.connectionString());
+
+        // ============ ใช้การตั้งค่าเวลาจาก ฐานข้อมูล ==============
+        if (!result.code && result.data && result.data.length > 0) {
+            for (const office of result.data) {
+                if (office.order_cutoff_time) {
+                    // แปลง order_cutoff_time เป็น "HH:mm" เพื่อตรวจสอบกับเวลาปัจจุบัน
+                    const cutoffHHmm = moment(office.order_cutoff_time, 'HH:mm:ss').format('HH:mm');
+
+                    if (currentHHmm === cutoffHHmm) {
+                        console.log(`⏰ [Low Stock Scheduler] ตรวจพบเวลา Cut-off ของ Office: ${office.off_code} (${cutoffHHmm}) ตรงกับเวลาปัจจุบัน: เริ่มประมวลผลการแจ้งเตือน...`);
+                        await lowStockAlertController.processLowStockAlerts(lic_code, office.off_code);
+                    }
+                }
+            }
+        }
 
     } catch (error) {
         console.error('❌ [Low Stock Scheduler] executeLoop Error:', error);
