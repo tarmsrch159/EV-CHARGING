@@ -6004,7 +6004,7 @@ exports.getLinkedOrderList = async (req, res, next) => {
         tbl_order.id, 
         tbl_order.order_no, 
         tbl_order.sh_cus_ref as aos_order_no, 
-        tbl_order.order_type, 
+        tbl_order_type.sales_order_type as order_type, 
         tbl_order.order_group, 
         tbl_order_type.ord_type_desc,
         tbl_petrol_group.ptrl_group_desc,
@@ -6184,7 +6184,7 @@ exports.getLinkedOrderList = async (req, res, next) => {
               GROUP BY ptrl_code, tank_code
           ) auto_sales ON tbl_petrol.ptrl_code = auto_sales.ptrl_code AND tbl_petrol_tank.ptrl_tank_code = auto_sales.tank_code
           WHERE tbl_order_item.order_no = '${order.id}' AND tbl_order_item.rm_dt IS NULL
-          ORDER BY tbl_petrol_tank.tank_number ASC
+          ORDER BY tbl_order_item.ptrl_tank_code, tbl_petrol_tank.tank_number ASC
         `;
       }
 
@@ -6499,7 +6499,7 @@ exports.getChildOrderInformation = async (req, res, next) => {
                 GROUP BY ptrl_code, tank_code
             ) auto_sales ON tbl_petrol.ptrl_code = auto_sales.ptrl_code AND tbl_petrol_tank.ptrl_tank_code = auto_sales.tank_code
             WHERE tbl_order_item.order_no = '${order.id}' AND tbl_order_item.rm_dt IS NULL
-            ORDER BY tbl_petrol_tank.tank_number ASC
+            ORDER BY tbl_order_item.ptrl_tank_code, tbl_petrol_tank.tank_number ASC
           `;
 
           let itemResult = await pgConn.get(dbPrefix + lic_code, itemScript, config.connectionString());
