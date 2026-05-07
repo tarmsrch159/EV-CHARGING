@@ -6504,11 +6504,8 @@ exports.getChildOrderInformation = async (req, res, next) => {
 
           let itemResult = await pgConn.get(dbPrefix + lic_code, itemScript, config.connectionString());
 
-          // ======== ตรวจสอบว่ามีข้อมูล Stock หรือยอดขายหรือไม่ ========
-          let hasData = false;
-          if (itemResult.data && itemResult.data.length > 0) {
-            hasData = itemResult.data.some(item => parseFloat(item.tank_start) > 0 || parseFloat(item.day_sales) > 0);
-          }
+          // ======== ตรวจสอบว่ามีข้อมูล Stock หรือยอดขายหรือไม่ (ปลดล็อกเพื่อให้เพิ่มออเดอร์พ่วงได้ก่อนโดยไม่สนเรื่องมี Stock) ========
+          let hasData = true;
 
           if (hasData) {
             order.items = itemResult.code ? [] : itemResult.data;
