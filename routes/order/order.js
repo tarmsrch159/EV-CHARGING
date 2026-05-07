@@ -2129,8 +2129,8 @@ const getConfirmOrder = async (lic_code, order_id, action) => {
           DeliveryPlant: item.delivery_plant,
           ItemText: [
             {
-              LongTextID: item.itm_material_number,
-              LongText: item.itm_desc,
+              LongTextID: item.long_text_id,
+              LongText: item.long_text,
             }
           ],
         };
