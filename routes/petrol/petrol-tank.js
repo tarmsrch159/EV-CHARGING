@@ -76,7 +76,7 @@ exports.getPetrolTankInformation = async (req, res, next) => {
                 left join tbl_item on tbl_petrol_tank.itm_code = tbl_item.itm_code 
                 left join tbl_item_type on tbl_item.itm_type_code = tbl_item_type.itm_type_code 
                 left join tbl_petrol_group on tbl_petrol.ptrl_group_code = tbl_petrol_group.ptrl_group_code 
-                where tbl_petrol_tank.ptrl_tank_flag = '1' and ptrl_tank_code is not null and tbl_petrol_tank.tnk_number = '${tnk_number}' `;
+                where tbl_petrol_tank.ptrl_tank_flag IN ('1', '2') and ptrl_tank_code is not null and tbl_petrol_tank.tnk_number = '${tnk_number}' `;
             }
             else {
                 script = `select
@@ -113,7 +113,7 @@ exports.getPetrolTankInformation = async (req, res, next) => {
                 left join tbl_item on tbl_petrol_tank.itm_code = tbl_item.itm_code 
                 left join tbl_item_type on tbl_item.itm_type_code = tbl_item_type.itm_type_code 
                 left join tbl_petrol_group on tbl_petrol.ptrl_group_code = tbl_petrol_group.ptrl_group_code 
-                where tbl_petrol_tank.ptrl_tank_flag = '1' and ptrl_tank_code is not null `;
+                where tbl_petrol_tank.ptrl_tank_flag IN ('1', '2') and ptrl_tank_code is not null `;
             }
 
             if (ptrl_code.toString().toUpperCase() != 'ALL') {
@@ -146,7 +146,7 @@ exports.getPetrolTankInformation = async (req, res, next) => {
                     left join tbl_item on tbl_petrol_tank.itm_code = tbl_item.itm_code 
                     left join tbl_item_type on tbl_item.itm_type_code = tbl_item_type.itm_type_code 
                     left join tbl_petrol_group on tbl_petrol.ptrl_group_code = tbl_petrol_group.ptrl_group_code 
-                    where tbl_petrol_tank.ptrl_tank_flag = '1' and ptrl_tank_code is not null 
+                    where tbl_petrol_tank.ptrl_tank_flag IN ('1', '2') and ptrl_tank_code is not null 
                     and tbl_petrol_tank.tnk_number = '${tnk_number}' `;
                     }
                     else {
@@ -159,7 +159,7 @@ exports.getPetrolTankInformation = async (req, res, next) => {
                     left join tbl_item on tbl_petrol_tank.itm_code = tbl_item.itm_code 
                     left join tbl_item_type on tbl_item.itm_type_code = tbl_item_type.itm_type_code 
                     left join tbl_petrol_group on tbl_petrol.ptrl_group_code = tbl_petrol_group.ptrl_group_code 
-                    where tbl_petrol_tank.ptrl_tank_flag = '1' and ptrl_tank_code is not null 
+                    where tbl_petrol_tank.ptrl_tank_flag IN ('1', '2') and ptrl_tank_code is not null 
                     and ptrl_tank_code is not null `;
                     }
 
