@@ -17,7 +17,7 @@ const executeLoop = async () => {
         const currentTime = moment();
         const currentHHmm = currentTime.format('HH:mm');
 
-        console.log(`\n[${currentTime.format('HH:mm:ss')}] 🔋 Low Stock Alert: เริ่มต้นรอบการทำงาน...`);
+        console.log(`\n[${currentTime.format('HH:mm:ss')}] 🔋 Run Out Alert: เริ่มต้นรอบการทำงาน...`);
 
         // ดึงรายการ office เฉพาะที่มีการเชื่อมโยงกับปั๊มที่เปิดใช้งานอยู่ในระบบ เพื่อตรวจสอบเวลา Cut-off
         const sql = `
@@ -37,7 +37,7 @@ const executeLoop = async () => {
                     const cutoffHHmm = moment(office.order_cutoff_time, 'HH:mm:ss').format('HH:mm');
 
                     if (currentHHmm === cutoffHHmm) {
-                        console.log(`⏰ [Low Stock Scheduler] ตรวจพบเวลา Cut-off ของ Office: ${office.off_code} (${cutoffHHmm}) ตรงกับเวลาปัจจุบัน: เริ่มประมวลผลการแจ้งเตือน...`);
+                        console.log(`⏰ [Run Out Scheduler] ตรวจพบเวลา Cut-off ของ Office: ${office.off_code} (${cutoffHHmm}) ตรงกับเวลาปัจจุบัน: เริ่มประมวลผลการแจ้งเตือน...`);
                         await lowStockAlertController.processLowStockAlerts(lic_code, office.off_code);
                     }
                 }
@@ -45,7 +45,7 @@ const executeLoop = async () => {
         }
 
     } catch (error) {
-        console.error('❌ [Low Stock Scheduler] executeLoop Error:', error);
+        console.error('❌ [Run Out Service Error] (executeLoop):', error);
     }
 };
 
@@ -53,7 +53,14 @@ const executeLoop = async () => {
  * เริ่มต้นระบบ Background Loop (รันทุกๆ 1 นาที)
  */
 exports.startLowStockLoop = async () => {
-    console.log('[Low Stock Scheduler] ระบบตรวจสอบสต็อกน้ำมันเริ่มทำงานแล้ว (Interval: 1 min)');
+    console.log(`\x1b[33m\x1b[1m`);
+    console.log(`====================================================================`);
+    console.log(`  [AOS SYSTEM] STARTING RUN OUT SCHEDULER SERVICE`);
+    console.log(`====================================================================`);
+    console.log(`  รอบการสแกน   : ทุก ๆ 1 นาที`);
+    console.log(`  เวลาตัดรอบ    : อ้างอิงตามเวลา Cut-off ของแต่ละ Office ในฐานข้อมูล`);
+    console.log(`  สถานะบริการ   : เปิดใช้งาน (กำลังตรวจสอบสต็อกน้ำมันใกล้หมด...)`);
+    console.log(`====================================================================\x1b[0m`);
 
     // หน่วงเวลาเริ่มต้น 10 วินาที
     await sleep(10000);

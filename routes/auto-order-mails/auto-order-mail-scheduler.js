@@ -28,7 +28,14 @@ const checkInTimeWindow = (startTimeStr, endTimeStr) => {
  * function กำหนดเวลาการทำงานของ ฺBackground Process
  */
 const executeLoop = async (startTimeStr, endTimeStr, pauseMinutes) => {
-    console.log(`[Auto Order Mail] เริ่มต้นระบบ Background Loop (${startTimeStr} - ${endTimeStr}, พัก ${pauseMinutes} นาที)...`);
+    console.log(`\x1b[32m\x1b[1m`);
+    console.log(`====================================================================`);
+    console.log(`  [AOS SYSTEM] STARTING AUTO ORDER MAIL SCHEDULER SERVICE`);
+    console.log(`====================================================================`);
+    console.log(`  ช่วงเวลาทำงาน : ${startTimeStr} - ${endTimeStr}`);
+    console.log(`  รอบการพักระบบ : ทุก ๆ ${pauseMinutes} นาที`);
+    console.log(`  สถานะบริการ   : เปิดใช้งาน (กำลังสแกนคิวส่งเมล...)`);
+    console.log(`====================================================================\x1b[0m`);
 
     while (true) {
         try {
@@ -75,7 +82,7 @@ const executeLoop = async (startTimeStr, endTimeStr, pauseMinutes) => {
                 await sleep(waitMs);
             }
         } catch (err) {
-            console.error('❌ [Auto Order Mail Loop] Error:', err);
+            console.error('❌ [Auto Order Mail Service Error] (executeLoop):', err);
             await sleep(60000);
         }
     }
@@ -88,7 +95,13 @@ exports.startAutoOrderMailLoop = () => executeLoop("00:30", "15:30", 10);
 
 // =========== Function Test ทำงานทุกๆ 10 วินาที =============
 exports.startAutoOrderMailLoopTest = async () => {
-    console.log('🧪 [Auto Order Mail] เริ่มต้นระบบ Background Loop (TEST MODE)...');
+    console.log(`\x1b[36m\x1b[1m`);
+    console.log(`====================================================================`);
+    console.log(` 🧪 [AOS SYSTEM] STARTING AUTO ORDER MAIL SCHEDULER (TEST MODE)`);
+    console.log(`====================================================================`);
+    console.log(`  ช่วงเวลาสแกน : ทุก ๆ 10 วินาที`);
+    console.log(`  สถานะบริการ   : โหมดทดสอบเปิดใช้งาน (กำลังสแกนคิวส่งเมล...)`);
+    console.log(`====================================================================\x1b[0m`);
     while (true) {
         try {
             console.log(`\n[${moment().format('HH:mm:ss')}] 🧪 [TEST] เริ่มประมวลผล...`);
@@ -96,7 +109,7 @@ exports.startAutoOrderMailLoopTest = async () => {
             console.log(`\n[${moment().format('HH:mm:ss')}] 💤 [TEST] พัก 10 วินาที...`);
             await sleep(10000);
         } catch (err) {
-            console.error('❌ [Auto Order Mail Loop TEST] Error:', err);
+            console.error('❌ [Auto Order Mail Service Error] (executeLoopTest):', err);
             await sleep(5000);
         }
     }
