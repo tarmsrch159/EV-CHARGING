@@ -25,8 +25,6 @@ exports.getPetrolInformation = async (req, res, next) => {
       ptrl_sales_type,
     } = payload;
 
-    const finalSalesGroupArray = ptrl_sales_group;
-    const finalSalesTypeArray = ptrl_sales_type;
 
     // ======== กำหนดค่าเริ่มต้น ========
     page_index = page_index === undefined ? 1 : page_index;
@@ -464,8 +462,11 @@ exports.getPetrolInformationFilter = async (req, res, next) => {
                 tbl_petrol.ptrl_number, 
                 tbl_petrol.ptrl_sitecode, 
                 tbl_petrol.ptrl_desc, 
-                tbl_petrol.ptrl_short_desc
+                tbl_petrol.ptrl_short_desc,
+                tbl_petrol.ptrl_sales_group,
+                tbl_order_type.sales_order_type
             FROM tbl_petrol 
+            LEFT JOIN tbl_order_type ON tbl_petrol.ptrl_sales_type = tbl_order_type.ord_type_code
             LEFT JOIN tbl_petrol_group ON tbl_petrol.ptrl_group_code = tbl_petrol_group.ptrl_group_code 
         `;
 

@@ -67,6 +67,7 @@ exports.getPetrolTankInformation = async (req, res, next) => {
                 tbl_petrol_tank.tnk_safety_factor,
                 tbl_petrol.off_code,
                 off_desc,
+                tbl_petrol_tank.ptrl_tank_flag,
                 tbl_petrol_tank.ist_dt,
                 tbl_petrol_tank.mdf_dt,
                 tbl_petrol_tank.rm_dt
@@ -104,6 +105,7 @@ exports.getPetrolTankInformation = async (req, res, next) => {
                 tbl_petrol_tank.tnk_safety_factor,
                 tbl_petrol.off_code,
                 off_desc,
+                 tbl_petrol_tank.ptrl_tank_flag,
                 tbl_petrol_tank.ist_dt,
                 tbl_petrol_tank.mdf_dt,
                 tbl_petrol_tank.rm_dt 
