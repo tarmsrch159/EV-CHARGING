@@ -195,6 +195,9 @@ exports.getReportStock = async (req, res, next) => {
                         'tank_end', COALESCE(auto_tank.tank_end, 0),
                         'total_sales', COALESCE(auto_sales.total_sales, 0),
                         'min_stock', COALESCE(auto_sales.total_sales, 0) + COALESCE(auto_tank.tnk_deadstock, tpt.tnk_deadstock, 0),
+                        'itm_flag', COALESCE(tit.itm_flag, '1'),
+                        'ptrl_tank_flag', COALESCE(tpt.ptrl_tank_flag, '1'),
+                        'is_disabled', CASE WHEN COALESCE(tit.itm_flag, '1') = '0' OR COALESCE(tpt.ptrl_tank_flag, '1') = '0' THEN true ELSE false END,
                         'recive_val', 0,
                         'current_stock', COALESCE(auto_tank.tank_end, 0),
                         'dpo_desc', (SELECT dpo_desc FROM tbl_depot WHERE dpo_code = (SELECT dpo_code FROM tbl_petrol_depot WHERE ptrl_code = tpr.ptrl_code AND rm_dt IS NULL LIMIT 1))
@@ -229,7 +232,7 @@ exports.getReportStock = async (req, res, next) => {
                 WHERE sale_at_previous::date = $1::date
                 GROUP BY ptrl_code, tank_code
             ) auto_sales ON tpr.ptrl_code = auto_sales.ptrl_code AND tpt.ptrl_tank_code = auto_sales.tank_code
-            WHERE tpr.ptrl_sitecode = $2
+            WHERE tpr.ptrl_sitecode = $2 AND tpt.ptrl_tank_flag = '1'
             GROUP BY tpr.ptrl_sitecode, tpr.ptrl_code
             ORDER BY tpr.ptrl_sitecode ASC;
         `;
