@@ -108,14 +108,7 @@ exports.getSapOrderErrorLogsInformation = async (req, res, next) => {
     if (!tbl_temporary.code) {
       if (tbl_temporary.data.length > 0) {
         tbl_temporary.data = tbl_temporary.data.map(item => {
-          let errorMsg = "";
-          if (item.action_desc === 'confirm_order_api_error') {
-            errorMsg = item.action_body;
-          } else if (item.action_desc === 'confirm_order_sap_msg') {
-            errorMsg = item.action_result;
-          } else {
-            errorMsg = item.action_result || item.action_body || "";
-          }
+          const errorMsg = item.action_result || "";
           return {
             action_log_code: item.action_log_code,
             action_result: errorMsg,
