@@ -211,7 +211,6 @@ exports.getOrderInformation = async (req, res, next) => {
             OFFSET (${page_index} * ${page_limit}) LIMIT ${page_limit};
         `;
 
-    console.log(dataScript);
 
     // =========================================================================
     // Execute Query หลัก และประมวลผลผลลัพธ์เพื่อส่ง Response

@@ -139,7 +139,7 @@ const generateEmailTableRows = (orders) => {
  * สร้าง Card Email
  */
 const generateFullEmailHtml = (stationName, confirmUrl, ordersHtml, hasOrders = true) => {
-    const logoUrl = "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ea/Bangchak_Corporation_logo.svg/512px-Bangchak_Corporation_logo.svg.png";
+    const logoUrl = "cid:bangchak_logo";
 
     if (!hasOrders) {
         return `
@@ -152,7 +152,7 @@ const generateFullEmailHtml = (stationName, confirmUrl, ordersHtml, hasOrders = 
     <body style="margin: 0; padding: 30px 10px; background-color: #f4f7f5; font-family: 'Sarabun', 'Inter', -apple-system, sans-serif; -webkit-font-smoothing: antialiased;">
         <div style="max-width: 680px; margin: 0 auto; background-color: #ffffff; padding: 40px; border-radius: 16px; border: 1px solid #e3e8e5; box-shadow: 0 10px 25px rgba(14,130,63,0.05);">
             <div style="text-align: center; margin-bottom: 35px;">
-                <img src="${logoUrl}" alt="Bangchak" style="max-height: 55px; margin-bottom: 15px;">
+                <img src="${logoUrl}" alt="Bangchak" style="max-height: 85px; margin-bottom: 15px;">
                 <h2 style="color: #0E823F; margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.3px;">รายงานออเดอร์อัตโนมัติ (Auto Order)</h2>
                 <div style="width: 60px; height: 4px; background: linear-gradient(90deg, #0E823F 0%, #F05A28 100%); margin: 15px auto; border-radius: 2px;"></div>
             </div>
@@ -187,7 +187,7 @@ const generateFullEmailHtml = (stationName, confirmUrl, ordersHtml, hasOrders = 
     <body style="margin: 0; padding: 30px 10px; background-color: #f4f7f5; font-family: 'Sarabun', 'Inter', -apple-system, sans-serif; -webkit-font-smoothing: antialiased;">
         <div style="max-width: 680px; margin: 0 auto; background-color: #ffffff; padding: 40px; border-radius: 16px; border: 1px solid #e3e8e5; box-shadow: 0 10px 25px rgba(14,130,63,0.05);">
             <div style="text-align: center; margin-bottom: 35px;">
-                <img src="${logoUrl}" alt="Bangchak" style="max-height: 55px; margin-bottom: 15px;">
+                <img src="${logoUrl}" alt="Bangchak" style="max-height: 85px; margin-bottom: 15px;">
                 <h2 style="color: #0E823F; margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.3px;">รายงานออเดอร์อัตโนมัติ (Auto Order)</h2>
                 <div style="width: 60px; height: 4px; background: linear-gradient(90deg, #0E823F 0%, #F05A28 100%); margin: 15px auto; border-radius: 2px;"></div>
             </div>
@@ -342,7 +342,13 @@ const sendAutoOrderEmail = async (stationData) => {
         if (!fs.existsSync(path.dirname(previewPath))) fs.mkdirSync(path.dirname(previewPath), { recursive: true });
         fs.writeFileSync(previewPath, htmlContent, 'utf8');
 
-        return (await mailer.sendMail(toEmail, subject, htmlContent)).success;
+        const attachments = [{
+            filename: 'Logo.png',
+            path: path.join(__dirname, '../../public/images/Logo.png'),
+            cid: 'bangchak_logo'
+        }];
+
+        return (await mailer.sendMail(toEmail, subject, htmlContent, attachments)).success;
     } catch (err) {
         console.error('❌ [sendAutoOrderEmail Error]:', err);
         return false;
@@ -422,7 +428,7 @@ exports.runAutoOrderMailTask = async () => {
             ORDER BY ao.ist_dt DESC 
         `;
         const result = await pgConn.get(dbPrefix + lic_code, query, config.connectionString());
-        console.log(result)
+
         if (result.code || !result.data || result.data.length === 0) {
             console.log(`ℹ️  [Auto Order Mail] ไม่มีงานค้าง`);
             return { success: true };
