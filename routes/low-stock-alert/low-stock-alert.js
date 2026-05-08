@@ -19,6 +19,7 @@ const dbPrefix = config.dbPrefix();
 const generateLowStockEmailHtml = (petrolInfo, lowStockProducts) => {
     let rowsHtml = '';
     lowStockProducts.forEach(prod => {
+        const recom = Math.max(0, Number(prod.total_day_sales) - Number(prod.total_usable_stock));
         rowsHtml += `
             <tr style="border-bottom: 1px solid #ddd;">
                 <td style="padding: 12px 15px; text-align: center;">${prod.tank_numbers}</td>
@@ -29,11 +30,11 @@ const generateLowStockEmailHtml = (petrolInfo, lowStockProducts) => {
                 <td style="padding: 12px 15px; text-align: right;">
                     ${Number(prod.total_day_sales).toLocaleString()} ลิตร/วัน
                 </td>
-                <td style="padding: 12px 15px; text-align: center; color: #d9534f; font-weight: bold;">
-                    ${Number(prod.days_remaining).toFixed(1)} วัน
+                <td style="padding: 12px 15px; text-align: right;">
+                    ${Number(prod.total_actual_unpump).toLocaleString()} ลิตร
                 </td>
-                <td style="padding: 12px 15px; text-align: center;">
-                    ${prod.coverage_days} วัน
+                <td style="padding: 12px 15px; text-align: right; color: #d9534f; font-weight: bold;">
+                    ${recom > 0 ? recom.toLocaleString() + ' ลิตร' : '-'}
                 </td>
             </tr>
         `;
@@ -82,10 +83,10 @@ const generateLowStockEmailHtml = (petrolInfo, lowStockProducts) => {
                             <tr>
                                 <th>ถัง (Tanks)</th>
                                 <th>ผลิตภัณฑ์</th>
-                                <th>ปริมาณที่ขายได้จริง<br><small>(รวมทุกถัง)</small></th>
-                                <th>ยอดขายเฉลี่ย<br><small>(รวมทุกถัง)</small></th>
-                                <th>เหลือขายได้<br><small>(โดยประมาณ)</small></th>
-                                <th>เกณฑ์ขั้นต่ำ</th>
+                                <th>Stock คงเหลือ</th>
+                                <th>ยอดขายเฉลี่ยต่อวัน</th>
+                                <th>Unpump</th>
+                                <th>แนะนำ</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -153,7 +154,7 @@ const generateLowStockExcel = async (petrolInfo, lowStockProducts) => {
             prodCell.alignment = { horizontal: 'center', vertical: 'middle' };
             prodCell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
 
-            ['Stock', 'ยอดขาย', 'Unpump', 'แนะนำ'].forEach((sub, i) => {
+            ['Stock คงเหลือ', 'ยอดขาย', 'Unpump', 'แนะนำ'].forEach((sub, i) => {
                 const subCell = worksheet.getCell(3, currentCol + i);
                 subCell.value = sub;
                 subCell.font = fontSarabunBold;
@@ -166,7 +167,7 @@ const generateLowStockExcel = async (petrolInfo, lowStockProducts) => {
         // 5. หัวตารางคอลัมน์ "รวม" (Total)
         worksheet.mergeCells(2, currentCol, 2, currentCol + 1);
         worksheet.getCell(2, currentCol).value = 'รวมทั้งหมด';
-        ['Stock', 'ยอดขาย'].forEach((sub, i) => {
+        ['Stock คงเหลือ', 'ยอดขาย'].forEach((sub, i) => {
             const subCell = worksheet.getCell(3, currentCol + i);
             subCell.value = sub;
             subCell.font = fontSarabunBold;
@@ -196,10 +197,8 @@ const generateLowStockExcel = async (petrolInfo, lowStockProducts) => {
             const unpump = prodData ? Number(prodData.total_actual_unpump) : 0;
             const pending = prodData ? Number(prodData.total_pending_qty) : 0;
 
-            // คำนวณยอดแนะนำ: (เกณฑ์วัน * ยอดขาย) - (สต็อก + ยอดที่สั่งไว้แล้ว)
-            const targetStock = (parseFloat(petrolInfo.coverage_days) || 3) * sales;
-            const shortfall = Math.max(0, targetStock - (stock + pending));
-            const recom = shortfall > 0 ? Math.ceil(shortfall / 1000) * 1000 : 0;
+            // คำนวณยอดแนะนำ: จำนวนแนะนำต้องรวมกับ stock คงเหลือ + กันแล้วต้องเท่ากับยอดขายเฉลี่ยต่อวัน
+            const recom = Math.max(0, sales - stock);
 
             grandTotalStock += stock;
             grandTotalSales += sales;
@@ -282,9 +281,9 @@ const generateCSSummaryEmailHtml = (stationsData) => {
 
     let subThHtml = ``;
     productList.forEach(() => {
-        subThHtml += `<th style="border-left: 2px solid #dee2e6; font-size:12px;">Stock</th><th style="font-size:12px;">ยอดขาย</th><th style="font-size:12px;">Unpump</th><th style="font-size:12px; color:#d9534f;">แนะนำ</th>`;
+        subThHtml += `<th style="border-left: 2px solid #dee2e6; font-size:12px;">Stock คงเหลือ</th><th style="font-size:12px;">ยอดขาย</th><th style="font-size:12px;">Unpump</th><th style="font-size:12px; color:#d9534f;">แนะนำ</th>`;
     });
-    subThHtml += `<th style="border-left: 2px solid #dee2e6; font-size:12px; background-color: #e9ecef;">Stock</th><th style="font-size:12px; background-color: #e9ecef;">ยอดขาย</th><th style="font-size:12px; color:#d9534f; background-color: #e9ecef;">แนะนำ</th>`;
+    subThHtml += `<th style="border-left: 2px solid #dee2e6; font-size:12px; background-color: #e9ecef;">Stock คงเหลือ</th><th style="font-size:12px; background-color: #e9ecef;">ยอดขาย</th><th style="font-size:12px; color:#d9534f; background-color: #e9ecef;">แนะนำ</th>`;
 
     let rowsHtml = '';
     let totalAllStocks = 0, totalAllSales = 0, totalAllRecom = 0;
@@ -302,9 +301,7 @@ const generateCSSummaryEmailHtml = (stationsData) => {
             const unpump = prod ? Number(prod.total_actual_unpump) : 0;
             const pending = prod ? Number(prod.total_pending_qty) : 0;
 
-            const targetStock = (parseFloat(station.coverage_days) || 3) * sales;
-            const shortfall = Math.max(0, targetStock - (stock + pending));
-            const recom = shortfall > 0 ? Math.ceil(shortfall / 1000) * 1000 : 0;
+            const recom = Math.max(0, sales - stock);
 
             rowStock += stock;
             rowSales += sales;
@@ -434,7 +431,7 @@ const generateCSSummaryExcel = async (stationsData) => {
             prodCell.alignment = { horizontal: 'center', vertical: 'middle' };
             prodCell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
 
-            ['Stock', 'ยอดขาย', 'Unpump', 'แนะนำ'].forEach((sub, i) => {
+            ['Stock คงเหลือ', 'ยอดขาย', 'Unpump', 'แนะนำ'].forEach((sub, i) => {
                 const subCell = worksheet.getCell(3, currentCol + i);
                 subCell.value = sub;
                 subCell.font = fontSarabunBold;
@@ -446,7 +443,7 @@ const generateCSSummaryExcel = async (stationsData) => {
 
         worksheet.mergeCells(2, currentCol, 2, currentCol + 2);
         worksheet.getCell(2, currentCol).value = 'รวมทั้งหมด';
-        ['Stock', 'ยอดขาย', 'แนะนำ'].forEach((sub, i) => {
+        ['Stock คงเหลือ', 'ยอดขาย', 'แนะนำ'].forEach((sub, i) => {
             const subCell = worksheet.getCell(3, currentCol + i);
             subCell.value = sub;
             subCell.font = fontSarabunBold;
@@ -478,9 +475,7 @@ const generateCSSummaryExcel = async (stationsData) => {
                 const unpump = prodData ? Number(prodData.total_actual_unpump) : 0;
                 const pending = prodData ? Number(prodData.total_pending_qty) : 0;
 
-                const targetStock = (parseFloat(station.coverage_days) || 3) * sales;
-                const shortfall = Math.max(0, targetStock - (stock + pending));
-                const recom = shortfall > 0 ? Math.ceil(shortfall / 1000) * 1000 : 0;
+                const recom = Math.max(0, sales - stock);
 
                 rowStock += stock; rowSales += sales; rowRecom += recom;
 
@@ -609,7 +604,7 @@ exports.processLowStockAlerts = async (lic_code, manual_off_code = null) => {
         let params = [];
         if (manual_off_code && manual_off_code.toString().toUpperCase() !== 'ALL') {
             params.push(manual_off_code);
-            wh = ` AND o.off_code = $${params.length} `;
+            wh = ` AND o.order_cutoff_time = (SELECT order_cutoff_time FROM tbl_office WHERE off_code = $${params.length} AND rm_dt IS NULL LIMIT 1) `;
         } else if (!manual_off_code) {
             params.push(currentTime.format('HH:mm:ss'));
             wh = ` AND o.order_cutoff_time <= $${params.length}::TIME `;
@@ -647,8 +642,9 @@ exports.processLowStockAlerts = async (lic_code, manual_off_code = null) => {
                     FROM tbl_automatics_tanks_information ORDER BY tank_code, ptrl_code, stock_at DESC
                 ) auto_tank ON tpt.ptrl_tank_code = auto_tank.tank_code AND tpt.ptrl_code = auto_tank.ptrl_code
                 LEFT JOIN (
-                    SELECT ptrl_code, tank_code, MAX(sale_previous) as sale_previous 
-                    FROM tbl_automatics_sales_previous_information GROUP BY ptrl_code, tank_code
+                    SELECT DISTINCT ON (tank_code, ptrl_code) ptrl_code, tank_code, sale_previous 
+                    FROM tbl_automatics_sales_previous_information 
+                    ORDER BY tank_code, ptrl_code, sale_at_previous DESC
                 ) auto_sales ON tpt.ptrl_code = auto_sales.ptrl_code AND tpt.ptrl_tank_code = auto_sales.tank_code
                 WHERE tpt.ptrl_code = $1 AND tpt.ptrl_tank_flag = '1' AND tpt.rm_dt IS NULL
                 ORDER BY tpt.tnk_number ASC
@@ -675,7 +671,7 @@ exports.processLowStockAlerts = async (lic_code, manual_off_code = null) => {
                     };
                 }
                 const group = productGroups[tank.itm_code];
-                const unpumpVolume = tank.deadstock + (tank.deadstock * (tank.unpump_level || 0) / 100);
+                const unpumpVolume = parseFloat(tank.deadstock) || 0;
 
                 group.tanks.push(tank.tnk_number);
                 group.total_stock += parseFloat(tank.current_stock) || 0;
@@ -692,20 +688,37 @@ exports.processLowStockAlerts = async (lic_code, manual_off_code = null) => {
                 const avgSales = group.total_sales > 0 ? group.total_sales : 0.001; // ป้องกันหารด้วยศูนย์
                 const daysLeft = usableStock / avgSales;
                 const potentialDaysLeft = (usableStock + group.total_pending) / avgSales;
+                let stockDaysales = (group.total_stock - group.total_sales)
+                if (stockDaysales < group.total_unpump) {
+                    // ตรวจสอบว่าวันนี้มีการเปิดออเดอร์สำหรับสินค้านี้ที่ส่ง SAP สำเร็จแล้วหรือไม่
+                    const todayOrderCheck = await pgConn.getWithParams(dbName, `
+                        SELECT 1
+                        FROM tbl_order o
+                        JOIN tbl_order_item i ON o.id = i.order_no
+                        WHERE o.ship_to = $1
+                          AND i.item_no = $2
+                          AND o.order_status = '1'
+                          AND DATE(o.ist_dt) = CURRENT_DATE
+                          AND o.rm_dt IS NULL 
+                          AND i.rm_dt IS NULL
+                        LIMIT 1
+                    `, [station.ptrl_number, itmCode], config.connectionString());
+                    // มีออเดอร์เปิดแล้ววันนี้และส่งเข้า SAP สำเร็จ ไม่ต้องแจ้งเตือน
+                    if (todayOrderCheck.data && todayOrderCheck.data.length > 0) {
 
-                if (daysLeft <= coverageLimit) {
-                    if (potentialDaysLeft <= coverageLimit) {
-                        lowStockProducts.push({
-                            product_name: group.name,
-                            tank_numbers: group.tanks.sort((a, b) => a - b).join(', '),
-                            total_usable_stock: usableStock,
-                            total_actual_unpump: group.total_unpump,
-                            total_day_sales: group.total_sales,
-                            total_pending_qty: group.total_pending,
-                            days_remaining: daysLeft,
-                            coverage_days: coverageLimit
-                        });
+                        continue;
                     }
+
+                    lowStockProducts.push({
+                        product_name: group.name,
+                        tank_numbers: group.tanks.sort((a, b) => a - b).join(', '),
+                        total_usable_stock: stockDaysales,
+                        total_actual_unpump: group.total_unpump,
+                        total_day_sales: group.total_sales,
+                        total_pending_qty: group.total_pending,
+                        days_remaining: daysLeft,
+                        coverage_days: coverageLimit
+                    });
                 }
             }
 
