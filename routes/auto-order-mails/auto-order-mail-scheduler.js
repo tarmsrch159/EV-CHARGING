@@ -33,14 +33,14 @@ const executeLoop = async (startTimeStr, endTimeStr, pauseMinutes) => {
     while (true) {
         try {
             const timeCtx = checkInTimeWindow(startTimeStr, endTimeStr);
-
+            // ======== เริ่มทำงานของรอบวัน ============
             if (timeCtx.isInWindow) {
                 console.log(`\n[${timeCtx.now.format('HH:mm:ss')}] 🟢 อยู่ในช่วงเวลาทำงาน | เริ่มประมวลผล...`);
                 await autoOrderMailsController.runAutoOrderMailTask();
 
                 const finishTime = moment();
                 const currentWindow = checkInTimeWindow(startTimeStr, endTimeStr);
-
+                // ====== จบรอบสุดท้ายของวัน หรือ เวลาเกินช่วงเวลาทำงานไปแล้ว ======
                 if (currentWindow.isAfter || finishTime.format('HH:mm') === endTimeStr) {
                     const tomorrowStart = moment().add(1, 'day').set({
                         hour: parseInt(startTimeStr.split(':')[0]),
@@ -50,15 +50,21 @@ const executeLoop = async (startTimeStr, endTimeStr, pauseMinutes) => {
                     const waitMs = tomorrowStart.diff(finishTime);
                     console.log(`\n[${finishTime.format('HH:mm:ss')}] 🏁 จบรอบสุดท้ายของวัน | จะเริ่มใหม่พรุ่งนี้ตอน ${startTimeStr} (${Math.round(waitMs / 1000 / 60)} นาที)`);
                     await sleep(waitMs);
-                } else {
+                }
+                // ====== Cool Down การทำงาน ======
+                else {
                     console.log(`\n[${finishTime.format('HH:mm:ss')}] 💤 เสร็จรอบนี้ | พัก ${pauseMinutes} นาที...`);
                     await sleep(pauseMinutes * 60 * 1000);
                 }
-            } else if (timeCtx.isBefore) {
+            }
+            // ====== ยังไม่ถึงเวลาเริ่ม (${startTimeStr}) | รออีก ${Math.round(waitMs / 1000 / 60)} นาที======
+            else if (timeCtx.isBefore) {
                 const waitMs = timeCtx.startWindow.diff(timeCtx.now);
                 console.log(`\n[${timeCtx.now.format('HH:mm:ss')}] ⏳ ยังไม่ถึงเวลาเริ่ม (${startTimeStr}) | รออีก ${Math.round(waitMs / 1000 / 60)} นาที...`);
                 await sleep(waitMs);
-            } else {
+            }
+            // เวลาเลยช่วงเวลาทำงานไปแล้ว
+            else {
                 const tomorrowStart = moment().add(1, 'day').set({
                     hour: parseInt(startTimeStr.split(':')[0]),
                     minute: parseInt(startTimeStr.split(':')[1]),
@@ -75,7 +81,7 @@ const executeLoop = async (startTimeStr, endTimeStr, pauseMinutes) => {
     }
 };
 
-// --- Export Functions ---
+
 
 // =========== Production Time =============
 exports.startAutoOrderMailLoop = () => executeLoop("00:30", "15:30", 10);

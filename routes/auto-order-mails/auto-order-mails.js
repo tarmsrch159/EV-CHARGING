@@ -138,45 +138,89 @@ const generateEmailTableRows = (orders) => {
 /**
  * สร้าง Card Email
  */
-const generateFullEmailHtml = (stationName, confirmUrl, ordersHtml) => {
+const generateFullEmailHtml = (stationName, confirmUrl, ordersHtml, hasOrders = true) => {
+    const logoUrl = "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ea/Bangchak_Corporation_logo.svg/512px-Bangchak_Corporation_logo.svg.png";
+
+    if (!hasOrders) {
+        return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    </head>
+    <body style="margin: 0; padding: 30px 10px; background-color: #f4f7f5; font-family: 'Sarabun', 'Inter', -apple-system, sans-serif; -webkit-font-smoothing: antialiased;">
+        <div style="max-width: 680px; margin: 0 auto; background-color: #ffffff; padding: 40px; border-radius: 16px; border: 1px solid #e3e8e5; box-shadow: 0 10px 25px rgba(14,130,63,0.05);">
+            <div style="text-align: center; margin-bottom: 35px;">
+                <img src="${logoUrl}" alt="Bangchak" style="max-height: 55px; margin-bottom: 15px;">
+                <h2 style="color: #0E823F; margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.3px;">รายงานออเดอร์อัตโนมัติ (Auto Order)</h2>
+                <div style="width: 60px; height: 4px; background: linear-gradient(90deg, #0E823F 0%, #F05A28 100%); margin: 15px auto; border-radius: 2px;"></div>
+            </div>
+
+            <p style="font-size: 16px; color: #1C2421; line-height: 1.6; margin-bottom: 8px;">เรียน ผู้ดูแลสถานีบริการ สาขา <strong>${stationName}</strong>,</p>
+            <p style="font-size: 15px; color: #4A5551; line-height: 1.6; margin-top: 0; margin-bottom: 30px;">
+                ระบบ Automatic Ordering System (AOS) ได้จัดเตรียมและคำนวณการสั่งซื้อน้ำมันประจำวันที่ <strong>${moment().format('DD/MM/YYYY')}</strong> เสร็จสมบูรณ์แล้ว:
+            </p>
+            
+            <div style="text-align: center; padding: 45px 30px; background: linear-gradient(135deg, #f7fbf8 0%, #edf7ef 100%); border: 1px solid #d0e7d7; border-radius: 16px; margin: 30px 0; box-shadow: inset 0 2px 6px rgba(14,130,63,0.02);">
+                <div style="font-size: 48px; margin-bottom: 18px; display: inline-block; line-height: 1;">📝</div>
+                <div style="color: #0E823F; font-size: 20px; font-weight: 700; margin-bottom: 6px;">ระบบวิเคราะห์สำเร็จ</div>
+                <div style="color: #55605B; font-size: 15px; font-weight: 500;">ไม่มียอดสั่งน้ำมันแนะนำเพิ่มเติมในวันนี้</div>
+            </div>
+
+            <div style="margin-top: 40px; text-align: center; font-size: 13px; color: #8A9994; border-top: 1px solid #edf1ef; padding-top: 25px; line-height: 1.6;">
+                <p style="margin: 0 0 4px 0; font-weight: 500; color: #55605B;">Bangchak Corporation Public Company Limited</p>
+                <p style="margin: 0; font-size: 12px; color: #A0B0AB;">นี่คืออีเมลอัตโนมัติจากระบบ AOS กรุณาอย่าตอบกลับอีเมลนี้</p>
+            </div>
+        </div>
+    </body>
+    </html>`;
+    }
+
     return `
     <!DOCTYPE html>
     <html>
-    <body style="margin: 0; padding: 20px; background-color: #f9f9f9;">
-        <div style="max-width: 750px; margin: 0 auto; background-color: #ffffff; font-family: sans-serif; padding: 30px; border: 1px solid #e0e0e0; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05);">
-            <div style="text-align: center; margin-bottom: 25px;">
-                <img src="https://www.bangchak.co.th/uploads/logos/logo.png" alt="Bangchak" style="max-height: 50px; margin-bottom: 10px;">
-                <h2 style="color: #00695c; margin: 0; font-size: 24px;">รายงานออเดอร์อัตโนมัติ (Auto Order)</h2>
-                <div style="width: 50px; height: 3px; background-color: #8bc34a; margin: 15px auto;"></div>
+    <head>
+        <meta charset="utf-8">
+        <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    </head>
+    <body style="margin: 0; padding: 30px 10px; background-color: #f4f7f5; font-family: 'Sarabun', 'Inter', -apple-system, sans-serif; -webkit-font-smoothing: antialiased;">
+        <div style="max-width: 680px; margin: 0 auto; background-color: #ffffff; padding: 40px; border-radius: 16px; border: 1px solid #e3e8e5; box-shadow: 0 10px 25px rgba(14,130,63,0.05);">
+            <div style="text-align: center; margin-bottom: 35px;">
+                <img src="${logoUrl}" alt="Bangchak" style="max-height: 55px; margin-bottom: 15px;">
+                <h2 style="color: #0E823F; margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.3px;">รายงานออเดอร์อัตโนมัติ (Auto Order)</h2>
+                <div style="width: 60px; height: 4px; background: linear-gradient(90deg, #0E823F 0%, #F05A28 100%); margin: 15px auto; border-radius: 2px;"></div>
             </div>
 
-            <p style="font-size: 16px; color: #333;">เรียน ผู้จัดการปั๊ม <strong>${stationName}</strong>,</p>
-            <p style="font-size: 15px; color: #555; line-height: 1.5;">
-                ระบบ Automatic Ordering System (AOS) ได้สร้างคำสั่งซื้อน้ำมันสำหรับรอบวันที่ <strong>${moment().format('DD/MM/YYYY')}</strong> เรียบร้อยแล้ว:
+            <p style="font-size: 16px; color: #1C2421; line-height: 1.6; margin-bottom: 8px;">เรียน ผู้จัดการปั๊ม <strong>${stationName}</strong>,</p>
+            <p style="font-size: 15px; color: #4A5551; line-height: 1.6; margin-top: 0; margin-bottom: 25px;">
+                ระบบ Automatic Ordering System (AOS) ได้สร้างคำสั่งซื้อน้ำมันแนะนำสำหรับรอบวันที่ <strong>${moment().format('DD/MM/YYYY')}</strong> เรียบร้อยแล้ว:
             </p>
             
-            <table style="width: 100%; border-collapse: collapse; margin-top: 25px; border: 1px solid #eee;">
-                <thead>
-                    <tr style="background-color: #00695c; color: #ffffff;">
-                        <th style="padding: 12px; text-align: left; border: 1px solid #004d40; font-size: 14px;">เลขที่ออเดอร์ (AOS)</th>
-                        <th style="padding: 12px; text-align: left; border: 1px solid #004d40; font-size: 14px;">ผลิตภัณฑ์</th>
-                        <th style="padding: 12px; text-align: right; border: 1px solid #004d40; font-size: 14px;">จำนวน (ลิตร)</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${ordersHtml}
-                </tbody>
-            </table>
+            <div style="border-radius: 12px; overflow: hidden; border: 1px solid #e1e8e4; margin: 25px 0; box-shadow: 0 4px 12px rgba(0,0,0,0.01);">
+                <table style="width: 100%; border-collapse: collapse; background-color: #ffffff;">
+                    <thead>
+                        <tr style="background-color: #0E823F; color: #ffffff;">
+                            <th style="padding: 14px 16px; text-align: left; font-size: 14px; font-weight: 600; border-bottom: 2px solid #0B6B34;">เลขที่ออเดอร์ (AOS)</th>
+                            <th style="padding: 14px 16px; text-align: left; font-size: 14px; font-weight: 600; border-bottom: 2px solid #0B6B34;">ผลิตภัณฑ์</th>
+                            <th style="padding: 14px 16px; text-align: right; font-size: 14px; font-weight: 600; border-bottom: 2px solid #0B6B34;">จำนวน (ลิตร)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${ordersHtml}
+                    </tbody>
+                </table>
+            </div>
 
-            <div style="text-align: center; margin: 30px 0;">
-                <a href="${confirmUrl}" style="display: inline-block; padding: 14px 40px; background-color: #00695c; color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; box-shadow: 0 4px 10px rgba(0,105,92,0.2);">
+            <div style="text-align: center; margin: 35px 0 25px 0;">
+                <a href="${confirmUrl}" style="display: inline-block; padding: 14px 45px; background: linear-gradient(135deg, #0E823F 0%, #0B6B34 100%); color: #ffffff; text-decoration: none; border-radius: 10px; font-weight: 600; font-size: 16px; box-shadow: 0 6px 20px rgba(14,130,63,0.25); transition: all 0.2s ease;">
                     ตรวจสอบข้อมูลและยืนยันออเดอร์
                 </a>
             </div>
 
-            <div style="margin-top: 30px; padding: 15px; background-color: #f1f8e9; border-left: 4px solid #8bc34a; border-radius: 4px;">
-                <p style="margin: 0; font-size: 14px; color: #33691e;">
-                    <strong>💡 หมายเหตุ:</strong> ออเดอร์นี้ถูกสร้างโดยระบบอัตโนมัติ กรุณาคลิกปุ่ม <strong>"ตรวจสอบ"</strong> เพื่อจัดการสถานะออเดอร์
+            <div style="margin-top: 30px; padding: 16px 20px; background-color: #f0f9f3; border-left: 4px solid #0E823F; border-radius: 6px; text-align: left;">
+                <p style="margin: 0; font-size: 14px; color: #1C3F2A; line-height: 1.5;">
+                    <strong style="color: #0E823F;">💡 หมายเหตุ:</strong> ออเดอร์นี้ถูกสร้างขึ้นโดยระบบแนะนำอัตโนมัติ กรุณาคลิกปุ่ม <strong>"ตรวจสอบข้อมูลและยืนยันออเดอร์"</strong> ด้านบนเพื่อจัดการและยืนยันสถานะออเดอร์ให้เสร็จสมบูรณ์
                 </p>
             </div>
 
@@ -208,26 +252,26 @@ const getDataForStation = async (lic_code, autoItem) => {
         // ====== ดึงข้อมูล Order (ออเดอร์หลัก) ======
         const orderResult = await pgConn.getWithParams(dbPrefix + lic_code, orderScript, [autoItem.ptrl_number], config.connectionString());
 
+        let orderDetails = [];
         if (orderResult.code || !orderResult.data || orderResult.data.length === 0) {
-            console.log(`   ⚪ ไม่พบ auto order สำหรับปั๊มนี้`);
-            return null;
+            console.log(`   ⚪ ไม่พบ auto order สำหรับปั๊มนี้ (จะส่งรายงานไม่มียอดสั่งน้ำมันแทน)`);
+        } else {
+            const orders = orderResult.data;
+            orderDetails = await Promise.all(orders.map(async (order) => {
+                // ====== ดึงข้อมูล Order Items (ออเดอร์ย่อย) ======
+                const items = await getOrderItems(lic_code, order);
+                return {
+                    order_id: order.id,
+                    order_no: order.order_no || '',
+                    sh_cus_ref: order.sh_cus_ref || '',
+                    order_status: order.order_status || '',
+                    deli_date_req: order.deli_date_req || '',
+                    description: order.description || '',
+                    ist_dt: order.ist_dt || '',
+                    items
+                };
+            }));
         }
-
-        const orders = orderResult.data;
-        const orderDetails = await Promise.all(orders.map(async (order) => {
-            // ====== ดึงข้อมูล Order Items (ออเดอร์ย่อย) ======
-            const items = await getOrderItems(lic_code, order);
-            return {
-                order_id: order.id,
-                order_no: order.order_no || '',
-                sh_cus_ref: order.sh_cus_ref || '',
-                order_status: order.order_status || '',
-                deli_date_req: order.deli_date_req || '',
-                description: order.description || '',
-                ist_dt: order.ist_dt || '',
-                items
-            };
-        }));
 
         // ====== ดึงข้อมูลผู้จัดการปั๊ม (emp_code) จาก tbl_employee ======
         const manager = await getManagerByPtrlCode(lic_code, autoItem.ptrl_code);
@@ -260,35 +304,45 @@ const sendAutoOrderEmail = async (stationData) => {
         const stationName = `${stationData.ptrl_desc} (${stationData.ptrl_number})`;
         const reportBaseUrlProd = 'https://spd-demo.dtc.co.th:9101/main/order/order-report';
         const reportBaseUrlTest = 'http://localhost:5173/main/order/order-report';
-
-
         const reportBaseUrl = reportBaseUrlProd;
 
-        const firstOrder = stationData.orders[0] || {};
-        const orderId = firstOrder.order_id || '';
-        // ====== สร้าง Encrypted Token สำหรับ Auto Signin ======
-        const payload = JSON.stringify({
-            lic_code: stationData.lic_code,
-            order_id: orderId,
-            emp_id: stationData.manager_emp_code || '',
-            u: stationData.manager_username || '',
-            p: stationData.manager_password || '',
-            exp: moment().add(24, 'hours').valueOf()  // หมดอายุ 24 ชั่วโมง
-        });
-        const token = encryptPayload(payload);
-        const confirmUrl = `${reportBaseUrl}?token=${encodeURIComponent(token)}`;
+        const hasOrders = stationData.orders && stationData.orders.length > 0;
+        let confirmUrl = '';
+        let rowsHtml = '';
+        let subject = `[Auto Order] รายงานยอดสั่งซื้ออัตโนมัติ - ${stationData.ptrl_desc}`;
 
-        console.log(`   🔗 สร้างลิงก์ตรวจสอบ: ${confirmUrl}`);
+        // =========== กรณีมีAuto Order ของปั๊มนั้นๆ ============
+        if (hasOrders) {
+            const firstOrder = stationData.orders[0] || {};
+            const orderId = firstOrder.order_id || '';
+            // ====== สร้าง Encrypted Token สำหรับ Auto Signin ======
+            const payload = JSON.stringify({
+                lic_code: stationData.lic_code,
+                order_id: orderId,
+                emp_id: stationData.manager_emp_code || '',
+                u: stationData.manager_username || '',
+                p: stationData.manager_password || '',
+                exp: moment().add(24, 'hours').valueOf()  // หมดอายุ 24 ชั่วโมง
+            });
+            const token = encryptPayload(payload);
+            confirmUrl = `${reportBaseUrl}?token=${encodeURIComponent(token)}`;
+            console.log(`   🔗 สร้างลิงก์ตรวจสอบ: ${confirmUrl}`);
 
-        const rowsHtml = generateEmailTableRows(stationData.orders);
-        const htmlContent = generateFullEmailHtml(stationName, confirmUrl, rowsHtml);
+            rowsHtml = generateEmailTableRows(stationData.orders);
+        } else {
+            // =========== กรณีไม่Auto Order ของปั๊มนั้นๆ ===========
+            subject = `[Auto Order] ไม่มียอดสั่งน้ำมันในวันนี้ - ${stationData.ptrl_desc}`;
+            console.log(`   ℹ️  ไม่มียอดสั่งซื้อ: เตรียมส่งเมลแจ้งเตือนไม่มียอดสั่งน้ำมัน`);
+        }
+
+        const htmlContent = generateFullEmailHtml(stationName, confirmUrl, rowsHtml, hasOrders);
 
         // Preview File
         const previewPath = path.join(__dirname, 'preview_html', 'preview_email.html');
         if (!fs.existsSync(path.dirname(previewPath))) fs.mkdirSync(path.dirname(previewPath), { recursive: true });
         fs.writeFileSync(previewPath, htmlContent, 'utf8');
 
-        return (await mailer.sendMail(toEmail, `[Auto Order] รายงานยอดสั่งซื้ออัตโนมัติ - ${stationData.ptrl_desc}`, htmlContent)).success;
+        return (await mailer.sendMail(toEmail, subject, htmlContent)).success;
     } catch (err) {
         console.error('❌ [sendAutoOrderEmail Error]:', err);
         return false;
@@ -306,7 +360,8 @@ const processAutoOrderMails = async (lic_code) => {
                    p.ptrl_number, p.ptrl_desc, p.ptrl_short_desc, p.ptrl_remark
             FROM tbl_automatics_orders ao
             INNER JOIN tbl_petrol p ON ao.ptrl_code = p.ptrl_code
-            WHERE ao.automatic_status = '1' AND ao.ist_dt::date = CURRENT_DATE - 1
+            WHERE ao.automatic_status = '1' 
+              AND ao.ist_dt::date = (SELECT MAX(ist_dt::date) FROM tbl_automatics_orders WHERE automatic_status = '1')
               AND p.ptrl_remark IS NOT NULL AND p.ptrl_remark != ''
             ORDER BY ao.ist_dt DESC
         `;
@@ -361,7 +416,8 @@ exports.runAutoOrderMailTask = async () => {
                    p.ptrl_number, p.ptrl_desc, p.ptrl_short_desc, p.ptrl_remark
             FROM tbl_automatics_orders ao
             INNER JOIN tbl_petrol p ON ao.ptrl_code = p.ptrl_code
-            WHERE ao.automatic_status = '1' AND ao.ist_dt::date = CURRENT_DATE - 1
+            WHERE ao.automatic_status = '1' 
+              AND ao.ist_dt::date = (SELECT MAX(ist_dt::date) FROM tbl_automatics_orders WHERE automatic_status = '1')
               AND p.ptrl_remark IS NOT NULL AND p.ptrl_remark != ''
             ORDER BY ao.ist_dt DESC 
         `;

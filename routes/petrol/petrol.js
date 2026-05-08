@@ -21,7 +21,12 @@ exports.getPetrolInformation = async (req, res, next) => {
       page_limit,
       action,
       auto_order,
+      ptrl_sales_group,
+      ptrl_sales_type,
     } = payload;
+
+    const finalSalesGroupArray = ptrl_sales_group;
+    const finalSalesTypeArray = ptrl_sales_type;
 
     // ======== กำหนดค่าเริ่มต้น ========
     page_index = page_index === undefined ? 1 : page_index;
@@ -79,6 +84,21 @@ exports.getPetrolInformation = async (req, res, next) => {
     // if (off_code.toString().toUpperCase() !== "ALL") {
     //   conditions.push(`tbl_petrol.off_code = '${off_code}'`);
     // }
+
+    // กรองเพิ่มเติมตาม array sales_org
+    if (ptrl_sales_group && Array.isArray(ptrl_sales_group) && ptrl_sales_group.length > 0) {
+      const salesOrg = ptrl_sales_group.map(val => `'${String(val).replace(/'/g, "''")}'`).join(", ");
+      conditions.push(`tbl_petrol.ptrl_sales_group IN (${salesOrg})`);
+    }
+
+    // กรองเพิ่มเติมตาม array order_type (รองรับทั้ง ord_type_code และ sales_order_type)
+    if (ptrl_sales_type && Array.isArray(ptrl_sales_type) && ptrl_sales_type.length > 0) {
+      const orderTypes = ptrl_sales_type.map(val => `'${String(val).replace(/'/g, "''")}'`).join(", ");
+      conditions.push(`(
+        tbl_petrol.ptrl_sales_type IN (${orderTypes})
+        OR tbl_petrol.ptrl_sales_type IN (SELECT ord_type_code FROM tbl_order_type WHERE sales_order_type IN (${orderTypes}))
+      )`);
+    }
 
 
 
@@ -316,6 +336,8 @@ exports.getPetrolInformationFilter = async (req, res, next) => {
       page_limit,
       action,
       auto_order,
+      ptrl_sales_group,
+      ptrl_sales_type,
     } = payload;
 
     // ======== กำหนดค่าเริ่มต้น ========
@@ -367,6 +389,21 @@ exports.getPetrolInformationFilter = async (req, res, next) => {
       ptrl_group_code !== ""
     ) {
       conditions.push(`tbl_petrol.ptrl_group_code = '${ptrl_group_code}'`);
+    }
+
+    // กรองเพิ่มเติมตาม array sales_org
+    if (ptrl_sales_group && Array.isArray(ptrl_sales_group) && ptrl_sales_group.length > 0) {
+      const salesOrg = ptrl_sales_group.map(val => `'${String(val).replace(/'/g, "''")}'`).join(", ");
+      conditions.push(`tbl_petrol.ptrl_sales_group IN (${salesOrg})`);
+    }
+
+    // กรองเพิ่มเติมตาม array order_type (รองรับทั้ง ord_type_code และ sales_order_type)
+    if (ptrl_sales_type && Array.isArray(ptrl_sales_type) && ptrl_sales_type.length > 0) {
+      const orderTypes = ptrl_sales_type.map(val => `'${String(val).replace(/'/g, "''")}'`).join(", ");
+      conditions.push(`(
+        tbl_petrol.ptrl_sales_type IN (${orderTypes})
+        OR tbl_petrol.ptrl_sales_type IN (SELECT ord_type_code FROM tbl_order_type WHERE sales_order_type IN (${orderTypes}))
+      )`);
     }
     // ดัก undefined ให้ Action
     let act_val = action?.[0]?.value?.toString().toUpperCase() || "ALL";
