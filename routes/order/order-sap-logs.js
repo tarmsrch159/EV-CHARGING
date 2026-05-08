@@ -63,7 +63,8 @@ exports.getSapOrderErrorLogsInformation = async (req, res, next) => {
     // =========================================================================
     let conditions = [
       "tbl_action_logs.rm_dt IS NULL",
-      "tbl_action_logs.action_desc IN ('confirm_order_api_error', 'confirm_order_sap_msg')"
+      "tbl_action_logs.action_desc IN ('confirm_order_api_error')"
+      // "tbl_action_logs.action_desc IN ('confirm_order_api_error', 'confirm_order_sap_msg')"
     ];
 
     if (order_id.toString().toUpperCase() !== "ALL") {
