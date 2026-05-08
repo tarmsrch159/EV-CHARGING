@@ -22,6 +22,7 @@ exports.getOrderInformation = async (req, res, next) => {
       start_date,
       end_date,
       order_type,
+      order_group,
       order_status,
       auto_order,
       status_deli,
@@ -86,8 +87,12 @@ exports.getOrderInformation = async (req, res, next) => {
       conditions.push(`tbl_order.order_no = '${order_no}'`);
     if (status_deli.toString().toUpperCase() !== "ALL")
       conditions.push(`tbl_order.status_deli = '${status_deli}'`);
-    if (order_type.toString().toUpperCase() !== "ALL")
+    if (order_type !== undefined && order_type.toString().toUpperCase() !== "ALL")
       conditions.push(`tbl_order.order_type = '${order_type}'`);
+
+    if (order_group !== undefined && order_group.toString().toUpperCase() !== "ALL")
+      conditions.push(`tbl_order.order_group = '${order_group}'`);
+
     if (auto_order.toString().toUpperCase() !== "ALL")
       conditions.push(`tbl_order.auto_order = '${auto_order}'`);
     if (order_status.toString().toUpperCase() !== "ALL")
