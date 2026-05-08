@@ -62,7 +62,7 @@ exports.getSapOrderErrorLogsInformation = async (req, res, next) => {
     // สร้าง Dynamic WHERE Clause สำหรับ Query หลัก (ดึงข้อมูล Order)
     // =========================================================================
     let conditions = [
-      "tbl_action_logs.rm_dt IS NULL", 
+      "tbl_action_logs.rm_dt IS NULL",
       "tbl_action_logs.action_desc IN ('confirm_order_api_error', 'confirm_order_sap_msg')"
     ];
 
@@ -124,7 +124,7 @@ exports.getSapOrderErrorLogsInformation = async (req, res, next) => {
         });
 
         tbl_temporary.data = JSON.parse(
-          JSON.stringify(tbl_temporary.data).replace(/\:null/gi, '\:""'),
+          JSON.stringify(tbl_temporary.data, (key, value) => value === null ? "" : value)
         );
 
         console.log("tbl_temporary.data", tbl_temporary.data);
