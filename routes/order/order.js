@@ -6135,7 +6135,7 @@ exports.getLinkedOrderList = async (req, res, next) => {
                 FROM tbl_automatics_sales_previous_information
                 GROUP BY ptrl_code, tank_code
             ) auto_sales ON tbl_petrol.ptrl_code = auto_sales.ptrl_code AND tbl_petrol_tank.ptrl_tank_code = auto_sales.tank_code
-            WHERE tbl_order_item.order_no = '${order.id}' AND tbl_order_item.rm_dt IS NULL
+            WHERE tbl_order_item.order_no = '${order.id}' AND tbl_order_item.rm_dt IS NULL AND tbl_petrol_tank.ptrl_tank_flag = '1'
             ORDER BY tbl_order_item.ptrl_tank_code, tbl_order_item.id DESC
           )
           UNION ALL
@@ -6173,7 +6173,7 @@ exports.getLinkedOrderList = async (req, res, next) => {
                 FROM tbl_automatics_sales_previous_information
                 GROUP BY ptrl_code, tank_code
             ) auto_sales ON p.ptrl_code = auto_sales.ptrl_code AND tpt.ptrl_tank_code = auto_sales.tank_code
-            WHERE tpt.ptrl_code = '${order.ptrl_code}' 
+            WHERE tpt.ptrl_code = '${order.ptrl_code}' AND tpt.ptrl_tank_flag = '1'
               AND tpt.ptrl_tank_code NOT IN (SELECT ptrl_tank_code FROM tbl_order_item WHERE order_no = '${order.id}' AND rm_dt IS NULL AND ptrl_tank_code IS NOT NULL)
           )
           ORDER BY tank_number ASC
@@ -6215,7 +6215,7 @@ exports.getLinkedOrderList = async (req, res, next) => {
               FROM tbl_automatics_sales_previous_information
               GROUP BY ptrl_code, tank_code
           ) auto_sales ON tbl_petrol.ptrl_code = auto_sales.ptrl_code AND tbl_petrol_tank.ptrl_tank_code = auto_sales.tank_code
-          WHERE tbl_order_item.order_no = '${order.id}' AND tbl_order_item.rm_dt IS NULL
+          WHERE tbl_order_item.order_no = '${order.id}' AND tbl_order_item.rm_dt IS NULL AND tbl_petrol_tank.ptrl_tank_flag = '1'
           ORDER BY tbl_order_item.ptrl_tank_code, tbl_petrol_tank.tnk_number ASC
         `;
       }
