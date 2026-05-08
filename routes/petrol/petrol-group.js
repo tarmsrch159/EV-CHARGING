@@ -107,7 +107,8 @@ exports.getPetrolGroupInformation = async (req, res, next) => {
             SELECT ptrl_group_code, ptrl_group_desc, ptrl_group_short_desc, ptrl_group_flag, 
             tbl_petrol_group.ist_dt, tbl_petrol_group.mdf_dt, tbl_petrol_group.rm_dt, 
             tbl_petrol_group.off_code, tbl_office.off_desc,
-            tbl_order_type.sales_order_type, tbl_petrol_group.ptrl_group_sales_org
+            tbl_order_type.sales_order_type, tbl_petrol_group.ptrl_group_sales_org,
+            tbl_petrol_group.ptrl_group_order_type
             FROM tbl_petrol_group 
             LEFT JOIN tbl_office ON tbl_petrol_group.off_code = tbl_office.off_code
             LEFT JOIN tbl_order_type ON tbl_petrol_group.ptrl_group_order_type = tbl_order_type.ord_type_code
@@ -348,6 +349,7 @@ exports.getPetrolGroupInformationFilter = async (req, res, next) => {
                 tbl_petrol_group.ptrl_group_desc, 
                 tbl_petrol_group.ptrl_group_short_desc,
                 tbl_petrol_group.ptrl_group_sales_org,
+                tbl_petrol_group.ptrl_group_order_type,
                 tbl_petrol_group.ptrl_group_order_type,
                 ot.sales_order_type
             FROM tbl_petrol_group 
