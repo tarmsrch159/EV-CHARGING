@@ -315,6 +315,7 @@ exports.setPetrolTankInformation = async (req, res, next) => {
             tnk_target,
             tnk_deadstock,
             tnk_safety_factor,
+            ptrl_tank_flag,
             action
         } = req.body[0];
         //เช็คเฉพาะส่วนที่สำคัญ
@@ -341,6 +342,7 @@ exports.setPetrolTankInformation = async (req, res, next) => {
             tnk_deadstock = ${tnk_deadstock},
             tnk_target = ${tnk_target},
             tnk_safety_factor = ${tnk_safety_factor},
+            ptrl_tank_flag = '${ptrl_tank_flag}',
             mdf_dt = '${moment().format('YYYY-MM-DD HH:mm:ss')}' 
             where ptrl_tank_code = '${ptrl_tank_code}';`
 
