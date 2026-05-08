@@ -12,7 +12,7 @@ exports.getItemInformation = async (req, res, next) => {
 
     return (async () => {
         let lic_code = req.header('lic_code');
-        let { itm_code, itm_material_number, search, page_index, page_limit, action } = req.body[0];
+        let { itm_code, itm_material_number, search, page_index, page_limit, action, itm_sales_org, itm_order_type } = req.body[0];
         page_index == undefined ? page_index = 1 : page_index;
         page_limit == undefined ? page_limit = 10 : page_limit;
 
@@ -101,6 +101,21 @@ exports.getItemInformation = async (req, res, next) => {
                 or tbl_item_unit.itm_unit_desc ILIKE '%${search}%')`
             }
 
+            // กรองเพิ่มเติมตาม array itm_sales_org
+            if (itm_sales_org && Array.isArray(itm_sales_org) && itm_sales_org.length > 0) {
+                const orgs = itm_sales_org.map(val => `'${String(val).replace(/'/g, "''")}'`).join(", ");
+                script += ` AND tbl_item.itm_sales_org IN (${orgs}) `;
+            }
+
+            // กรองเพิ่มเติมตาม array itm_order_type (รองรับทั้ง ord_type_code และ sales_order_type)
+            if (itm_order_type && Array.isArray(itm_order_type) && itm_order_type.length > 0) {
+                const otypes = itm_order_type.map(val => `'${String(val).replace(/'/g, "''")}'`).join(", ");
+                script += ` AND (
+                    tbl_item.itm_order_type IN (${otypes})
+                    OR tbl_item.itm_order_type IN (SELECT ord_type_code FROM tbl_order_type WHERE sales_order_type IN (${otypes}))
+                ) `;
+            }
+
             // ดัก undefined ให้ Action
             let act_val = action?.[0]?.value?.toString().toUpperCase() || "ALL";
             let act_id = action?.[0]?.id || "";
@@ -166,6 +181,21 @@ exports.getItemInformation = async (req, res, next) => {
                         or tbl_item.itm_short_desc ILIKE '%${search}%' 
                         or tbl_item_type.itm_type_desc ILIKE '%${search}%' 
                         or tbl_item_unit.itm_unit_desc ILIKE '%${search}%')`
+                    }
+
+                    // กรองเพิ่มเติมตาม array itm_sales_org
+                    if (itm_sales_org && Array.isArray(itm_sales_org) && itm_sales_org.length > 0) {
+                        const orgs = itm_sales_org.map(val => `'${String(val).replace(/'/g, "''")}'`).join(", ");
+                        script += ` AND tbl_item.itm_sales_org IN (${orgs}) `;
+                    }
+
+                    // กรองเพิ่มเติมตาม array itm_order_type (รองรับทั้ง ord_type_code และ sales_order_type)
+                    if (itm_order_type && Array.isArray(itm_order_type) && itm_order_type.length > 0) {
+                        const otypes = itm_order_type.map(val => `'${String(val).replace(/'/g, "''")}'`).join(", ");
+                        script += ` AND (
+                            tbl_item.itm_order_type IN (${otypes})
+                            OR tbl_item.itm_order_type IN (SELECT ord_type_code FROM tbl_order_type WHERE sales_order_type IN (${otypes}))
+                        ) `;
                     }
 
                     // จัดการเงื่อนไขตามสิทธิ์การเข้าถึงสำหรับชุดนับจำนวน
