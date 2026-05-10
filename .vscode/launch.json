@@ -8,7 +8,8 @@
                 "<node_internals>/**"
             ],
             "type": "node",
-            "program": "${workspaceFolder}/bin/www"
+            "program": "${workspaceFolder}/bin/www",
+            "runtimeVersion": "22.11.0"
         }
     ]
 }

@@ -508,7 +508,11 @@ exports.addItemInformation = async (req, res, next) => {
 
 
             let script = ``;
-            script = `select itm_code from tbl_item where (itm_desc = '${itm_desc}' or itm_short_desc = '${itm_short_desc}' or itm_material_number = '${itm_material_number}') and itm_flag = '1';`
+            script = `select itm_code from tbl_item where 
+            (itm_desc = '${itm_desc}' or itm_short_desc = '${itm_short_desc}' 
+            or itm_material_number = '${itm_material_number}') and itm_flag = '1' and itm_sales_org = '${itm_sales_org}' 
+            and itm_order_type = '${itm_order_type}';`
+            
             let tbl_temporary0 = await pgConn.get(dbPrefix + lic_code, script, config.connectionString());
             if (!tbl_temporary0.code) {
                 if (tbl_temporary0.data.length > 0) {
