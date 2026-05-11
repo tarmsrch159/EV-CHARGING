@@ -45,11 +45,24 @@ exports.updateManualStock = async (req, res, next) => {
 
         for (let item of items) {
             let {
-                shipto, shipto_no, tank_no, product_no, product_name,
-                tank_start, tank_end, recive_val,
+                shipto, tank_no, product_no, product_name,
+                tank_start, tank_end, recive_val, day_sales,
                 date_at, close_at
             } = item;
 
+            const targetShipto = shipto;
+
+            // 1. ดึงข้อมูล Metadata ของปั๊มและถังน้ำมัน เพื่อนำไปใช้ในตาราง Automatics
+            const petrolQuery = `
+                SELECT p.ptrl_code, p.ptrl_sitecode, t.itm_code, t.tnk_capacity, t.tnk_target, t.tnk_deadstock, t.tnk_safety_factor
+                FROM tbl_petrol p
+                LEFT JOIN tbl_petrol_tank t ON p.ptrl_code = t.ptrl_code AND t.tnk_number = $2
+                WHERE p.ptrl_number = $1 AND p.ptrl_flag = '1'
+                LIMIT 1
+            `;
+            const petrolInfo = await pgConn.getWithParams(dbPrefix + lic_code, petrolQuery, [targetShipto, tank_no], config.connectionString());
+
+            // 2. บันทึกข้อมูลลง tbl_order_eodtank (ตารางหลักของ Manual Stock)
             let insertScript = `
                 INSERT INTO tbl_order_eodtank (
                     shipto_no, tank_no, product_no, product_name, 
@@ -58,7 +71,7 @@ exports.updateManualStock = async (req, res, next) => {
                 ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             `;
             let params = [
-                shipto || shipto_no || null,
+                targetShipto || null,
                 tank_no || null,
                 product_no || null,
                 product_name || null,
@@ -74,9 +87,74 @@ exports.updateManualStock = async (req, res, next) => {
 
             if (result.code) {
                 error_count++;
-            } else {
-                success_count++;
+                continue; // ข้ามไปรายการถัดไปหากบันทึกตารางหลักไม่สำเร็จ
             }
+
+            // 3. หากมีข้อมูลปั๊มและถัง ให้ Sync ไปยังตาราง Automatics สำหรับคำนวณ Auto Order
+            if (!petrolInfo.code && petrolInfo.data && petrolInfo.data.length > 0) {
+                const info = petrolInfo.data[0];
+                const ptrl_code = info.ptrl_code;
+                const sh_cus_ref = info.ptrl_sitecode; // ใช้ Site Code เป็นตัวอ้างอิงเบื้องต้น
+                const itm_code = info.itm_code || product_no;
+
+                const nowStr = moment().format('YYYY-MM-DD HH:mm:ss');
+                const yesterdayStr = moment().subtract(1, 'days').format('YYYY-MM-DD HH:mm:ss');
+
+                const stockAtEnd = moment().subtract(1, 'days').format('YYYY-MM-DD HH:mm:ss');
+                const stockAtStart = moment().subtract(2, 'days').format('YYYY-MM-DD HH:mm:ss');
+
+                // บันทึก Tank End (วันนี้)
+                const autoCodeEnd = `auto-${moment().format('x')}`;
+                const sqlTankEnd = `
+                    INSERT INTO tbl_automatics_tanks_information (
+                        automatic_code, ptrl_code, tank_code, itm_code, stock, stock_at, ist_dt,
+                        tnk_capacity, tnk_target, tnk_deadstock, tnk_safety_factor, sh_cus_ref
+                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                `;
+                const paramsEnd = [
+                    autoCodeEnd, ptrl_code, tank_no, itm_code, tank_end, stockAtEnd, nowStr,
+                    info.tnk_capacity, info.tnk_target, info.tnk_deadstock, info.tnk_safety_factor, sh_cus_ref
+                ];
+                console.log(`[Manual Stock] Inserting Tank End:`, paramsEnd);
+                const resEnd = await pgConn.execute2params(dbPrefix + lic_code, sqlTankEnd, paramsEnd, config.connectionString());
+                console.log(`[Manual Stock] Tank End Result:`, resEnd);
+
+                // บันทึก Tank Start (เมื่อวาน)
+                const autoCodeStart = `auto-${moment().format('x')}`;
+                const sqlTankStart = `
+                    INSERT INTO tbl_automatics_tanks_information (
+                        automatic_code, ptrl_code, tank_code, itm_code, stock, stock_at, ist_dt,
+                        tnk_capacity, tnk_target, tnk_deadstock, tnk_safety_factor, sh_cus_ref
+                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                `;
+                const paramsStart = [
+                    autoCodeStart, ptrl_code, tank_no, itm_code, tank_start, stockAtStart, nowStr,
+                    info.tnk_capacity, info.tnk_target, info.tnk_deadstock, info.tnk_safety_factor, sh_cus_ref
+                ];
+                console.log(`[Manual Stock] Inserting Tank Start:`, paramsStart);
+                const resStart = await pgConn.execute2params(dbPrefix + lic_code, sqlTankStart, paramsStart, config.connectionString());
+                console.log(`[Manual Stock] Tank Start Result:`, resStart);
+
+                // บันทึกยอดขาย (Sales Previous)
+                // const sale_val = (parseFloat(tank_start || 0) + parseFloat(recive_val || 0)) - parseFloat(tank_end || 0);
+                // บันทึกยอดขาย (Sales Previous)
+                if (parseFloat(day_sales) >= 0) {
+                    const autoCodeSale = `auto-${moment().format('x')}`;
+                    const sqlSale = `
+                        INSERT INTO tbl_automatics_sales_previous_information (
+                            automatic_code, ptrl_code, tank_code, itm_code, sale_previous, sale_at_previous, ist_dt, sh_cus_ref
+                        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                    `;
+                    const paramsSale = [
+                        autoCodeSale, ptrl_code, tank_no, itm_code, day_sales, yesterdayStr, nowStr, sh_cus_ref
+                    ];
+                    console.log(`[Manual Stock] Inserting Sales:`, paramsSale);
+                    const resSale = await pgConn.execute2params(dbPrefix + lic_code, sqlSale, paramsSale, config.connectionString());
+                    console.log(`[Manual Stock] Sales Result:`, resSale);
+                }
+            }
+
+            success_count++;
         }
 
         let finalStatus = error_count === 0 ? 'success' : 'partial_success';

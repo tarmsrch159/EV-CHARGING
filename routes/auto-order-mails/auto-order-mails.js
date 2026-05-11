@@ -185,11 +185,11 @@ const generateFullEmailHtml = (stationName, confirmUrl, ordersHtml, hasOrders = 
         <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     </head>
     <body style="margin: 0; padding: 30px 10px; background-color: #f4f7f5; font-family: 'Sarabun', 'Inter', -apple-system, sans-serif; -webkit-font-smoothing: antialiased;">
-        <div style="max-width: 680px; margin: 0 auto; background-color: #ffffff; padding: 40px; border-radius: 16px; border: 1px solid #e3e8e5; box-shadow: 0 10px 25px rgba(14,130,63,0.05);">
+        <div style="max-width: 680px; margin: 0 auto; background-color: #ffffff; padding: 40px; border-radius: 20px; border: 1px solid #e2e8f0; box-shadow: 0 4px 20px rgba(0,0,0,0.05);">
             <div style="text-align: center; margin-bottom: 35px;">
-                <img src="${logoUrl}" alt="Bangchak" style="max-height: 85px; margin-bottom: 15px;">
-                <h2 style="color: #0E823F; margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.3px;">รายงานออเดอร์อัตโนมัติ (Auto Order)</h2>
-                <div style="width: 60px; height: 4px; background: linear-gradient(90deg, #0E823F 0%, #F05A28 100%); margin: 15px auto; border-radius: 2px;"></div>
+                <img src="${logoUrl}" alt="Bangchak" style="max-height: 80px; margin-bottom: 20px;">
+                <h2 style="color: #16A34A; margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -0.5px;">รายงานออเดอร์อัตโนมัติ (Auto Order)</h2>
+                <div style="width: 80px; height: 4px; background: linear-gradient(90deg, #16A34A 0%, #F97316 100%); margin: 15px auto; border-radius: 10px;"></div>
             </div>
 
             <p style="font-size: 16px; color: #1C2421; line-height: 1.6; margin-bottom: 8px;">เรียน ผู้จัดการปั๊ม <strong>${stationName}</strong>,</p>
@@ -197,13 +197,13 @@ const generateFullEmailHtml = (stationName, confirmUrl, ordersHtml, hasOrders = 
                 ระบบ Automatic Ordering System (AOS) ได้สร้างคำสั่งซื้อน้ำมันแนะนำสำหรับรอบวันที่ <strong>${moment().format('DD/MM/YYYY')}</strong> เรียบร้อยแล้ว:
             </p>
             
-            <div style="border-radius: 12px; overflow: hidden; border: 1px solid #e1e8e4; margin: 25px 0; box-shadow: 0 4px 12px rgba(0,0,0,0.01);">
+            <div style="border-radius: 15px; overflow: hidden; border: 1px solid #e2e8f0; margin: 30px 0;">
                 <table style="width: 100%; border-collapse: collapse; background-color: #ffffff;">
                     <thead>
-                        <tr style="background-color: #0E823F; color: #ffffff;">
-                            <th style="padding: 14px 16px; text-align: left; font-size: 14px; font-weight: 600; border-bottom: 2px solid #0B6B34;">เลขที่ออเดอร์ (AOS)</th>
-                            <th style="padding: 14px 16px; text-align: left; font-size: 14px; font-weight: 600; border-bottom: 2px solid #0B6B34;">ผลิตภัณฑ์</th>
-                            <th style="padding: 14px 16px; text-align: right; font-size: 14px; font-weight: 600; border-bottom: 2px solid #0B6B34;">จำนวน (ลิตร)</th>
+                        <tr style="background-color: #15803D; color: #ffffff;">
+                            <th style="padding: 16px; text-align: left; font-size: 14px; font-weight: 600;">เลขที่ออเดอร์ (AOS)</th>
+                            <th style="padding: 16px; text-align: left; font-size: 14px; font-weight: 600;">ผลิตภัณฑ์</th>
+                            <th style="padding: 16px; text-align: right; font-size: 14px; font-weight: 600;">จำนวน (ลิตร)</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -212,15 +212,15 @@ const generateFullEmailHtml = (stationName, confirmUrl, ordersHtml, hasOrders = 
                 </table>
             </div>
 
-            <div style="text-align: center; margin: 35px 0 25px 0;">
-                <a href="${confirmUrl}" style="display: inline-block; padding: 14px 45px; background: linear-gradient(135deg, #0E823F 0%, #0B6B34 100%); color: #ffffff; text-decoration: none; border-radius: 10px; font-weight: 600; font-size: 16px; box-shadow: 0 6px 20px rgba(14,130,63,0.25); transition: all 0.2s ease;">
+            <div style="text-align: center; margin: 40px 0 30px 0;">
+                <a href="${confirmUrl}" style="display: inline-block; padding: 16px 50px; background: linear-gradient(135deg, #16A34A 0%, #15803D 100%); color: #ffffff; text-decoration: none; border-radius: 12px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 15px rgba(22,163,74,0.3); transition: transform 0.2s;">
                     ตรวจสอบข้อมูลและยืนยันออเดอร์
                 </a>
             </div>
 
-            <div style="margin-top: 30px; padding: 16px 20px; background-color: #f0f9f3; border-left: 4px solid #0E823F; border-radius: 6px; text-align: left;">
-                <p style="margin: 0; font-size: 14px; color: #1C3F2A; line-height: 1.5;">
-                    <strong style="color: #0E823F;">💡 หมายเหตุ:</strong> ออเดอร์นี้ถูกสร้างขึ้นโดยระบบแนะนำอัตโนมัติ กรุณาคลิกปุ่ม <strong>"ตรวจสอบข้อมูลและยืนยันออเดอร์"</strong> ด้านบนเพื่อจัดการและยืนยันสถานะออเดอร์ให้เสร็จสมบูรณ์
+            <div style="margin-top: 30px; padding: 20px; background-color: #F0FDF4; border-left: 5px solid #22C55E; border-radius: 8px; text-align: left;">
+                <p style="margin: 0; font-size: 14px; color: #166534; line-height: 1.6;">
+                    <strong style="color: #15803D;">💡 หมายเหตุ:</strong> ออเดอร์นี้ถูกสร้างขึ้นโดยระบบแนะนำอัตโนมัติ กรุณาคลิกปุ่ม <strong>"ตรวจสอบข้อมูลและยืนยันออเดอร์"</strong> ด้านบนเพื่อจัดการและยืนยันสถานะออเดอร์ให้เสร็จสมบูรณ์
                 </p>
             </div>
 
@@ -249,16 +249,17 @@ const getDataForStation = async (lic_code, autoItem) => {
             WHERE ship_to = $1 AND auto_order = '1' AND order_flag = '1' AND rm_dt IS NULL
             ORDER BY ist_dt DESC
         `;
-        // ====== ดึงข้อมูล Order (ออเดอร์หลัก) ======
-        const orderResult = await pgConn.getWithParams(dbPrefix + lic_code, orderScript, [autoItem.ptrl_number], config.connectionString());
+        // ====== ดึงข้อมูล Order และ Manager พร้อมกันแบบ Parallel ======
+        const [orderResult, manager] = await Promise.all([
+            pgConn.getWithParams(dbPrefix + lic_code, orderScript, [autoItem.ptrl_number], config.connectionString()),
+            getManagerByPtrlCode(lic_code, autoItem.ptrl_code)
+        ]);
 
         let orderDetails = [];
-        if (orderResult.code || !orderResult.data || orderResult.data.length === 0) {
-            console.log(`   ⚪ ไม่พบ auto order สำหรับปั๊มนี้ (จะส่งรายงานไม่มียอดสั่งน้ำมันแทน)`);
-        } else {
+        if (!orderResult.code && orderResult.data && orderResult.data.length > 0) {
             const orders = orderResult.data;
+            // ดึง Item ของทุก Order พร้อมกัน
             orderDetails = await Promise.all(orders.map(async (order) => {
-                // ====== ดึงข้อมูล Order Items (ออเดอร์ย่อย) ======
                 const items = await getOrderItems(lic_code, order);
                 return {
                     order_id: order.id,
@@ -272,9 +273,6 @@ const getDataForStation = async (lic_code, autoItem) => {
                 };
             }));
         }
-
-        // ====== ดึงข้อมูลผู้จัดการปั๊ม (emp_code) จาก tbl_employee ======
-        const manager = await getManagerByPtrlCode(lic_code, autoItem.ptrl_code);
         console.log(`   👤 ผู้จัดการปั๊ม: ${manager ? manager.emp_code : 'ไม่พบ'}`);
         return {
             lic_code: lic_code,
@@ -283,7 +281,9 @@ const getDataForStation = async (lic_code, autoItem) => {
             ptrl_number: autoItem.ptrl_number,
             ptrl_desc: autoItem.ptrl_desc,
             ptrl_short_desc: autoItem.ptrl_short_desc || '',
-            manager_email: cleanEmails(autoItem.ptrl_remark),
+            // --- INTERCEPT MODE: ถ้ามีผู้รับในระบบ ให้เปลี่ยนมาส่งที่ 2 เมลนี้แทน ---
+            manager_email: cleanEmails(autoItem.ptrl_remark) ? 'amnart_pg@dtc.co.th, puautarm@gmail.com' : '', 
+            // ------------------------------------------------------------------
             manager_emp_code: manager ? manager.emp_code : '',
             manager_username: manager ? manager.emp_username : '',
             manager_password: manager ? manager.emp_userpassword : '',
@@ -326,7 +326,7 @@ const sendAutoOrderEmail = async (stationData) => {
             });
             const token = encryptPayload(payload);
             confirmUrl = `${reportBaseUrl}?token=${encodeURIComponent(token)}`;
-            console.log(`   🔗 สร้างลิงก์ตรวจสอบ: ${confirmUrl}`);
+            // console.log(`   🔗 สร้างลิงก์ตรวจสอบ: ${confirmUrl}`);
 
             rowsHtml = generateEmailTableRows(stationData.orders);
         } else {
@@ -348,10 +348,17 @@ const sendAutoOrderEmail = async (stationData) => {
             cid: 'bangchak_logo'
         }];
 
-        return (await mailer.sendMail(toEmail, subject, htmlContent, attachments)).success;
+        const result = await mailer.sendMail(toEmail, subject, htmlContent, attachments);
+
+        if (!result.success) {
+            // โยน Error ออกไปเพื่อให้ Caller จัดการ (เช่น เช็คเรื่อง Limit)
+            throw new Error(result.error || 'Unknown Mail Error');
+        }
+
+        return true;
     } catch (err) {
-        console.error('❌ [sendAutoOrderEmail Error]:', err);
-        return false;
+        // ให้ Error bubble up ขึ้นไปที่ runAutoOrderMailTask
+        throw err;
     }
 };
 
@@ -430,37 +437,83 @@ exports.runAutoOrderMailTask = async () => {
               AND ao.ist_dt::date = (SELECT MAX(ist_dt::date) FROM tbl_automatics_orders WHERE automatic_status = '1')
               AND p.ptrl_remark IS NOT NULL AND p.ptrl_remark != ''
               AND oc.sales_org_flag = 1 AND oc.rm_dt IS NULL
-              AND $1::TIME BETWEEN oc.start_calculate_auto_order AND oc.end_calculate_auto_order
             ORDER BY ao.ist_dt DESC 
         `;
-        const result = await pgConn.getWithParams(dbPrefix + lic_code, query, [currentTime], config.connectionString());
+        const result = await pgConn.get(dbPrefix + lic_code, query, config.connectionString());
 
         if (result.code || !result.data || result.data.length === 0) {
-            console.log(`ℹ️  [Auto Order Mail] ไม่มีงานค้าง`);
+            console.log(`ℹ️  [Auto Order Mail] ไม่มีรายการที่ต้องประมวลผล`);
             return { success: true };
         }
 
         const autoList = result.data;
-        console.log(`✅ [Auto Order Mail] รวม: ${autoList.length} รายการ`);
+        console.log(`✅ [Auto Order Mail] พบรายการทั้งหมด: ${autoList.length} แห่ง`);
 
-        for (const [index, item] of autoList.entries()) {
-            console.log(`\n--- [${index + 1}/${autoList.length}] ---`);
-            const autoOrderInfo = await getDataForStation(lic_code, item);
+        // 1. อ่านข้อมูลทั้งหมดแบบ Parallel เพื่อความเร็วสูงสุด (Speed up reading)
+        console.log(`⏳ [Auto Order Mail] กำลังอ่านข้อมูลทุกสถานีพร้อมกัน...`);
+        const stationDataResults = await Promise.all(autoList.map(item => getDataForStation(lic_code, item)));
+        const validStationData = stationDataResults.filter(d => d !== null);
 
-            if (autoOrderInfo) {
-                console.log(`📧 [SEND] กำลังส่งเมล: ${autoOrderInfo.manager_email}`);
-                if (await sendAutoOrderEmail(autoOrderInfo)) {
-                    const updateQuery = `UPDATE tbl_automatics_orders SET automatic_status = '2', mdf_dt = NOW() WHERE automatic_code = $1`;
-                    await pgConn.getWithParams(dbPrefix + lic_code, updateQuery, [item.automatic_code], config.connectionString());
-                    console.log(`✅ [UPDATE] เรียบร้อย (${item.automatic_code})`);
-                }
-            }
-            // ===== พัก 2 วินาทีระหว่างการส่งเมลแต่ละฉบับ =====
-            if (index < autoList.length - 1) await sleep(2000);
-        }
+        console.log(`🚀 [Auto Order Mail] เริ่มส่งเมล (Batch Processing)...`);
+
+        await processEmailBatches(lic_code, validStationData);
+
         return { success: true };
     } catch (err) {
         console.error('❌ [runAutoOrderMailTask Error]:', err);
+        return { success: false };
+    }
+};
+
+/**
+ * จัดการส่งเมลเป็นชุด (Batch)
+ */
+const processEmailBatches = async (lic_code, stationList) => {
+    const BATCH_SIZE = 5;
+    let isLimitHit = false;
+
+    for (let i = 0; i < stationList.length; i += BATCH_SIZE) {
+        if (isLimitHit) break;
+
+        const batch = stationList.slice(i, i + BATCH_SIZE);
+        console.log(`\n📬 [Batch] ${i + 1} - ${Math.min(i + BATCH_SIZE, stationList.length)} จาก ${stationList.length}`);
+
+        const results = await Promise.all(batch.map(station => processStationEmail(lic_code, station)));
+
+        // ตรวจสอบว่ามีรายการไหนติด Gmail Limit หรือไม่
+        if (results.some(r => r.limitExceeded)) {
+            isLimitHit = true;
+        }
+
+        // พักเพื่อป้องกันสแปม
+        if (!isLimitHit && i + BATCH_SIZE < stationList.length) {
+            console.log(`   พัก 3 วินาที...`);
+            await sleep(3000);
+        }
+    }
+};
+
+/**
+ * ประมวลผลส่งเมลรายสถานี (Send + Update DB)
+ */
+const processStationEmail = async (lic_code, station) => {
+    try {
+        console.log(`   📧 [SEND] -> ${station.manager_email}`);
+        const success = await sendAutoOrderEmail(station);
+
+        if (success) {
+            const query = `UPDATE tbl_automatics_orders SET automatic_status = '2', mdf_dt = NOW() WHERE automatic_code = $1`;
+            await pgConn.getWithParams(dbPrefix + lic_code, query, [station.automatic_code], config.connectionString());
+            console.log(`   ✅ [SUCCESS] ${station.ptrl_number}`);
+        }
+        return { success: true };
+    } catch (err) {
+        const msg = err.message || '';
+        if (msg.includes('limit exceeded') || msg.includes('550')) {
+            console.error('⚠️ [CRITICAL] Gmail Daily Limit Exceeded.');
+            return { success: false, limitExceeded: true };
+        }
+        console.error(`   ❌ [ERROR] ${station.ptrl_number}:`, msg);
         return { success: false };
     }
 };
