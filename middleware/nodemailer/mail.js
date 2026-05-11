@@ -21,8 +21,8 @@ const MAIL_CONFIGS = {
     port: 587,
     secure: false,
     auth: {
-      user: "tarmsrch159@gmail.com",
-      pass: "hbsamebjclsvujug"
+      user: "mrxon2486@gmail.com",
+      pass: "sdbtxvlriokbbjxw"
     },
     from: '"AOS System (SIT)" <noreply@bangchak.co.th>'
   }
@@ -58,7 +58,7 @@ exports.sendMail = async (to, subject, html, attachments = []) => {
       attachments
     });
 
-    console.log(`   ✅ [MAIL SENT] Message ID: ${info.messageId} (Attachments: ${attachments.length})`);
+    console.log(`   ✅ [MAIL SENT] (Attachments: ${attachments.length})`);
     return { success: true, messageId: info.messageId };
   } catch (error) {
     console.error(`   ❌ [MAIL ERROR]:`, error.message);
