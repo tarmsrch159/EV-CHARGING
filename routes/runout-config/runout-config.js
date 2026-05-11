@@ -150,10 +150,10 @@ exports.addEmailAlert = async (req, res, next) => {
             if (email) {
                 const ptrl_mail_code = 'pmal-' + moment().format('YYYYMMDDHHmmss') + Math.floor(Math.random() * 1000);
                 const insertScript = `
-                    INSERT INTO tbl_petrol_mail_alert (ptrl_mail_code, ptrl_code, email_alert, mail_alert_flag, ist_dt, re_alert_type, alert_status, ptrl_mail_status)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                    INSERT INTO tbl_petrol_mail_alert (ptrl_mail_code, ptrl_code, email_alert, mail_alert_flag, ist_dt, re_alert_type, alert_status, ptrl_mail_status, emp_code)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
                 `;
-                const params = [ptrl_mail_code, ptrl_code, email, 1, now, re_alert_type, alert_status, ptrl_mail_status];
+                const params = [ptrl_mail_code, ptrl_code, email, 1, now, re_alert_type, alert_status, ptrl_mail_status, action[0].id];
                 await pgConn.execute2params(dbPrefix + lic_code, insertScript, params, config.connectionString());
             }
         }
