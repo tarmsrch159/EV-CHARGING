@@ -596,6 +596,21 @@ async function sendSummaryAlertToCS(dbName, summaryAlerts) {
 
         if (!csData.data?.length) return logEntries;
 
+        // ดึงประวัติการส่งของวันนี้มาไว้เช็คกันส่งซ้ำ (เช็คแบบรายคน และแยกประเภทการส่ง)
+        const historyQuery = await pgConn.get(dbName, `
+            SELECT ptrl_code, itm_code, recipient_email, emp_code, recipient_type
+            FROM tbl_runout_information 
+            WHERE DATE(ist_dt) = CURRENT_DATE
+        `, config.connectionString());
+
+        const historySet = new Set();
+        if (historyQuery.data) {
+            historyQuery.data.forEach(h => {
+                // Key: ptrl_itm_email_empCode_type
+                historySet.add(`${h.ptrl_code}_${h.itm_code}_${h.recipient_email}_${h.emp_code}_${h.recipient_type}`);
+            });
+        }
+
         // Group by email to support employees with multiple groups
         const emailToGroups = {};
         for (const row of csData.data) {
@@ -604,10 +619,37 @@ async function sendSummaryAlertToCS(dbName, summaryAlerts) {
         }
 
         for (const email in emailToGroups) {
+            const empInfo = csData.data.find(e => e.emp_email === email);
+            const empCode = empInfo?.emp_code || null;
             const allowedGroups = emailToGroups[email];
 
-            // Filter global alerts to only those stations the CS manages
-            const relevantAlerts = summaryAlerts.filter(a => allowedGroups.has(a.station.ptrl_group_code));
+            // --- เริ่มกระบวนการกรองข้อมูลแบบอ่านง่าย ---
+            const relevantAlerts = [];
+
+            for (const alert of summaryAlerts) {
+                // 1. เช็คก่อนว่าปั๊มนี้อยู่ในกลุ่มที่ CS คนนี้ดูแลหรือไม่
+                if (!allowedGroups.has(alert.station.ptrl_group_code)) continue;
+
+                // 2. กรองเฉพาะสินค้าที่ CS คนนี้ "ยังไม่เคยได้รับแจ้ง" ในรูปแบบรายงานสรุป (cs_planner) ในวันนี้
+                const newProducts = [];
+                for (const p of alert.products) {
+                    const checkKey = `${alert.station.ptrl_code}_${p.itm_code}_${email}_${empCode}_cs_planner`;
+
+                    if (historySet.has(checkKey)) {
+                        console.log(`    [Runout Alert]  [Skip] ข้ามรายการซ้ำในรายงานสรุป: ${alert.station.ptrl_desc} (${p.product_name}) สำหรับคุณ ${email}`);
+                    } else {
+                        newProducts.push(p);
+                    }
+                }
+
+                // 3. ถ้ามีสินค้าใหม่ที่ต้องแจ้งเตือน ให้เพิ่มลงในลิสต์ที่จะส่ง
+                if (newProducts.length > 0) {
+                    relevantAlerts.push({
+                        ...alert,
+                        products: newProducts
+                    });
+                }
+            }
 
             if (relevantAlerts.length > 0) {
                 const subject = `[AOS Alert] สรุปรายงานสถานีที่เสี่ยง Run Out (สำหรับ CS/Planner)`;
@@ -690,25 +732,6 @@ exports.processLowStockAlerts = async (lic_code, manual_off_code = null) => {
 
         let globalLowStockData = [];
         let allDebugLogs = [];
-
-        // --- เพิ่มส่วนนี้สำหรับการเช็คว่าวันนี้ส่ง CS ไปหรือยัง ---
-        const todayCSAlertsQuery = await pgConn.get(dbName, `
-            SELECT ptrl_code, itm_code 
-            FROM tbl_runout_information 
-            WHERE recipient_type = 'cs_planner' 
-              AND DATE(ist_dt) = CURRENT_DATE
-        `, config.connectionString());
-
-        const alreadyAlertedSet = new Set();
-        if (todayCSAlertsQuery.data) {
-            todayCSAlertsQuery.data.forEach(row => {
-                alreadyAlertedSet.add(`${row.ptrl_code}_${row.itm_code}`);
-            });
-        }
-        if (alreadyAlertedSet.size > 0) {
-            console.log(`    [Runout Alert]  พบประวัติการส่งให้ CS ในวันนี้แล้ว ${alreadyAlertedSet.size} รายการ (จะถูกข้ามการแจ้งเตือน)`);
-        }
-        // -----------------------------------------------------
 
         // 2. ตรวจสอบสต็อกรายปั๊มแบบทีละสถานี
         for (const station of activeStations.data) {
@@ -802,20 +825,8 @@ exports.processLowStockAlerts = async (lic_code, manual_off_code = null) => {
                 const logs = await sendAlertToRecipients(dbName, station, lowStockProducts);
                 if (logs && logs.length > 0) allDebugLogs.push(...logs);
 
-                // สำหรับ CS ต้องกรองเฉพาะสินค้าที่ยังไม่เคยส่งแจ้งเตือนในวันนี้
-                const csProducts = [];
-                for (const p of lowStockProducts) {
-                    if (alreadyAlertedSet.has(`${station.ptrl_code}_${p.itm_code}`)) {
-                        console.log(`    [Runout Alert]  ข้ามปั๊ม: ${station.ptrl_desc} (${station.ptrl_number}) | สินค้า: ${p.product_name} (ส่งเข้าเมลสรุปของ CS ไปแล้ววันนี้)`);
-                    } else {
-                        console.log(`    [Runout Alert]  เตรียมปั๊ม: ${station.ptrl_desc} (${station.ptrl_number}) | สินค้า: ${p.product_name} เข้าคิวรายงานสรุปของ CS`);
-                        csProducts.push(p);
-                    }
-                }
-
-                if (csProducts.length > 0) {
-                    globalLowStockData.push({ station, products: csProducts });
-                }
+                // เก็บข้อมูลทั้งหมดไว้ก่อน แล้วค่อยไปกรองแยกรายคนในฟังก์ชันส่งเมลสรุป (เพื่อความแม่นยำรายบุคคล)
+                globalLowStockData.push({ station, products: lowStockProducts });
             }
         }
 
@@ -910,14 +921,8 @@ async function sendAlertToRecipients(dbName, station, lowStockProducts) {
 
         // บันทึกข้อมูล Runout หลังส่งอีเมลแจ้งเตือนสำเร็จ (บันทึกทีละคนเพื่อให้ emp_code ตรงกับคนรับ)
         for (const r of validRecipients) {
-            // ดักจับ Role เพื่อกำหนด Type ให้ถูกต้อง (กรณีเอา CS/Planner มาใส่ในลิสต์แจ้งเตือนปั๊ม)
-            let rType = 'station_manager';
-            const roleName = (r.empRoleDesc || '').toUpperCase();
-            if (roleName.includes('CS') || roleName.includes('PLANNER')) {
-                rType = 'cs_planner';
-            }
-
-            await saveRunoutToDatabase(dbName, station, lowStockProducts, r.email, rType, r.empCode, r.empRoleDesc);
+            // บันทึกเป็นสถานะ station_manager เพราะเป็นการส่งเมลรายปั๊ม (Individual)
+            await saveRunoutToDatabase(dbName, station, lowStockProducts, r.email, 'station_manager', r.empCode, r.empRoleDesc);
         }
 
         // อัปเดต Last Alert Time
