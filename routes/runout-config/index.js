@@ -11,6 +11,7 @@ router.patch('/email-alert', runoutConfig.setEmailAlertInformation);
 router.delete('/email-alert', runoutConfig.removeEmailAlert);
 router.post('/email-alert/information', runoutConfig.getEmailAlertInformation);
 router.patch('/email-alert/status', runoutConfig.updateEmailStatus);
+router.patch('/email-alert-config/status', runoutConfig.setEmailAlertStatus);
 
 
 module.exports = router;

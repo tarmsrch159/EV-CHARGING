@@ -340,3 +340,45 @@ exports.removeEmailAlert = async (req, res, next) => {
         return sendResponse(res, 'error', '-4', 'เกิดข้อผิดพลาดภายในระบบ', []);
     }
 };
+
+exports.setEmailAlertStatus = async (req, res, next) => {
+    try {
+        const lic_code = req.header('lic_code');
+        const { ptrl_code } = req.query;
+        const { re_alert_type, alert_status, ptrl_mail_status, action } = req.body[0] || {};
+
+        const missing = [];
+        if (!lic_code) missing.push('lic_code');
+        if (!ptrl_code) missing.push('ptrl_code');
+        if (!action) missing.push('action');
+
+        if (missing.length > 0) {
+            return sendResponse(res, 'error', '-1', `ข้อมูลพารามิเตอร์ไม่ถูกต้อง (ขาด: ${missing.join(', ')})`, []);
+        }
+
+        const script = `
+            UPDATE tbl_petrol_mail_alert
+            SET 
+                re_alert_type = $1,
+                alert_status = $2,
+                mdf_dt = $3
+            WHERE ptrl_code = $4 AND rm_dt IS NULL
+        `;
+
+        const now = moment().format('YYYY-MM-DD HH:mm:ss');
+        const params = [re_alert_type, alert_status, now, ptrl_code];
+        const result = await pgConn.execute2params(dbPrefix + lic_code, script, params, config.connectionString());
+
+        if (result.code) {
+            await xglobal.action_logs(lic_code, action[0].id, 'อัปเดตข้อมูลอีเมลแจ้งเตือน', JSON.stringify(req.body[0]), 'ไม่สามารถอัพเดตข้อมูลได้', action[0].value);
+            return sendResponse(res, 'error', '-3', 'ไม่สามารถอัพเดตข้อมูลได้, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ', []);
+        }
+
+        await xglobal.action_logs(lic_code, action[0].id, 'อัปเดตข้อมูลอีเมลแจ้งเตือน', JSON.stringify(req.body[0]), 'success', action[0].value);
+        return sendResponse(res, 'success', '0', 'อัพเดตข้อมูลสำเร็จ', []);
+
+    } catch (err) {
+        console.error(err);
+        return sendResponse(res, 'error', '-4', 'เกิดข้อผิดพลาดภายในระบบ', []);
+    }
+};
