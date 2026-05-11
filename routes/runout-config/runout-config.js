@@ -204,7 +204,7 @@ exports.getEmailAlertInformation = async (req, res, next) => {
             params.push(ptrl_code);
         }
 
-        script += ` ORDER BY pma.ist_dt DESC`;
+        script += ` ORDER BY pma.ptrl_mail_status ASC`;
 
         const result = await pgConn.getWithParams(dbPrefix + lic_code, script, params, config.connectionString());
 
@@ -227,11 +227,12 @@ exports.getEmailAlertInformation = async (req, res, next) => {
 exports.setEmailAlertInformation = async (req, res, next) => {
     try {
         const lic_code = req.header('lic_code');
-        const { ptrl_code } = req.query;
-        const { re_alert_type, alert_status, action } = req.body[0] || {};
+        const { ptrl_mail_code } = req.query;
+        const { re_alert_type, alert_status, ptrl_mail_status, action } = req.body[0] || {};
 
         const missing = [];
         if (!lic_code) missing.push('lic_code');
+        if (!ptrl_mail_code) missing.push('ptrl_mail_code');
         if (!action) missing.push('action');
 
         if (missing.length > 0) {
@@ -243,12 +244,13 @@ exports.setEmailAlertInformation = async (req, res, next) => {
             SET 
                 re_alert_type = $1,
                 alert_status = $2,
-                mdf_dt = $3
-            WHERE ptrl_code = $4 AND rm_dt IS NULL
+                mdf_dt = $3,
+                ptrl_mail_status = $4
+            WHERE ptrl_mail_code = $5 AND rm_dt IS NULL
         `;
 
         const now = moment().format('YYYY-MM-DD HH:mm:ss');
-        const params = [re_alert_type, alert_status, now, ptrl_code];
+        const params = [re_alert_type, alert_status, now, ptrl_mail_status, ptrl_mail_code];
         const result = await pgConn.execute2params(dbPrefix + lic_code, script, params, config.connectionString());
 
         if (result.code) {
