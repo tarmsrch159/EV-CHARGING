@@ -19,26 +19,24 @@ const executeLoop = async () => {
 
         console.log(`\n[${currentTime.format('HH:mm:ss')}] 🔋 Run Out Alert: เริ่มต้นรอบการทำงาน...`);
 
-        // ดึงรายการ office เฉพาะที่มีการเชื่อมโยงกับปั๊มที่เปิดใช้งานอยู่ในระบบ เพื่อตรวจสอบเวลา Cut-off
+        // ดึงรายการตั้งค่าราย Sales Org / Order Type เพื่อตรวจสอบเวลา Cut-off
         const sql = `
-            SELECT DISTINCT o.off_code, o.order_cutoff_time 
-            FROM tbl_office o
-            INNER JOIN tbl_petrol p ON o.off_code = p.off_code
-            WHERE o.off_flag = '1' AND o.rm_dt IS NULL AND o.order_cutoff_time IS NOT NULL
-              AND p.ptrl_flag = '1' AND p.rm_dt IS NULL
+            SELECT sales_org_code, order_type_code, order_cutoff_time 
+            FROM tbl_sales_org_order_config
+            WHERE cutoff_status = 1 AND sales_org_flag = 1 AND rm_dt IS NULL AND order_cutoff_time IS NOT NULL
         `;
         const result = await pgConn.get(dbName, sql, config.connectionString());
 
-        // ============ ใช้การตั้งค่าเวลาจาก ฐานข้อมูล ==============
+        // ============ ใช้การตั้งค่าเวลาจากตารางใหม่ (Organizational Config) ==============
         if (!result.code && result.data && result.data.length > 0) {
-            for (const office of result.data) {
-                if (office.order_cutoff_time) {
+            for (const item of result.data) {
+                if (item.order_cutoff_time) {
                     // แปลง order_cutoff_time เป็น "HH:mm" เพื่อตรวจสอบกับเวลาปัจจุบัน
-                    const cutoffHHmm = moment(office.order_cutoff_time, 'HH:mm:ss').format('HH:mm');
+                    const cutoffHHmm = moment(item.order_cutoff_time, 'HH:mm:ss').format('HH:mm');
 
                     if (currentHHmm === cutoffHHmm) {
-                        console.log(`⏰ [Run Out Scheduler] ตรวจพบเวลา Cut-off ของ Office: ${office.off_code} (${cutoffHHmm}) ตรงกับเวลาปัจจุบัน: เริ่มประมวลผลการแจ้งเตือน...`);
-                        await lowStockAlertController.processLowStockAlerts(lic_code, office.off_code);
+                        console.log(`⏰ [Run Out Scheduler] ตรวจพบเวลา Cut-off ของ Org: ${item.sales_org_code} | Type: ${item.order_type_code} (${cutoffHHmm}) ตรงกับเวลาปัจจุบัน: เริ่มประมวลผล...`);
+                        await lowStockAlertController.processLowStockAlerts(lic_code, item.sales_org_code, item.order_type_code);
                     }
                 }
             }
@@ -58,7 +56,7 @@ exports.startLowStockLoop = async () => {
     console.log(`  [AOS SYSTEM] STARTING RUN OUT SCHEDULER SERVICE`);
     console.log(`====================================================================`);
     console.log(`  รอบการสแกน   : ทุก ๆ 1 นาที`);
-    console.log(`  เวลาตัดรอบ    : อ้างอิงตามเวลา Cut-off ของแต่ละ Office ในฐานข้อมูล`);
+    console.log(`  เวลาตัดรอบ    : อ้างอิงตาม Sales Org`);
     console.log(`  สถานะบริการ   : เปิดใช้งาน (กำลังตรวจสอบสต็อกน้ำมันใกล้หมด...)`);
     console.log(`====================================================================\x1b[0m`);
 

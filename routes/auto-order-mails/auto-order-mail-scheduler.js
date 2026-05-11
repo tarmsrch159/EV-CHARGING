@@ -32,7 +32,7 @@ const executeLoop = async (startTimeStr, endTimeStr, pauseMinutes) => {
     console.log(`====================================================================`);
     console.log(`  [AOS SYSTEM] STARTING AUTO ORDER MAIL SCHEDULER SERVICE`);
     console.log(`====================================================================`);
-    console.log(`  ช่วงเวลาทำงาน : ${startTimeStr} - ${endTimeStr}`);
+    console.log(`  ช่วงเวลาทำงาน : อ้างอิงตาม Sales Org และ Order Type (Config Table)`);
     console.log(`  รอบการพักระบบ : ทุก ๆ ${pauseMinutes} นาที`);
     console.log(`  สถานะบริการ   : เปิดใช้งาน (กำลังสแกนคิวส่งเมล...)`);
     console.log(`====================================================================\x1b[0m`);
@@ -90,8 +90,8 @@ const executeLoop = async (startTimeStr, endTimeStr, pauseMinutes) => {
 
 
 
-// =========== Production Time =============
-exports.startAutoOrderMailLoop = () => executeLoop("00:30", "15:30", 10);
+// =========== Production Time (ใช้ช่วงเวลาที่กว้างขึ้นเพราะกรองใน Query แล้ว) =============
+exports.startAutoOrderMailLoop = () => executeLoop("00:01", "23:59", 10);
 
 // =========== Function Test ทำงานทุกๆ 10 วินาที =============
 exports.startAutoOrderMailLoopTest = async () => {

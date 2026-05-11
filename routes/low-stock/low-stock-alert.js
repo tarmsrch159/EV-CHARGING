@@ -701,30 +701,42 @@ async function sendSummaryAlertToCS(dbName, summaryAlerts) {
  * รอบที่ 1: วนเช็ครายปั๊ม ยิงเมลหา ผจก.ปั๊ม 
  * รอบที่ 2: เอาข้อมูลปั๊มที่น้ำมันเหลือน้อยในรอบนั้น มาส่งสรุปรวมฉบับเดียวให้ CS แต่ละคน
  */
-exports.processLowStockAlerts = async (lic_code, manual_off_code = null) => {
+exports.processLowStockAlerts = async (lic_code, filter_sales_org = null, filter_order_type = null) => {
     if (!lic_code) return;
     const dbName = dbPrefix + lic_code;
     try {
         const currentTime = moment();
         console.log(`\n🔍 [Runout Alert] เริ่มตรวจสอบ (${lic_code}) เวลา ${currentTime.format('HH:mm:ss')}...`);
 
-        // 1. ดึงรายการปั๊มที่ถึงรอบการตรวจสอบ
+        // 1. ดึงรายการปั๊มที่ถึงรอบการตรวจสอบ (อ้างอิงตาม Sales Org และ Order Type)
         let wh = "";
         let params = [];
-        if (manual_off_code && manual_off_code.toString().toUpperCase() !== 'ALL') {
-            params.push(manual_off_code);
-            wh = ` AND o.order_cutoff_time = (SELECT order_cutoff_time FROM tbl_office WHERE off_code = $${params.length} AND rm_dt IS NULL LIMIT 1) `;
-        } else if (!manual_off_code) {
+
+        if (filter_sales_org && filter_sales_org !== 'ALL') {
+            params.push(filter_sales_org);
+            wh += ` AND oc.sales_org_code = $${params.length} `;
+        }
+
+        if (filter_order_type && filter_order_type !== 'ALL') {
+            params.push(filter_order_type);
+            wh += ` AND oc.order_type_code = $${params.length} `;
+        }
+
+        // กรณีเป็นการรันอัตโนมัติ (ไม่ได้ระบุเจาะจง) ให้เช็คเวลาที่ตรงกับปัจจุบัน
+        if (!filter_sales_org && !filter_order_type) {
             params.push(currentTime.format('HH:mm:ss'));
-            wh = ` AND o.order_cutoff_time <= $${params.length}::TIME `;
+            wh += ` AND oc.order_cutoff_time <= $${params.length}::TIME `;
         }
 
         const scriptSql = `
-            SELECT DISTINCT p.ptrl_code, p.ptrl_number, p.ptrl_desc, p.coverage_days, p.ptrl_group_code, pg.ptrl_group_desc
+            SELECT DISTINCT p.ptrl_code, p.ptrl_number, p.ptrl_desc, p.coverage_days, p.ptrl_group_code, pg.ptrl_group_desc,
+                   oc.sales_org_code, oc.order_type_code
             FROM tbl_petrol p
-            INNER JOIN tbl_office o ON p.off_code = o.off_code
+            INNER JOIN tbl_sales_org_order_config oc ON p.ptrl_sales_group = oc.sales_org_code 
+                  AND p.ptrl_sales_type = oc.order_type_code
             LEFT JOIN tbl_petrol_group pg ON p.ptrl_group_code = pg.ptrl_group_code
-            WHERE p.ptrl_flag = '1' AND p.rm_dt IS NULL
+            WHERE p.ptrl_flag = '1' AND p.rm_dt IS NULL 
+                  AND oc.sales_org_flag = 1 AND oc.rm_dt IS NULL
                 ${wh}
         `;
         const activeStations = await pgConn.getWithParams(dbName, scriptSql, params, config.connectionString());
@@ -943,17 +955,17 @@ async function sendAlertToRecipients(dbName, station, lowStockProducts) {
 exports.triggerLowStockAlert = async (req, res, next) => {
     try {
         const lic_code = req.header('lic_code');
-        const { off_code, action } = req.body[0] || {};
+        const { sales_org_code, order_type_code, action } = req.body[0] || {};
 
         if (!lic_code || !action) {
             return xglobal.sendResponse(res, 'error', '-1', 'ข้อมูลพารามิเตอร์ไม่ถูกต้อง', []);
         }
 
         const username = action[0].value || 'SYSTEM';
-        await xglobal.action_logs(lic_code, action[0].id, 'Manual Low Stock Alert Triggered', JSON.stringify({ off_code }), 'success', username);
+        await xglobal.action_logs(lic_code, action[0].id, 'Manual Low Stock Alert Triggered', JSON.stringify({ sales_org_code, order_type_code }), 'success', username);
 
-        // รันแบบ Background
-        this.processLowStockAlerts(lic_code, off_code || 'ALL');
+        // รันแบบ Background (ส่ง Sales Org และ Order Type แทน Office)
+        this.processLowStockAlerts(lic_code, sales_org_code || 'ALL', order_type_code || 'ALL');
 
         return xglobal.sendResponse(res, 'success', '0', 'เริ่มกระบวนการตรวจสอบ Low Stock แล้ว (Background Task)', []);
     } catch (err) {

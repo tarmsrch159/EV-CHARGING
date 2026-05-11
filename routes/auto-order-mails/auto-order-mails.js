@@ -417,17 +417,23 @@ exports.runAutoOrderMailTask = async () => {
     console.log(`\n🚀 [Auto Order Mail] เริ่ม Background Task: ${moment().format('YYYY-MM-DD HH:mm:ss')}`);
 
     try {
+        const currentTime = moment().format('HH:mm:ss');
         const query = `
             SELECT ao.automatic_code, ao.ptrl_code, ao.ist_dt, ao.automatic_status,
-                   p.ptrl_number, p.ptrl_desc, p.ptrl_short_desc, p.ptrl_remark
+                   p.ptrl_number, p.ptrl_desc, p.ptrl_short_desc, p.ptrl_remark,
+                   oc.start_calculate_auto_order, oc.end_calculate_auto_order
             FROM tbl_automatics_orders ao
             INNER JOIN tbl_petrol p ON ao.ptrl_code = p.ptrl_code
+            INNER JOIN tbl_sales_org_order_config oc ON p.ptrl_sales_group = oc.sales_org_code 
+                  AND p.ptrl_sales_type = oc.order_type_code
             WHERE ao.automatic_status = '1' 
               AND ao.ist_dt::date = (SELECT MAX(ist_dt::date) FROM tbl_automatics_orders WHERE automatic_status = '1')
               AND p.ptrl_remark IS NOT NULL AND p.ptrl_remark != ''
+              AND oc.sales_org_flag = 1 AND oc.rm_dt IS NULL
+              AND $1::TIME BETWEEN oc.start_calculate_auto_order AND oc.end_calculate_auto_order
             ORDER BY ao.ist_dt DESC 
         `;
-        const result = await pgConn.get(dbPrefix + lic_code, query, config.connectionString());
+        const result = await pgConn.getWithParams(dbPrefix + lic_code, query, [currentTime], config.connectionString());
 
         if (result.code || !result.data || result.data.length === 0) {
             console.log(`ℹ️  [Auto Order Mail] ไม่มีงานค้าง`);
