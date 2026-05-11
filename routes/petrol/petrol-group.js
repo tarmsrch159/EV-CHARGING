@@ -560,6 +560,8 @@ exports.setPetrolGroupInformation = async (req, res, next) => {
             off_code,
             address,
             veh_type,
+            ptrl_group_sales_org,
+            ptrl_group_order_type,
             action,
         } = req.body[0];
 
@@ -639,6 +641,8 @@ exports.setPetrolGroupInformation = async (req, res, next) => {
             ptrl_group_desc = '${ptrl_group_desc}', 
             ptrl_group_short_desc = '${ptrl_group_short_desc}',
             off_code = '${off_code}', 
+            ptrl_group_sales_org = '${ptrl_group_sales_org}',
+            ptrl_group_order_type = '${ptrl_group_order_type}',
             mdf_dt = '${moment().format("YYYY-MM-DD HH:mm:ss")}' 
             where ptrl_group_code = '${ptrl_group_code}';`;
 
@@ -803,6 +807,8 @@ exports.addPetrolGroupInformation = async (req, res, next) => {
             off_code,
             address,
             veh_type,
+            ptrl_group_sales_org,
+            ptrl_group_order_type,
             action,
         } = req.body[0];
 
@@ -881,7 +887,9 @@ exports.addPetrolGroupInformation = async (req, res, next) => {
             script = `select ptrl_group_code from tbl_petrol_group 
                 where (ptrl_group_desc = '${ptrl_group_desc}' 
                     or ptrl_group_short_desc = '${ptrl_group_short_desc}') 
-                    and ptrl_group_flag = '1';
+                    and ptrl_group_flag = '1' 
+                    and ptrl_group_sales_org = '${ptrl_group_sales_org}' 
+                    and ptrl_group_order_type = '${ptrl_group_order_type}';
             `;
             let tbl_temporary0 = await pgConn.get(
                 dbPrefix + lic_code,
@@ -915,8 +923,8 @@ exports.addPetrolGroupInformation = async (req, res, next) => {
 
             let ptrl_group_code = "pgrd-" + moment().format("x");
             script = `insert into tbl_petrol_group 
-            (ptrl_group_code, ptrl_group_desc, ptrl_group_short_desc, ptrl_group_flag, ist_dt, off_code) values 
-            ('${ptrl_group_code}', '${ptrl_group_desc}', '${ptrl_group_short_desc}', '1', '${moment().format("YYYY-MM-DD HH:mm:ss")}', '${off_code}');`;
+            (ptrl_group_code, ptrl_group_desc, ptrl_group_short_desc, ptrl_group_flag, ist_dt, off_code, ptrl_group_sales_org, ptrl_group_order_type) values 
+            ('${ptrl_group_code}', '${ptrl_group_desc}', '${ptrl_group_short_desc}', '1', '${moment().format("YYYY-MM-DD HH:mm:ss")}', '${off_code}', '${ptrl_group_sales_org}', '${ptrl_group_order_type}');`;
 
             let tbl_temporary = await pgConn.execute(
                 dbPrefix + lic_code,
