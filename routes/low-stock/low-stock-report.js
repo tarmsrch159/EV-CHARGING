@@ -18,6 +18,8 @@ exports.getRunoutReportInformation = async (req, res, next) => {
             start_date,
             end_date,
             itm_code,
+            sales_org,
+            order_type,
             page_index = 1,
             page_limit = 10,
             action
@@ -52,6 +54,16 @@ exports.getRunoutReportInformation = async (req, res, next) => {
             conditions.push(`ri.itm_code = $${params.length}`);
         }
 
+        if (sales_org && sales_org.toString().toUpperCase() !== 'ALL') {
+            params.push(sales_org);
+            conditions.push(`p.ptrl_sales_group = $${params.length}`);
+        }
+
+        if (order_type && order_type.toString().toUpperCase() !== 'ALL') {
+            params.push(order_type);
+            conditions.push(`p.ptrl_sales_type = $${params.length}`);
+        }
+
         const whereClause = conditions.length > 0 ? "WHERE " + conditions.join(" AND ") : "";
 
         // 2. Query หลัก: ดึงข้อมูลพร้อมเช็คว่า "ยังไม่มีการยืนยันคำสั่งซื้อใน SAP"
@@ -66,9 +78,12 @@ exports.getRunoutReportInformation = async (req, res, next) => {
                 ri.itm_desc,
                 ri.day_sales,
                 ri.unpump,
-                ri.stock_minus_sales as stock
+                ri.stock_minus_sales as stock,
+                p.ptrl_sales_group,
+                ot.sales_order_type
             FROM tbl_runout_information ri
             JOIN tbl_petrol p ON ri.ptrl_code = p.ptrl_code
+            LEFT JOIN tbl_order_type ot ON p.ptrl_sales_type = ot.ord_type_code
             ${whereClause}
             ORDER BY p.ptrl_number ASC, ri.tank_numbers ASC, ri.itm_code, DATE(ri.ist_dt), ri.ist_dt DESC
             OFFSET ${offset} LIMIT ${pageLimitInt};
@@ -92,11 +107,13 @@ exports.getRunoutReportInformation = async (req, res, next) => {
 
         // 4. คำนวณจำนวนหน้าทั้งหมด
         const countScript = `
-            SELECT COUNT(*) as total_rows
-            FROM tbl_runout_information ri
-            JOIN tbl_petrol p ON ri.ptrl_code = p.ptrl_code
-            ${whereClause}
-          
+            SELECT COUNT(*) as total_rows FROM (
+                SELECT DISTINCT ON (p.ptrl_number, ri.tank_numbers, ri.itm_code, DATE(ri.ist_dt)) 1
+                FROM tbl_runout_information ri
+                JOIN tbl_petrol p ON ri.ptrl_code = p.ptrl_code
+                LEFT JOIN tbl_order_type ot ON p.ptrl_sales_type = ot.ord_type_code
+                ${whereClause}
+            ) tmp
         `;
         const tbl_temporary0 = await pgConn.getWithParams(dbName, countScript, params, config.connectionString());
         const totalRows = parseInt(tbl_temporary0.data[0]?.total_rows || 0);
