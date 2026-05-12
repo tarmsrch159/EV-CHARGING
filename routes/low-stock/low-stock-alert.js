@@ -313,7 +313,7 @@ async function saveRunoutToDatabase(dbName, station, lowStockProducts, recipient
 
             await pgConn.execute2params(dbName, insertScript, params, config.connectionString());
         }
-        console.log(`    [Runout Alert]  บันทึกข้อมูลลงฐานข้อมูล ${lowStockProducts.length} รายการ สำหรับ ${station.ptrl_desc} (${recipientType})`);
+        console.log(`[Runout Alert]  บันทึกข้อมูลลงฐานข้อมูล ${lowStockProducts.length} รายการ สำหรับ ${station.ptrl_desc} (${recipientType})`);
     } catch (err) {
         console.error('❌ [saveRunoutToDatabase Error]:', err.message);
     }
@@ -613,7 +613,7 @@ const generateCSSummaryExcel = async (stationsData) => {
 // หาว่า CS คนไหนดูแลปั๊มกลุ่มไหนบ้าง แล้วกรองปั๊มที่เตือนโยนใส่เมลสรุปฉบับเดียว/คน
 const sendSummaryAlertToCS = async (dbName, csData, summaryAlerts, historySet) => {
     const logEntries = [];
-    console.log(`[Runout Alert]  ตรวจสอบการส่งสรุปให้ CS (CS Count: ${csData.length}, Alert Count: ${summaryAlerts.length})`);
+    console.log(`[Runout Alert] ตรวจสอบการส่งสรุปให้ CS (CS Count: ${csData.length}, Alert Count: ${summaryAlerts.length})`);
     try {
         const testEmails = 'amnart_pg@dtc.co.th, puautarm@gmail.com';
         const emailToGroups = {};
@@ -638,7 +638,7 @@ const sendSummaryAlertToCS = async (dbName, csData, summaryAlerts, historySet) =
                 const newProducts = alert.products.filter(p => {
                     const checkKey = `${alert.station.ptrl_code}_${p.itm_code}_${email}_${empCode}_cs_planner`;
                     const hasHistory = historySet.has(checkKey);
-                    if (hasHistory) console.log(`[Runout Alert]  [Skip CS] รายการ ${alert.station.ptrl_desc} - ${p.product_name} ได้ทำการส่งให้ ${email} ในวันนี้แล้ว`);
+                    if (hasHistory) console.log(`[Runout Alert] Skip CS รายการ ${alert.station.ptrl_desc} - ${p.product_name} ได้ทำการส่งให้ ${email} ในวันนี้แล้ว`);
                     return !hasHistory;
                 });
 
@@ -856,7 +856,7 @@ exports.processLowStockAlerts = async (lic_code, filter_sales_org = null, filter
 
         // 4. เริ่มประมวลผลรายปั๊ม...
         for (const station of activeStations.data) {
-            console.log(`[Runout Alert]  ประมวลผลปั๊ม: ${station.ptrl_desc} (${station.ptrl_number}) [Org: ${station.sales_org_code} | Type: ${station.sales_order_type}]`);
+            console.log(`[Runout Alert] ประมวลผลปั๊ม: ${station.ptrl_desc} (${station.ptrl_number}) [Org: ${station.sales_org_code} | Type: ${station.sales_order_type}]`);
             const coverageLimit = parseFloat(station.coverage_days) || 3;
 
             const script = `
@@ -976,10 +976,10 @@ exports.processLowStockAlerts = async (lic_code, filter_sales_org = null, filter
         }
 
         if (allDebugLogs.length > 0) {
-            console.log(`\n\x1b[32m\x1b[1m [Run Out Alert Summary] ตารางสรุปการจัดส่งแจ้งเตือนสำเร็จ:\x1b[0m`);
+            console.log(`\n\x1b[32m\x1b[1m[Run Out Alert Summary] ตารางสรุปการจัดส่งแจ้งเตือนสำเร็จ:\x1b[0m`);
             console.table(allDebugLogs);
         } else {
-            console.log(`\n\x1b[33m [Run Out Alert] ตรวจสอบเสร็จสิ้น ไม่พบบัญชีน้ำมันใกล้หมดที่จะต้องส่งแจ้งเตือนในรอบนี้\x1b[0m`);
+            console.log(`\n\x1b[33m[Run Out Alert] ตรวจสอบเสร็จสิ้น ไม่พบบัญชีน้ำมันใกล้หมดที่จะต้องส่งแจ้งเตือนในรอบนี้\x1b[0m`);
         }
     } catch (error) {
         console.error('❌ [processLowStockAlerts Error]:', error);
