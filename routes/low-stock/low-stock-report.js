@@ -56,7 +56,7 @@ exports.getRunoutReportInformation = async (req, res, next) => {
 
         // 2. Query หลัก: ดึงข้อมูลพร้อมเช็คว่า "ยังไม่มีการยืนยันคำสั่งซื้อใน SAP"
         const script = `
-            SELECT 
+            SELECT DISTINCT ON (p.ptrl_number, ri.itm_code, DATE(ri.ist_dt))
                 ri.ist_dt as alert_date,
                 p.ptrl_code,
                 p.ptrl_number,
@@ -71,9 +71,11 @@ exports.getRunoutReportInformation = async (req, res, next) => {
             FROM tbl_runout_information ri
             JOIN tbl_petrol p ON ri.ptrl_code = p.ptrl_code
             ${whereClause}
-            ORDER BY ri.ist_dt DESC, ri.tank_numbers ASC
+            ORDER BY p.ptrl_number ASC, ri.itm_code, DATE(ri.ist_dt), ri.tank_numbers ASC, ri.ist_dt DESC
             OFFSET ${offset} LIMIT ${pageLimitInt};
         `;
+
+        console.log(`🔍 [getRunoutReportInformation] SQL:`, script);
 
         const tbl_temporary = await pgConn.getWithParams(dbName, script, params, config.connectionString());
 
