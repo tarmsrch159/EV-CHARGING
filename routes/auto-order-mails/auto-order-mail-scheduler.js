@@ -32,7 +32,6 @@ const executeLoop = async (startTimeStr, endTimeStr, pauseMinutes) => {
     console.log(`====================================================================`);
     console.log(`  [AOS SYSTEM] STARTING AUTO ORDER MAIL SCHEDULER SERVICE`);
     console.log(`====================================================================`);
-    console.log(`  ช่วงเวลาทำงาน : อ้างอิงตาม Sales Org และ Order Type (Config Table)`);
     console.log(`  รอบการพักระบบ : ทุก ๆ ${pauseMinutes} นาที`);
     console.log(`  สถานะบริการ   : เปิดใช้งาน (กำลังสแกนคิวส่งเมล...)`);
     console.log(`====================================================================\x1b[0m`);
