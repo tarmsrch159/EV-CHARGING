@@ -4,6 +4,7 @@ const order = require('./order')
 const order_type = require('./order-type');
 const order_sap_logs = require('./order-sap-logs');
 const auto_order = require('./auto-order');
+const auto_order_calculate = require('./auto-order-calculate');
 
 // ============= Order =============
 router.post('/information', order.getOrderInformation);
@@ -40,9 +41,12 @@ router.delete('/type/remove', order_type.removeOrderType);
 // ========= Auto Order ==========
 router.post('/auto-order/stock/information', auto_order.getStockAutoOrderInformation);
 router.post('/auto-order/sales/information', auto_order.getSalesAutoOrderInformation);
+router.post('/auto-order/calculate/information', auto_order_calculate.getAutoCalculateOrderInformation);
 
 // ========= Child Order ==========
 router.post('/child-order/information', order.getChildOrderInformation);
+
+
 
 
 module.exports = router;
