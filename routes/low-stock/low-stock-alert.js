@@ -245,20 +245,18 @@ const generateLowStockExcel = async (petrolInfo, lowStockProducts) => {
  */
 async function getPendingOrderQty(dbName, tankInfo, stationInfo) {
     const sql = `
-        SELECT SUM(oi.item_qty) as pending_qty
+        SELECT coalesce(SUM(oi.item_qty), 0) as pending_qty
         FROM tbl_order_item oi
         JOIN tbl_order o ON oi.order_no = o.id
-        WHERE (oi.ptrl_tank_code = $1 OR (o.ship_to = $2 AND (oi.item_no = $3 OR oi.item_no = $4)))
+        WHERE oi.ptrl_tank_code = $1 AND o.ship_to = $2 AND oi.item_no = $3
             AND oi.order_item_flag = '1'
             AND oi.rm_dt IS NULL
             AND o.rm_dt IS NULL
             AND o.order_flag = '1'
-            AND o.order_status = '1'
-            AND (oi.sd_process_status IS NULL OR oi.sd_process_status != 'C')
-            AND (oi.sd_reject_reason IS NULL OR oi.sd_reject_reason = '')
             AND DATE(o.ist_dt) = CURRENT_DATE
+            AND o.order_status IN ('1', '3', '10')
     `;
-    const params = [tankInfo.ptrl_tank_code, stationInfo.ptrl_number, tankInfo.itm_code, tankInfo.itm_material_number];
+    const params = [tankInfo.ptrl_tank_code, stationInfo.ptrl_number, tankInfo.itm_code];
     const result = await pgConn.getWithParams(dbName, sql, params, config.connectionString());
     return parseFloat(result.data[0]?.pending_qty) || 0;
 }
@@ -362,9 +360,9 @@ const generateCSSummaryEmailHtml = (stationsData) => {
 
             const recom = Math.max(0, sales - stock);
 
-            rowStock += stock;
-            rowSales += sales;
-            rowRecom += recom;
+            rowStock += Math.max(0, stock);
+            rowSales += Math.max(0, sales);
+            rowRecom += Math.max(0, recom);
 
             rowHtml += `
                 <td style="text-align: right; border-left: 2px solid #dee2e6;">${Math.max(0, stock).toLocaleString()}</td>
@@ -374,9 +372,9 @@ const generateCSSummaryEmailHtml = (stationsData) => {
             `;
         });
 
-        totalAllStocks += rowStock;
-        totalAllSales += rowSales;
-        totalAllRecom += rowRecom;
+        totalAllStocks += (rowStock || 0);
+        totalAllSales += (rowSales || 0);
+        totalAllRecom += (rowRecom || 0);
 
         rowHtml += `
             <td style="text-align: right; border-left: 2px solid #dee2e6; background-color: #f8f9fa;">${Math.max(0, rowStock).toLocaleString()}</td>
@@ -386,6 +384,9 @@ const generateCSSummaryEmailHtml = (stationsData) => {
 
         rowsHtml += `<tr style="border-bottom: 1px solid #ddd;">${rowHtml}</tr>`;
     });
+
+    // คำนวณยอดรวมสรุปท้าย (HTML)
+    // totalAllStocks, totalAllSales, totalAllRecom ถูกคำนวณไว้แล้วใน loop stationsData
 
     return `
     <!DOCTYPE html>
@@ -428,12 +429,12 @@ const generateCSSummaryEmailHtml = (stationsData) => {
                             ${rowsHtml}
                         </tbody>
                         <tfoot>
-                            <tr style="background-color: #f1f3f5; font-weight: bold;">
-                                <td colspan="2" style="text-align: center;">รวมทั้งหมด</td>
-                                ${productList.map(() => '<td colspan="4" style="border-left: 2px solid #dee2e6;"></td>').join('')}
-                                <td style="text-align: right; border-left: 2px solid #dee2e6;">${Math.max(0, totalAllStocks).toLocaleString()}</td>
-                                <td style="text-align: right;">${Math.max(0, totalAllSales).toLocaleString()}</td>
-                                <td style="text-align: right; color:#d9534f;">${Math.max(0, totalAllRecom).toLocaleString()}</td>
+                            <tr style="background-color: #ffff00; font-weight: bold;">
+                                <td colspan="2" style="text-align: center; border: 1px solid #ddd;">รวม</td>
+                                ${productList.map(() => '<td colspan="4" style="border: 1px solid #ddd;"></td>').join('')}
+                                <td style="text-align: right; border: 1px solid #ddd;">${Math.max(0, totalAllStocks).toLocaleString()}</td>
+                                <td style="text-align: right; border: 1px solid #ddd;">${Math.max(0, totalAllSales).toLocaleString()}</td>
+                                <td style="text-align: right; border: 1px solid #ddd; color:#d9534f;">${Math.max(0, totalAllRecom).toLocaleString()}</td>
                             </tr>
                         </tfoot>
                     </table>
@@ -535,12 +536,15 @@ const generateCSSummaryExcel = async (stationsData) => {
                 const pending = prodData ? Number(prodData.total_pending_qty) : 0;
 
                 const recom = Math.max(0, sales - stock);
+                const s_val = Math.max(0, stock);
+                const sa_val = Math.max(0, sales);
+                const r_val = Math.max(0, recom);
 
-                rowStock += stock; rowSales += sales; rowRecom += recom;
+                rowStock += s_val; rowSales += sa_val; rowRecom += r_val;
 
-                [stock, sales, unpump, recom].forEach((val, i) => {
+                [s_val, sa_val, unpump, r_val].forEach((val, i) => {
                     const cell = worksheet.getCell(currentRow, colIndex + i);
-                    cell.value = val > 0 ? val : 0;
+                    cell.value = val;
                     cell.numFmt = '#,##0';
                     cell.font = (i === 3 && val > 0) ? { ...fontSarabun, color: { argb: 'FFFF0000' }, bold: true } : fontSarabun;
                     cell.alignment = { horizontal: 'right', vertical: 'middle' };
@@ -553,7 +557,7 @@ const generateCSSummaryExcel = async (stationsData) => {
 
             [rowStock, rowSales, rowRecom].forEach((val, i) => {
                 const cell = worksheet.getCell(currentRow, colIndex + i);
-                cell.value = val > 0 ? val : 0;
+                cell.value = val;
                 cell.numFmt = '#,##0';
                 cell.font = fontSarabunBold;
                 cell.alignment = { horizontal: 'right', vertical: 'middle' };
@@ -562,12 +566,37 @@ const generateCSSummaryExcel = async (stationsData) => {
             currentRow++;
         });
 
+        // --- 4. Grand Total Row (Excel) ---
         worksheet.mergeCells(currentRow, 1, currentRow, 2);
         const sumTitle = worksheet.getCell(currentRow, 1);
-        sumTitle.value = 'รวมทั้งหมด (Grand Total)';
+        sumTitle.value = 'รวม';
         sumTitle.font = fontSarabunBold;
-        sumTitle.alignment = { horizontal: 'right', vertical: 'middle' };
-        sumTitle.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2F2F2' } };
+        sumTitle.alignment = { horizontal: 'center', vertical: 'middle' };
+        sumTitle.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } }; // สีเหลืองตามรูป
+        sumTitle.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+
+        // เว้นว่างคอลัมน์รายสินค้า (Grand Total Row)
+        let totalColIndex = 3;
+        productList.forEach(() => {
+            for (let i = 0; i < 4; i++) {
+                const cell = worksheet.getCell(currentRow, totalColIndex + i);
+                cell.value = '';
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } }; // สีเหลืองตามรูป
+                cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+            }
+            totalColIndex += 4;
+        });
+
+        // ใส่ยอดรวมสรุปท้าย (Final Totals)
+        [finalStock, finalSales, finalRecom].forEach((val, i) => {
+            const cell = worksheet.getCell(currentRow, totalColIndex + i);
+            cell.value = val;
+            cell.numFmt = '#,##0';
+            cell.font = fontSarabunBold;
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } }; // สีเหลืองตามรูป
+            cell.alignment = { horizontal: 'right', vertical: 'middle' };
+            cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+        });
 
         worksheet.getColumn(1).width = 5;
         worksheet.getColumn(2).width = 30;
@@ -575,7 +604,7 @@ const generateCSSummaryExcel = async (stationsData) => {
 
         return await workbook.xlsx.writeBuffer();
     } catch (err) {
-        console.error('❌ [generateCSSummaryExcel Error]:', err.message);
+        console.error('[generateCSSummaryExcel Error]:', err.message);
         return null;
     }
 };
@@ -584,7 +613,7 @@ const generateCSSummaryExcel = async (stationsData) => {
 // หาว่า CS คนไหนดูแลปั๊มกลุ่มไหนบ้าง แล้วกรองปั๊มที่เตือนโยนใส่เมลสรุปฉบับเดียว/คน
 const sendSummaryAlertToCS = async (dbName, csData, summaryAlerts, historySet) => {
     const logEntries = [];
-    console.log(`   🔋 [Runout Alert]  ตรวจสอบการส่งสรุปให้ CS (CS Count: ${csData.length}, Alert Count: ${summaryAlerts.length})`);
+    console.log(`[Runout Alert]  ตรวจสอบการส่งสรุปให้ CS (CS Count: ${csData.length}, Alert Count: ${summaryAlerts.length})`);
     try {
         const testEmails = 'amnart_pg@dtc.co.th, puautarm@gmail.com';
         const emailToGroups = {};
@@ -609,7 +638,7 @@ const sendSummaryAlertToCS = async (dbName, csData, summaryAlerts, historySet) =
                 const newProducts = alert.products.filter(p => {
                     const checkKey = `${alert.station.ptrl_code}_${p.itm_code}_${email}_${empCode}_cs_planner`;
                     const hasHistory = historySet.has(checkKey);
-                    if (hasHistory) console.log(`    [Runout Alert]  [Skip CS] รายการ ${alert.station.ptrl_desc} - ${p.product_name} ได้ทำการส่งให้ ${email} ในวันนี้แล้ว`);
+                    if (hasHistory) console.log(`[Runout Alert]  [Skip CS] รายการ ${alert.station.ptrl_desc} - ${p.product_name} ได้ทำการส่งให้ ${email} ในวันนี้แล้ว`);
                     return !hasHistory;
                 });
 
@@ -622,10 +651,10 @@ const sendSummaryAlertToCS = async (dbName, csData, summaryAlerts, historySet) =
                 const subject = `[AOS Alert] สรุปรายงานสถานีที่เสี่ยง Run Out (สำหรับ CS/Planner)`;
                 const html = generateCSSummaryEmailHtml(relevantAlerts);
                 const excel = await generateCSSummaryExcel(relevantAlerts);
-                const attachments = excel ? [{ filename: `AOS_CS_Summary_RunOut_${moment().format('YYYYMMDD')}.xlsx`, content: excel }] : [];
+                const attachments = excel ? [{ filename: `AOS_Order_Recommendation_Runout_${moment().format('YYYYMMDD')}.xlsx`, content: excel }] : [];
 
                 await mailer.sendMail(testEmails, subject, html, attachments);
-                console.log(`   ✅ [Runout Alert] 🔀 [INTERCEPT] ส่งสรุปของ (${email}) ไปที่ -> ${testEmails}`);
+                console.log(`[Runout Alert] 🔀 [INTERCEPT] ส่งสรุปของ (${email}) ไปที่ -> ${testEmails}`);
 
                 // บันทึกประวัติ
                 const empName = empInfo?.emp_name || 'ไม่ทราบชื่อ';
@@ -649,7 +678,7 @@ const sendSummaryAlertToCS = async (dbName, csData, summaryAlerts, historySet) =
         }
 
     } catch (err) {
-        console.error('❌ [sendSummaryAlertToCS Error]:', err);
+        console.error('[sendSummaryAlertToCS Error]:', err);
     }
     return logEntries;
 }
@@ -698,7 +727,7 @@ async function sendAlertToRecipients(dbName, station, lowStockProducts) {
             });
             mailCodesToUpdate.push(conf.ptrl_mail_code);
         } else {
-            console.log(`    [Runout Alert]  ข้ามการส่งให้ผู้จัดการ: ${conf.email_alert} (เพิ่งส่งไปเมื่อ ${lastAlert.format('HH:mm')} ติดเงื่อนไขความถี่)`);
+            console.log(`[Runout Alert]  ข้ามการส่งให้ผู้จัดการ: ${conf.email_alert} (เพิ่งส่งไปเมื่อ ${lastAlert.format('HH:mm')} ติดเงื่อนไขความถี่)`);
         }
     }
 
@@ -707,7 +736,7 @@ async function sendAlertToRecipients(dbName, station, lowStockProducts) {
         const html = generateLowStockEmailHtml(station, lowStockProducts);
         const excel = await generateLowStockExcel(station, lowStockProducts);
 
-        const attachments = excel ? [{ filename: `AOS_RunOut_${station.ptrl_number}.xlsx`, content: excel }] : [];
+        const attachments = excel ? [{ filename: `AOS_Order_Recommendation_RunOut${station.ptrl_number}.xlsx`, content: excel }] : [];
 
         const groupDesc = station.ptrl_group_desc || 'ไม่มีกลุ่ม';
         const groupID = station.ptrl_group_code || '-';
@@ -757,7 +786,7 @@ exports.processLowStockAlerts = async (lic_code, filter_sales_org = null, filter
     const dbName = dbPrefix + lic_code;
     try {
         const currentTime = moment();
-        console.log(`\n🔍 [Runout Alert] เริ่มตรวจสอบ (${lic_code}) เวลา ${currentTime.format('HH:mm:ss')}...`);
+        console.log(`\n[Runout Alert] เริ่มตรวจสอบ (${lic_code}) เวลา ${currentTime.format('HH:mm:ss')}...`);
 
         // 1. ดึงรายการปั๊มที่ถึงรอบการตรวจสอบ (อ้างอิงตาม Sales Org และ Order Type)
         let wh = "";
@@ -792,7 +821,7 @@ exports.processLowStockAlerts = async (lic_code, filter_sales_org = null, filter
                 ${wh}
         `;
         const activeStations = await pgConn.getWithParams(dbName, scriptSql, params, config.connectionString());
-        if (!activeStations.data?.length) return console.log(`    [Runout Alert]  ไม่มีปั๊มที่ต้องตรวจสอบในรอบนี้`);
+        if (!activeStations.data?.length) return console.log(`[Runout Alert]  ไม่มีปั๊มที่ต้องตรวจสอบในรอบนี้`);
 
         // 2. ดึงข้อมูลพนักงาน CS/Planner (กรองเฉพาะคนที่จะเทสใน SQL เลย)
         const csDataQuery = await pgConn.get(dbName, `

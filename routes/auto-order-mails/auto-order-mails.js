@@ -282,7 +282,7 @@ const getDataForStation = async (lic_code, autoItem) => {
             ptrl_desc: autoItem.ptrl_desc,
             ptrl_short_desc: autoItem.ptrl_short_desc || '',
             // --- INTERCEPT MODE: ถ้ามีผู้รับในระบบ ให้เปลี่ยนมาส่งที่ 2 เมลนี้แทน ---
-            manager_email: cleanEmails(autoItem.ptrl_remark) ? 'amnart_pg@dtc.co.th, puautarm@gmail.com' : '', 
+            manager_email: cleanEmails(autoItem.ptrl_remark) ? 'amnart_pg@dtc.co.th, puautarm@gmail.com' : '',
             // ------------------------------------------------------------------
             manager_emp_code: manager ? manager.emp_code : '',
             manager_username: manager ? manager.emp_username : '',
@@ -421,7 +421,7 @@ exports.getAutoOrderMailData = async (req, res) => {
  */
 exports.runAutoOrderMailTask = async () => {
     const lic_code = 'aos01';
-    console.log(`\n🚀 [Auto Order Mail] เริ่ม Background Task: ${moment().format('YYYY-MM-DD HH:mm:ss')}`);
+    console.log(`\n[Auto Order Mail] เริ่ม Background Task: ${moment().format('YYYY-MM-DD HH:mm:ss')}`);
 
     try {
         const currentTime = moment().format('HH:mm:ss');
@@ -442,7 +442,7 @@ exports.runAutoOrderMailTask = async () => {
         const result = await pgConn.get(dbPrefix + lic_code, query, config.connectionString());
 
         if (result.code || !result.data || result.data.length === 0) {
-            console.log(`ℹ️  [Auto Order Mail] ไม่มีรายการที่ต้องประมวลผล`);
+            console.log(`[Auto Order Mail] ไม่มีรายการที่ต้องประมวลผล`);
             return { success: true };
         }
 

@@ -59,7 +59,7 @@ const executeLoop = async (startTimeStr, endTimeStr, pauseMinutes) => {
                 }
                 // ====== Cool Down การทำงาน ======
                 else {
-                    console.log(`\n[${finishTime.format('HH:mm:ss')}] 💤 เสร็จรอบนี้ | พัก ${pauseMinutes} นาที...`);
+                    console.log(`\n[${finishTime.format('HH:mm:ss')} Auto Order Mail] พัก ${pauseMinutes} นาที...`);
                     await sleep(pauseMinutes * 60 * 1000);
                 }
             }

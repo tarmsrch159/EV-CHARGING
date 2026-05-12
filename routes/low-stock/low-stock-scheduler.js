@@ -17,7 +17,7 @@ const executeLoop = async () => {
         const currentTime = moment();
         const currentHHmm = currentTime.format('HH:mm');
 
-        console.log(`\n[${currentTime.format('HH:mm:ss')}] 🔋 Run Out Alert: เริ่มต้นรอบการทำงาน...`);
+        console.log(`\n[${currentTime.format('HH:mm:ss')}] [Run Out Alert] เริ่มต้นรอบการทำงาน...`);
 
         // เรียกประมวลผลแบบรวม (Controller จะเช็คเวลา Cut-off <= ปัจจุบันให้เอง)
         await lowStockAlertController.processLowStockAlerts(lic_code);
