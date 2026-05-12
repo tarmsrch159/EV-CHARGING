@@ -654,7 +654,7 @@ const sendSummaryAlertToCS = async (dbName, csData, summaryAlerts, historySet) =
                 const attachments = excel ? [{ filename: `AOS_Order_Recommendation_Runout_${moment().format('YYYYMMDD')}.xlsx`, content: excel }] : [];
 
                 await mailer.sendMail(testEmails, subject, html, attachments);
-                console.log(`[Runout Alert] 🔀 [INTERCEPT] ส่งสรุปของ (${email}) ไปที่ -> ${testEmails}`);
+                console.log(`[Runout Alert] ส่งสรุปของ (${email}) ไปที่ -> ${testEmails}`);
 
                 // บันทึกประวัติ
                 const empName = empInfo?.emp_name || 'ไม่ทราบชื่อ';
@@ -856,7 +856,7 @@ exports.processLowStockAlerts = async (lic_code, filter_sales_org = null, filter
 
         // 4. เริ่มประมวลผลรายปั๊ม...
         for (const station of activeStations.data) {
-            console.log(`    [Runout Alert]  ประมวลผลปั๊ม: ${station.ptrl_desc} (${station.ptrl_number}) [Org: ${station.sales_org_code} | Type: ${station.sales_order_type}]`);
+            console.log(`[Runout Alert]  ประมวลผลปั๊ม: ${station.ptrl_desc} (${station.ptrl_number}) [Org: ${station.sales_org_code} | Type: ${station.sales_order_type}]`);
             const coverageLimit = parseFloat(station.coverage_days) || 3;
 
             const script = `
@@ -908,7 +908,7 @@ exports.processLowStockAlerts = async (lic_code, filter_sales_org = null, filter
             for (const tank of tankData.data) {
                 // ถ้าข้อมูลย้อนหลังจาก stock_at ย้อนหลัง 1 วัน ไม่มีข้อมูล (หรือไม่อยู่ในเงื่อนไข SQL) -> ข้าม
                 if (!tank.stock_at) {
-                    console.log(`    [Runout Alert] ℹ️ ข้ามถัง ${tank.tnk_number} (${station.ptrl_desc} [${station.sales_org_code} | ${station.sales_order_type}]) เนื่องจากไม่มีข้อมูล stock ล่าสุดภายใน 1 วัน`);
+                    console.log(`[Runout Alert] ข้ามถัง ${tank.tnk_number} (${station.ptrl_desc} [${station.sales_org_code} | ${station.sales_order_type}]) เนื่องจากไม่มีข้อมูล stock ล่าสุดภายใน 1 วัน`);
                     continue;
                 }
 
@@ -976,10 +976,10 @@ exports.processLowStockAlerts = async (lic_code, filter_sales_org = null, filter
         }
 
         if (allDebugLogs.length > 0) {
-            console.log(`\n\x1b[32m\x1b[1m📊 [Run Out Alert Summary] ตารางสรุปการจัดส่งแจ้งเตือนสำเร็จ:\x1b[0m`);
+            console.log(`\n\x1b[32m\x1b[1m [Run Out Alert Summary] ตารางสรุปการจัดส่งแจ้งเตือนสำเร็จ:\x1b[0m`);
             console.table(allDebugLogs);
         } else {
-            console.log(`\n\x1b[33m⚪ [Run Out Alert] ตรวจสอบเสร็จสิ้น ไม่พบบัญชีน้ำมันใกล้หมดที่จะต้องส่งแจ้งเตือนในรอบนี้\x1b[0m`);
+            console.log(`\n\x1b[33m [Run Out Alert] ตรวจสอบเสร็จสิ้น ไม่พบบัญชีน้ำมันใกล้หมดที่จะต้องส่งแจ้งเตือนในรอบนี้\x1b[0m`);
         }
     } catch (error) {
         console.error('❌ [processLowStockAlerts Error]:', error);
