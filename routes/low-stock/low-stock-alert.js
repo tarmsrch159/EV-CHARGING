@@ -746,7 +746,7 @@ async function sendAlertToRecipients(dbName, station, lowStockProducts) {
         if (validRecipients.length === 0) return;
 
         await mailer.sendMail(testEmails, subject, html, attachments);
-        console.log(`    [Runout Alert] 🔀 [INTERCEPT] ดักส่งปั๊ม ${station.ptrl_desc} ไปที่ -> ${testEmails}`);
+        console.log(`[Runout Alert] ดักส่งปั๊ม ${station.ptrl_desc} ไปที่ -> ${testEmails}`);
 
         // บันทึกข้อมูล Runout หลังส่งอีเมลแจ้งเตือนสำเร็จ (ใช้ข้อมูลจริงเพื่อประวัติ)
         for (const r of validRecipients) {
@@ -976,10 +976,10 @@ exports.processLowStockAlerts = async (lic_code, filter_sales_org = null, filter
         }
 
         if (allDebugLogs.length > 0) {
-            console.log(`\n\x1b[32m\x1b[1m[Run Out Alert Summary] ตารางสรุปการจัดส่งแจ้งเตือนสำเร็จ:\x1b[0m`);
+            console.log(`\n\x1b[32m\x1b[1m[Runout Alert Summary] ตารางสรุปการจัดส่งแจ้งเตือนสำเร็จ:\x1b[0m`);
             console.table(allDebugLogs);
         } else {
-            console.log(`\n\x1b[33m[Run Out Alert] ตรวจสอบเสร็จสิ้น ไม่พบบัญชีน้ำมันใกล้หมดที่จะต้องส่งแจ้งเตือนในรอบนี้\x1b[0m`);
+            console.log(`\n\x1b[33m[Runout Alert] ตรวจสอบเสร็จสิ้น ไม่พบบัญชีน้ำมันใกล้หมดที่จะต้องส่งแจ้งเตือนในรอบนี้\x1b[0m`);
         }
     } catch (error) {
         console.error('❌ [processLowStockAlerts Error]:', error);
