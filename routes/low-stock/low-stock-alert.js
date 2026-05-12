@@ -781,10 +781,11 @@ exports.processLowStockAlerts = async (lic_code, filter_sales_org = null, filter
 
         const scriptSql = `
             SELECT DISTINCT p.ptrl_code, p.ptrl_number, p.ptrl_desc, p.coverage_days, p.ptrl_group_code, pg.ptrl_group_desc,
-                   oc.sales_org_code, oc.order_type_code
+                   oc.sales_org_code, oc.order_type_code, ot.sales_order_type
             FROM tbl_petrol p
             INNER JOIN tbl_sales_org_order_config oc ON p.ptrl_sales_group = oc.sales_org_code 
                   AND p.ptrl_sales_type = oc.order_type_code
+            LEFT JOIN tbl_order_type ot ON oc.order_type_code = ot.ord_type_code
             LEFT JOIN tbl_petrol_group pg ON p.ptrl_group_code = pg.ptrl_group_code
             WHERE p.ptrl_flag = '1' AND p.rm_dt IS NULL 
                   AND oc.sales_org_flag = 1 AND oc.rm_dt IS NULL
@@ -826,6 +827,7 @@ exports.processLowStockAlerts = async (lic_code, filter_sales_org = null, filter
 
         // 4. เริ่มประมวลผลรายปั๊ม...
         for (const station of activeStations.data) {
+            console.log(`    [Runout Alert]  ประมวลผลปั๊ม: ${station.ptrl_desc} (${station.ptrl_number}) [Org: ${station.sales_org_code} | Type: ${station.sales_order_type}]`);
             const coverageLimit = parseFloat(station.coverage_days) || 3;
 
             const script = `
@@ -877,7 +879,7 @@ exports.processLowStockAlerts = async (lic_code, filter_sales_org = null, filter
             for (const tank of tankData.data) {
                 // ถ้าข้อมูลย้อนหลังจาก stock_at ย้อนหลัง 1 วัน ไม่มีข้อมูล (หรือไม่อยู่ในเงื่อนไข SQL) -> ข้าม
                 if (!tank.stock_at) {
-                    console.log(`    [Runout Alert] ℹ️ ข้ามถัง ${tank.tnk_number} (${station.ptrl_desc}) เนื่องจากไม่มีข้อมูล stock ล่าสุดภายใน 1 วัน`);
+                    console.log(`    [Runout Alert] ℹ️ ข้ามถัง ${tank.tnk_number} (${station.ptrl_desc} [${station.sales_org_code} | ${station.sales_order_type}]) เนื่องจากไม่มีข้อมูล stock ล่าสุดภายใน 1 วัน`);
                     continue;
                 }
 
