@@ -64,10 +64,9 @@ exports.getRunoutReportInformation = async (req, res, next) => {
                 ri.tank_numbers,
                 ri.itm_code,
                 ri.itm_desc,
-                ri.stock,
                 ri.day_sales,
                 ri.unpump,
-                ri.stock_minus_sales
+                ri.stock_minus_sales as stock
             FROM tbl_runout_information ri
             JOIN tbl_petrol p ON ri.ptrl_code = p.ptrl_code
             ${whereClause}
