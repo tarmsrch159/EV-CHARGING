@@ -263,48 +263,6 @@ async function getPendingOrderQty(dbName, tankInfo, stationInfo) {
     return parseFloat(result.data[0]?.pending_qty) || 0;
 }
 
-/**
- * คำนวณ Stock ประมาณการย้อนหลังเมื่อไม่มีข้อมูล Stock วันล่าสุด
- * สูตร: Stock = stock วันก่อนหน้า - ยอดขายเฉลี่ยจากประวัติ 7 สัปดาห์ (ตามวันของสัปดาห์เดียวกัน)
- */
-function estimateStockFromSalesHistory(tank) {
-    const todayDow = moment().day(); // 0=Sunday, 6=Saturday
-    const previousStock = parseFloat(tank.current_stock) || 0;
-
-    // รวบรวมข้อมูลยอดขายย้อนหลังทั้ง 8 ช่อง (sale_previous ~ sale_previous7)
-    const salePairs = [
-        { sale: tank.sale_previous, date: tank.sale_at_previous },
-        { sale: tank.sale_previous1, date: tank.sale_at_previous1 },
-        { sale: tank.sale_previous2, date: tank.sale_at_previous2 },
-        { sale: tank.sale_previous3, date: tank.sale_at_previous3 },
-        { sale: tank.sale_previous4, date: tank.sale_at_previous4 },
-        { sale: tank.sale_previous5, date: tank.sale_at_previous5 },
-        { sale: tank.sale_previous6, date: tank.sale_at_previous6 },
-        { sale: tank.sale_previous7, date: tank.sale_at_previous7 },
-    ];
-
-    // กรองเฉพาะวันที่ตรงกับวันในสัปดาห์เดียวกับวันนี้
-    const matchingSales = [];
-    for (const pair of salePairs) {
-        if (pair.date && pair.sale != null && pair.sale !== '') {
-            const saleDow = moment(pair.date).day();
-            if (saleDow === todayDow) {
-                const saleVal = parseFloat(pair.sale) || 0;
-                if (saleVal > 0) matchingSales.push(saleVal);
-            }
-        }
-    }
-
-    // คำนวณยอดขายเฉลี่ยสำหรับวันในสัปดาห์นี้
-    const avgSales = matchingSales.length > 0
-        ? matchingSales.reduce((a, b) => a + b, 0) / matchingSales.length
-        : 0;
-
-    // Stock ประมาณการ = stock วันก่อนหน้า - ยอดขายเฉลี่ย
-    const estimatedStock = previousStock - avgSales;
-
-    return { estimatedStock, avgSales, matchCount: matchingSales.length };
-}
 
 /**
  * บันทึกข้อมูล Runout ลง tbl_runout_information หลังส่งอีเมลสำเร็จ
@@ -626,8 +584,8 @@ const generateCSSummaryExcel = async (stationsData) => {
 // หาว่า CS คนไหนดูแลปั๊มกลุ่มไหนบ้าง แล้วกรองปั๊มที่เตือนโยนใส่เมลสรุปฉบับเดียว/คน
 const sendSummaryAlertToCS = async (dbName, csData, summaryAlerts, historySet) => {
     const logEntries = [];
+    console.log(`   🔋 [Runout Alert]  ตรวจสอบการส่งสรุปให้ CS (CS Count: ${csData.length}, Alert Count: ${summaryAlerts.length})`);
     try {
-        // --- INTERCEPT MODE: รัน Logic เดิมเพื่อหาข้อมูลตาม Table แต่ดักส่งมาที่ 2 เมลที่กำหนด ---
         const testEmails = 'amnart_pg@dtc.co.th, puautarm@gmail.com';
         const emailToGroups = {};
 
@@ -643,11 +601,16 @@ const sendSummaryAlertToCS = async (dbName, csData, summaryAlerts, historySet) =
 
             const relevantAlerts = [];
             for (const alert of summaryAlerts) {
-                if (!allowedGroups.has(alert.station.ptrl_group_code)) continue;
+                if (!allowedGroups.has(alert.station.ptrl_group_code)) {
+                    console.log(`    [Runout Alert]  [Skip CS] ปั๊ม ${alert.station.ptrl_desc} ไม่อยู่ในกลุ่มที่ ${email} ดูแล`);
+                    continue;
+                }
 
                 const newProducts = alert.products.filter(p => {
                     const checkKey = `${alert.station.ptrl_code}_${p.itm_code}_${email}_${empCode}_cs_planner`;
-                    return !historySet.has(checkKey);
+                    const hasHistory = historySet.has(checkKey);
+                    if (hasHistory) console.log(`    [Runout Alert]  [Skip CS] รายการ ${alert.station.ptrl_desc} - ${p.product_name} ได้ทำการส่งให้ ${email} ในวันนี้แล้ว`);
+                    return !hasHistory;
                 });
 
                 if (newProducts.length > 0) {
@@ -661,9 +624,8 @@ const sendSummaryAlertToCS = async (dbName, csData, summaryAlerts, historySet) =
                 const excel = await generateCSSummaryExcel(relevantAlerts);
                 const attachments = excel ? [{ filename: `AOS_CS_Summary_RunOut_${moment().format('YYYYMMDD')}.xlsx`, content: excel }] : [];
 
-                // --- ดักส่ง (Intercept) ---
                 await mailer.sendMail(testEmails, subject, html, attachments);
-                console.log(`   🔋 [Runout Alert] 🔀 [INTERCEPT] ดักส่งสรุปของ (${email}) ไปที่ -> ${testEmails}`);
+                console.log(`   ✅ [Runout Alert] 🔀 [INTERCEPT] ส่งสรุปของ (${email}) ไปที่ -> ${testEmails}`);
 
                 // บันทึกประวัติ
                 const empName = empInfo?.emp_name || 'ไม่ทราบชื่อ';
@@ -688,6 +650,93 @@ const sendSummaryAlertToCS = async (dbName, csData, summaryAlerts, historySet) =
 
     } catch (err) {
         console.error('❌ [sendSummaryAlertToCS Error]:', err);
+    }
+    return logEntries;
+}
+
+
+/**
+ * ฟังก์ชันย่อยสำหรับตรวจสอบเงื่อนไขความถี่และส่งอีเมล
+ */
+async function sendAlertToRecipients(dbName, station, lowStockProducts) {
+    const currentTime = moment();
+    const logEntries = [];
+    const alertConfigs = await pgConn.getWithParams(dbName, `
+        SELECT DISTINCT ON (a.email_alert) 
+               a.ptrl_mail_code, a.email_alert, a.re_alert_type, a.last_alert_dt,
+               COALESCE(e.emp_code, a.emp_code) as emp_code, 
+               e.emp_name, r.emp_role_desc
+        FROM tbl_petrol_mail_alert a
+        LEFT JOIN tbl_employee e ON a.emp_code = e.emp_code AND e.rm_dt IS NULL AND e.emp_flag = '1'
+        LEFT JOIN tbl_employee_role r ON e.emp_role_code = r.emp_role_code
+        WHERE a.ptrl_code = $1 
+              AND a.alert_status = '1' AND a.rm_dt IS NULL
+              AND a.email_alert IN ('amnart_pg@dtc.co.th', 'puautarm@gmail.com')
+        `, [station.ptrl_code], config.connectionString());
+
+    if (!alertConfigs.data?.length) return logEntries;
+
+    const validRecipients = [];
+    const mailCodesToUpdate = [];
+
+    for (const conf of alertConfigs.data) {
+        const lastAlert = conf.last_alert_dt ? moment(conf.last_alert_dt) : null;
+        let canSend = false;
+
+        if (conf.re_alert_type == 1) { // ครั้งเดียวต่อวัน
+            if (!lastAlert || lastAlert.format('YYYY-MM-DD') !== currentTime.format('YYYY-MM-DD')) canSend = true;
+        } else if (conf.re_alert_type == 2) { // ทุก 30 นาที
+            if (!lastAlert || currentTime.diff(lastAlert, 'minutes') >= 30) canSend = true;
+        }
+
+        if (canSend) {
+            validRecipients.push({
+                email: conf.email_alert,
+                empCode: conf.emp_code || null,
+                empName: conf.emp_name || 'ผู้จัดการปั๊ม',
+                empRoleDesc: conf.emp_role_desc || 'ผู้จัดการสถานี'
+            });
+            mailCodesToUpdate.push(conf.ptrl_mail_code);
+        } else {
+            console.log(`    [Runout Alert]  ข้ามการส่งให้ผู้จัดการ: ${conf.email_alert} (เพิ่งส่งไปเมื่อ ${lastAlert.format('HH:mm')} ติดเงื่อนไขความถี่)`);
+        }
+    }
+
+    if (validRecipients.length > 0) {
+        const subject = `[AOS Alert] แจ้งเตือนน้ำมันใกล้หมด - ${station.ptrl_desc}`;
+        const html = generateLowStockEmailHtml(station, lowStockProducts);
+        const excel = await generateLowStockExcel(station, lowStockProducts);
+
+        const attachments = excel ? [{ filename: `AOS_RunOut_${station.ptrl_number}.xlsx`, content: excel }] : [];
+
+        const groupDesc = station.ptrl_group_desc || 'ไม่มีกลุ่ม';
+        const groupID = station.ptrl_group_code || '-';
+
+        // --- INTERCEPT MODE: ถ้ามีใครต้องได้รับเมล ให้เปลี่ยนมาส่งที่ 2 เมลนี้แทน ---
+        const testEmails = 'amnart_pg@dtc.co.th, puautarm@gmail.com';
+        if (validRecipients.length === 0) return;
+
+        await mailer.sendMail(testEmails, subject, html, attachments);
+        console.log(`    [Runout Alert] 🔀 [INTERCEPT] ดักส่งปั๊ม ${station.ptrl_desc} ไปที่ -> ${testEmails}`);
+
+        // บันทึกข้อมูล Runout หลังส่งอีเมลแจ้งเตือนสำเร็จ (ใช้ข้อมูลจริงเพื่อประวัติ)
+        for (const r of validRecipients) {
+            await saveRunoutToDatabase(dbName, station, lowStockProducts, r.email, 'station_manager', r.empCode, r.empRoleDesc);
+
+            logEntries.push({
+                'สถานีบริการ (Station)': `${station.ptrl_desc} (${station.ptrl_number})`,
+                'กลุ่มปั๊ม (Petrol Group)': `${groupDesc} (${groupID})`,
+                'ชื่อพนักงาน': r.empName,
+                'ตำแหน่ง': r.empRoleDesc,
+                'อีเมลเดิม (Original)': r.email,
+                'ส่งจริงไปที่ (Intercepted)': testEmails
+            });
+        }
+
+        // อัปเดต Last Alert Time
+        for (const code of mailCodesToUpdate) {
+            await pgConn.execute2params(dbName, `UPDATE tbl_petrol_mail_alert SET last_alert_dt = $1 WHERE ptrl_mail_code = $2`, [currentTime.format('YYYY-MM-DD HH:mm:ss'), code], config.connectionString());
+        }
     }
     return logEntries;
 }
@@ -779,65 +828,44 @@ exports.processLowStockAlerts = async (lic_code, filter_sales_org = null, filter
         for (const station of activeStations.data) {
             const coverageLimit = parseFloat(station.coverage_days) || 3;
 
-            // ดึงข้อมูลถังน้ำมันทั้งหมดของปั๊ม
-            const tankData = await pgConn.getWithParams(dbName, `
+            const script = `
                 SELECT tpt.ptrl_tank_code, tpt.tnk_number, tpt.itm_code, itm.itm_material_number, 
                        itm.itm_desc AS product_name, tpt.unpump_level,
                        COALESCE(auto_tank.tnk_deadstock, 0) AS deadstock,
                        COALESCE(auto_tank.stock, 0) as current_stock,
-                       auto_tank.stock_at,
                        COALESCE(auto_sales.sale_previous, 0) AS day_sales,
-                       auto_sales.sale_at_previous,
-                       auto_sales.sale_previous1, auto_sales.sale_at_previous1,
-                       auto_sales.sale_previous2, auto_sales.sale_at_previous2,
-                       auto_sales.sale_previous3, auto_sales.sale_at_previous3,
-                       auto_sales.sale_previous4, auto_sales.sale_at_previous4,
-                       auto_sales.sale_previous5, auto_sales.sale_at_previous5,
-                       auto_sales.sale_previous6, auto_sales.sale_at_previous6,
-                       auto_sales.sale_previous7, auto_sales.sale_at_previous7
+                       auto_tank.stock_at 
                 FROM tbl_petrol_tank tpt 
                 LEFT JOIN tbl_item itm ON tpt.itm_code = itm.itm_code
                 LEFT JOIN (
-                    SELECT DISTINCT ON (tank_code, ptrl_code) * 
-                    FROM tbl_automatics_tanks_information ORDER BY tank_code, ptrl_code, stock_at DESC
-                ) auto_tank ON tpt.ptrl_tank_code = auto_tank.tank_code AND tpt.ptrl_code = auto_tank.ptrl_code
+                    SELECT * FROM (
+                        SELECT *, 
+                               ROW_NUMBER() OVER (PARTITION BY tank_code, ptrl_code ORDER BY stock_at DESC) as rn
+                        FROM tbl_automatics_tanks_information 
+                        WHERE stock > 0 
+                          AND stock_at >= (
+                              SELECT MAX(stock_at) - INTERVAL '1 day'
+                              FROM tbl_automatics_tanks_information 
+                          )
+                    ) tmp WHERE rn = 1 
+                ) auto_tank ON tpt.ptrl_tank_code = auto_tank.tank_code AND tpt.ptrl_code = auto_tank.ptrl_code 
                 LEFT JOIN (
-                    SELECT DISTINCT ON (tank_code, ptrl_code) ptrl_code, tank_code,
-                           sale_previous, sale_at_previous,
-                           sale_previous1, sale_at_previous1,
-                           sale_previous2, sale_at_previous2,
-                           sale_previous3, sale_at_previous3,
-                           sale_previous4, sale_at_previous4,
-                           sale_previous5, sale_at_previous5,
-                           sale_previous6, sale_at_previous6,
-                           sale_previous7, sale_at_previous7
+                    SELECT DISTINCT ON (tank_code, ptrl_code, DATE(sale_at_previous)) 
+                           ptrl_code, tank_code, sale_previous, DATE(sale_at_previous) as sale_date
                     FROM tbl_automatics_sales_previous_information 
-                    ORDER BY tank_code, ptrl_code, sale_at_previous DESC
-                ) auto_sales ON tpt.ptrl_code = auto_sales.ptrl_code AND tpt.ptrl_tank_code = auto_sales.tank_code
+                    WHERE sale_previous > 0 
+                    ORDER BY tank_code, ptrl_code, DATE(sale_at_previous), sale_at_previous DESC
+                ) auto_sales ON tpt.ptrl_code = auto_sales.ptrl_code 
+                             AND tpt.ptrl_tank_code = auto_sales.tank_code 
+                             AND DATE(auto_tank.stock_at) = auto_sales.sale_date
                 WHERE tpt.ptrl_code = $1 AND tpt.ptrl_tank_flag = '1' AND tpt.rm_dt IS NULL 
                 ORDER BY tpt.tnk_number ASC
-            `, [station.ptrl_code], config.connectionString());
+            `;
+
+            // ดึงข้อมูลถังน้ำมันทั้งหมดของปั๊ม
+            const tankData = await pgConn.getWithParams(dbName, script, [station.ptrl_code], config.connectionString());
 
             if (!tankData.data?.length) continue;
-
-
-            // StockAt - 1 วันปัจจุบัน
-            // StockAt - 2 คือวันย้อนหลัง 1 วัน
-            const expectedStockDate = moment().subtract(1, 'days').format('YYYY-MM-DD'); // T-1 (ข้อมูลปกติ)
-            const fallbackStockDate = moment().subtract(2, 'days').format('YYYY-MM-DD'); // T-2 (ย้อนหลัง 1 วัน)
-            for (const tank of tankData.data) {
-                const stockDate = tank.stock_at ? moment(tank.stock_at).format('YYYY-MM-DD') : null;
-
-                if (stockDate && stockDate !== expectedStockDate) {
-                    // คำนวณย้อนหลังเฉพาะกรณีที่ stock_at เป็น T-2 (ไม่ส่งมาเกิน 1 วันเท่านั้น)
-                    if (stockDate === fallbackStockDate) {
-                        const { estimatedStock, avgSales, matchCount } = estimateStockFromSalesHistory(tank);
-                        console.log(`    [Runout Alert] ⚠️ ประมาณ Stock ย้อนหลัง: ถัง ${tank.tnk_number} (${station.ptrl_desc}) stock_at=${stockDate} (T-2), stock_เดิม=${tank.current_stock}, avg_sales_same_dow=${avgSales.toFixed(2)} (${matchCount} รายการ), estimated=${estimatedStock.toFixed(2)}`);
-                        tank.current_stock = estimatedStock;
-                        tank.is_estimated = true;
-                    }
-                }
-            }
 
             // ดึงค่า Pending Order ของทุกถังพร้อมกันแบบขนาน 
             await Promise.all(tankData.data.map(async (tank) => {
@@ -847,6 +875,12 @@ exports.processLowStockAlerts = async (lic_code, filter_sales_org = null, filter
             // จัดกลุ่มข้อมูลตามสินค้า (Aggregation)
             const productGroups = {};
             for (const tank of tankData.data) {
+                // ถ้าข้อมูลย้อนหลังจาก stock_at ย้อนหลัง 1 วัน ไม่มีข้อมูล (หรือไม่อยู่ในเงื่อนไข SQL) -> ข้าม
+                if (!tank.stock_at) {
+                    console.log(`    [Runout Alert] ℹ️ ข้ามถัง ${tank.tnk_number} (${station.ptrl_desc}) เนื่องจากไม่มีข้อมูล stock ล่าสุดภายใน 1 วัน`);
+                    continue;
+                }
+
                 if (!productGroups[tank.itm_code]) {
                     productGroups[tank.itm_code] = {
                         name: tank.product_name,
@@ -921,91 +955,6 @@ exports.processLowStockAlerts = async (lic_code, filter_sales_org = null, filter
     }
 };
 
-/**
- * ฟังก์ชันย่อยสำหรับตรวจสอบเงื่อนไขความถี่และส่งอีเมล
- */
-async function sendAlertToRecipients(dbName, station, lowStockProducts) {
-    const currentTime = moment();
-    const logEntries = [];
-    const alertConfigs = await pgConn.getWithParams(dbName, `
-        SELECT DISTINCT ON (a.email_alert) 
-               a.ptrl_mail_code, a.email_alert, a.re_alert_type, a.last_alert_dt,
-               COALESCE(e.emp_code, a.emp_code) as emp_code, 
-               e.emp_name, r.emp_role_desc
-        FROM tbl_petrol_mail_alert a
-        LEFT JOIN tbl_employee e ON a.emp_code = e.emp_code AND e.rm_dt IS NULL AND e.emp_flag = '1'
-        LEFT JOIN tbl_employee_role r ON e.emp_role_code = r.emp_role_code
-        WHERE a.ptrl_code = $1 
-              AND a.alert_status = '1' AND a.rm_dt IS NULL
-              AND a.email_alert IN ('amnart_pg@dtc.co.th', 'puautarm@gmail.com')
-        `, [station.ptrl_code], config.connectionString());
-
-    if (!alertConfigs.data?.length) return logEntries;
-
-    const validRecipients = [];
-    const mailCodesToUpdate = [];
-
-    for (const conf of alertConfigs.data) {
-        const lastAlert = conf.last_alert_dt ? moment(conf.last_alert_dt) : null;
-        let canSend = false;
-
-        if (conf.re_alert_type == 1) { // ครั้งเดียวต่อวัน
-            if (!lastAlert || lastAlert.format('YYYY-MM-DD') !== currentTime.format('YYYY-MM-DD')) canSend = true;
-        } else if (conf.re_alert_type == 2) { // ทุก 30 นาที
-            if (!lastAlert || currentTime.diff(lastAlert, 'minutes') >= 30) canSend = true;
-        }
-
-        if (canSend) {
-            validRecipients.push({
-                email: conf.email_alert,
-                empCode: conf.emp_code || null,
-                empName: conf.emp_name || 'ผู้จัดการปั๊ม',
-                empRoleDesc: conf.emp_role_desc || 'ผู้จัดการสถานี'
-            });
-            mailCodesToUpdate.push(conf.ptrl_mail_code);
-        } else {
-            console.log(`    [Runout Alert]  ข้ามการส่งให้ผู้จัดการ: ${conf.email_alert} (เพิ่งส่งไปเมื่อ ${lastAlert.format('HH:mm')} ติดเงื่อนไขความถี่)`);
-        }
-    }
-
-    if (validRecipients.length > 0) {
-        const subject = `[AOS Alert] แจ้งเตือนน้ำมันใกล้หมด - ${station.ptrl_desc}`;
-        const html = generateLowStockEmailHtml(station, lowStockProducts);
-        const excel = await generateLowStockExcel(station, lowStockProducts);
-
-        const attachments = excel ? [{ filename: `AOS_RunOut_${station.ptrl_number}.xlsx`, content: excel }] : [];
-
-        const groupDesc = station.ptrl_group_desc || 'ไม่มีกลุ่ม';
-        const groupID = station.ptrl_group_code || '-';
-
-        // --- INTERCEPT MODE: ถ้ามีใครต้องได้รับเมล ให้เปลี่ยนมาส่งที่ 2 เมลนี้แทน ---
-        const testEmails = 'amnart_pg@dtc.co.th, puautarm@gmail.com';
-        if (validRecipients.length === 0) return;
-
-        await mailer.sendMail(testEmails, subject, html, attachments);
-        console.log(`    [Runout Alert] 🔀 [INTERCEPT] ดักส่งปั๊ม ${station.ptrl_desc} ไปที่ -> ${testEmails}`);
-
-        // บันทึกข้อมูล Runout หลังส่งอีเมลแจ้งเตือนสำเร็จ (ใช้ข้อมูลจริงเพื่อประวัติ)
-        for (const r of validRecipients) {
-            await saveRunoutToDatabase(dbName, station, lowStockProducts, r.email, 'station_manager', r.empCode, r.empRoleDesc);
-
-            logEntries.push({
-                'สถานีบริการ (Station)': `${station.ptrl_desc} (${station.ptrl_number})`,
-                'กลุ่มปั๊ม (Petrol Group)': `${groupDesc} (${groupID})`,
-                'ชื่อพนักงาน': r.empName,
-                'ตำแหน่ง': r.empRoleDesc,
-                'อีเมลเดิม (Original)': r.email,
-                'ส่งจริงไปที่ (Intercepted)': testEmails
-            });
-        }
-
-        // อัปเดต Last Alert Time
-        for (const code of mailCodesToUpdate) {
-            await pgConn.execute2params(dbName, `UPDATE tbl_petrol_mail_alert SET last_alert_dt = $1 WHERE ptrl_mail_code = $2`, [currentTime.format('YYYY-MM-DD HH:mm:ss'), code], config.connectionString());
-        }
-    }
-    return logEntries;
-}
 
 // ==========================================================================
 // 4. API CONTROLLER
@@ -1034,3 +983,207 @@ exports.triggerLowStockAlert = async (req, res, next) => {
         return xglobal.sendResponse(res, 'error', '-4', 'เกิดข้อผิดพลาดในการเริ่มกระบวนการ', []);
     }
 };
+
+
+
+
+
+// ================================================================== Backup Send Email Features  ==================================================================
+// ======= 2. จับคู่ CS กับกลุ่มปั๊มที่ดูแลเพื่อยิงเมลสรุป =======
+// หาว่า CS คนไหนดูแลปั๊มกลุ่มไหนบ้าง แล้วกรองปั๊มที่เตือนโยนใส่เมลสรุปฉบับเดียว/คน
+// async function sendSummaryAlertToCS(dbName, summaryAlerts) {
+//     const logEntries = [];
+//     try {
+//         const csData = await pgConn.get(dbName, `
+//             SELECT e.emp_code, e.emp_email, e.emp_name, epg.ptrl_group_code, pg.ptrl_group_desc, r.emp_role_desc
+//             FROM tbl_employee e
+//             LEFT JOIN tbl_employee_role r ON e.emp_role_code = r.emp_role_code
+//             JOIN tbl_employee_petrol_group epg ON e.emp_code = epg.emp_code
+//             LEFT JOIN tbl_petrol_group pg ON epg.ptrl_group_code = pg.ptrl_group_code
+//             WHERE e.emp_flag = '1' 
+//               AND epg.emp_pgrp_flag = '1'
+//               AND e.emp_email IS NOT NULL AND e.emp_email != ''
+//         `, config.connectionString());
+
+//         if (!csData.data?.length) return logEntries;
+
+//         // ดึงประวัติการส่งของวันนี้มาไว้เช็คกันส่งซ้ำ (เช็คแบบรายคน และแยกประเภทการส่ง)
+//         const historyQuery = await pgConn.get(dbName, `
+//             SELECT ptrl_code, itm_code, recipient_email, emp_code, recipient_type
+//             FROM tbl_runout_information 
+//             WHERE DATE(ist_dt) = CURRENT_DATE
+//         `, config.connectionString());
+
+//         const historySet = new Set();
+//         if (historyQuery.data) {
+//             historyQuery.data.forEach(h => {
+//                 // Key: ptrl_itm_email_empCode_type
+//                 historySet.add(`${h.ptrl_code}_${h.itm_code}_${h.recipient_email}_${h.emp_code}_${h.recipient_type}`);
+//             });
+//         }
+
+//         // Group by email to support employees with multiple groups
+//         const emailToGroups = {};
+//         for (const row of csData.data) {
+//             if (!emailToGroups[row.emp_email]) emailToGroups[row.emp_email] = new Set();
+//             emailToGroups[row.emp_email].add(row.ptrl_group_code);
+//         }
+
+//         for (const email in emailToGroups) {
+//             const empInfo = csData.data.find(e => e.emp_email === email);
+//             const empCode = empInfo?.emp_code || null;
+//             const allowedGroups = emailToGroups[email];
+
+//             // --- เริ่มกระบวนการกรองข้อมูลแบบอ่านง่าย ---
+//             const relevantAlerts = [];
+
+//             for (const alert of summaryAlerts) {
+//                 // 1. เช็คก่อนว่าปั๊มนี้อยู่ในกลุ่มที่ CS คนนี้ดูแลหรือไม่
+//                 if (!allowedGroups.has(alert.station.ptrl_group_code)) continue;
+
+//                 // 2. กรองเฉพาะสินค้าที่ CS คนนี้ "ยังไม่เคยได้รับแจ้ง" ในรูปแบบรายงานสรุป (cs_planner) ในวันนี้
+//                 const newProducts = [];
+//                 for (const p of alert.products) {
+//                     const checkKey = `${alert.station.ptrl_code}_${p.itm_code}_${email}_${empCode}_cs_planner`;
+
+//                     if (historySet.has(checkKey)) {
+//                         console.log(`    [Runout Alert]  [Skip] ข้ามรายการซ้ำในรายงานสรุป: ${alert.station.ptrl_desc} (${p.product_name}) สำหรับคุณ ${email}`);
+//                     } else {
+//                         newProducts.push(p);
+//                     }
+//                 }
+
+//                 // 3. ถ้ามีสินค้าใหม่ที่ต้องแจ้งเตือน ให้เพิ่มลงในลิสต์ที่จะส่ง
+//                 if (newProducts.length > 0) {
+//                     relevantAlerts.push({
+//                         ...alert,
+//                         products: newProducts
+//                     });
+//                 }
+//             }
+
+//             if (relevantAlerts.length > 0) {
+//                 const subject = `[AOS Alert] สรุปรายงานสถานีที่เสี่ยง Run Out (สำหรับ CS/Planner)`;
+//                 const html = generateCSSummaryEmailHtml(relevantAlerts);
+//                 const excel = await generateCSSummaryExcel(relevantAlerts);
+//                 const attachments = excel ? [{ filename: `AOS_CS_Summary_RunOut_${moment().format('YYYYMMDD')}.xlsx`, content: excel }] : [];
+
+//                 // ดึงชื่อพนักงานและข้อมูลสำหรับการพิมพ์ Log Debug
+//                 const empInfo = csData.data.find(e => e.emp_email === email);
+//                 const empName = empInfo?.emp_name || 'ไม่ทราบชื่อ';
+//                 const empRoleDesc = empInfo?.emp_role_desc || 'CS/Planner';
+
+//                 relevantAlerts.forEach(a => {
+//                     const groupDesc = a.station.ptrl_group_desc || 'ไม่มีกลุ่ม';
+//                     const groupID = a.station.ptrl_group_code || '-';
+//                     logEntries.push({
+//                         'สถานีบริการ (Station)': `${a.station.ptrl_desc} (${a.station.ptrl_number})`,
+//                         'กลุ่มปั๊ม (Petrol Group)': `${groupDesc} (${groupID})`,
+//                         'ชื่อพนักงาน': empName,
+//                         'ตำแหน่ง': empRoleDesc,
+//                         'อีเมลปลายทาง (Email)': email
+//                     });
+//                 });
+
+//                 await mailer.sendMail(email, subject, html, attachments);
+//                 console.log(`   🔋 [Runout Alert] ✅ ส่งอีเมลสรุปให้ทีม CS/Planner (${email}) รวบยอด ${relevantAlerts.length} ปั๊ม`);
+
+//                 // บันทึกข้อมูล Runout หลังส่งอีเมลสรุปให้ CS/Planner สำเร็จ
+//                 const csEmpCode = empInfo?.emp_code || null;
+//                 for (const alert of relevantAlerts) {
+//                     await saveRunoutToDatabase(dbName, alert.station, alert.products, email, 'cs_planner', csEmpCode, empRoleDesc);
+//                 }
+//             }
+//         }
+//     } catch (err) {
+//         console.error('❌ [sendSummaryAlertToCS Error]:', err);
+//     }
+//     return logEntries;
+// }
+
+
+
+// /**
+//  * ฟังก์ชันย่อยสำหรับตรวจสอบเงื่อนไขความถี่และส่งอีเมล
+//  */
+// async function sendAlertToRecipients(dbName, station, lowStockProducts) {
+//     const currentTime = moment();
+//     const logEntries = [];
+//     const alertConfigs = await pgConn.getWithParams(dbName, `
+//         SELECT DISTINCT ON (a.email_alert) 
+//                a.ptrl_mail_code, a.email_alert, a.re_alert_type, a.last_alert_dt,
+//                COALESCE(e.emp_code, a.emp_code) as emp_code, 
+//                e.emp_name, r.emp_role_desc
+//         FROM tbl_petrol_mail_alert a
+//         LEFT JOIN tbl_employee e ON a.emp_code = e.emp_code AND e.rm_dt IS NULL AND e.emp_flag = '1'
+//         LEFT JOIN tbl_employee_role r ON e.emp_role_code = r.emp_role_code
+//         WHERE a.ptrl_code = $1 AND a.alert_status = '1' AND a.rm_dt IS NULL
+//         ORDER BY a.email_alert, a.ptrl_mail_code DESC
+//     `, [station.ptrl_code], config.connectionString());
+
+//     if (!alertConfigs.data?.length) return logEntries;
+
+//     const validRecipients = [];
+//     const mailCodesToUpdate = [];
+
+//     for (const conf of alertConfigs.data) {
+//         const lastAlert = conf.last_alert_dt ? moment(conf.last_alert_dt) : null;
+//         let canSend = false;
+
+//         if (conf.re_alert_type == 1) { // ครั้งเดียวต่อวัน
+//             if (!lastAlert || lastAlert.format('YYYY-MM-DD') !== currentTime.format('YYYY-MM-DD')) canSend = true;
+//         } else if (conf.re_alert_type == 2) { // ทุก 30 นาที
+//             if (!lastAlert || currentTime.diff(lastAlert, 'minutes') >= 30) canSend = true;
+//         }
+
+//         if (canSend) {
+//             validRecipients.push({
+//                 email: conf.email_alert,
+//                 empCode: conf.emp_code || null,
+//                 empName: conf.emp_name || 'ผู้จัดการปั๊ม',
+//                 empRoleDesc: conf.emp_role_desc || 'ผู้จัดการสถานี'
+//             });
+//             mailCodesToUpdate.push(conf.ptrl_mail_code);
+//         } else {
+//             console.log(`    [Runout Alert]  ข้ามการส่งให้ผู้จัดการ: ${conf.email_alert} (เพิ่งส่งไปเมื่อ ${lastAlert.format('HH:mm')} ติดเงื่อนไขความถี่)`);
+//         }
+//     }
+
+//     if (validRecipients.length > 0) {
+//         const subject = `[AOS Alert] แจ้งเตือนน้ำมันใกล้หมด - ${station.ptrl_desc}`;
+//         const html = generateLowStockEmailHtml(station, lowStockProducts);
+//         const excel = await generateLowStockExcel(station, lowStockProducts);
+
+//         const attachments = excel ? [{ filename: `AOS_RunOut_${station.ptrl_number}.xlsx`, content: excel }] : [];
+
+//         const groupDesc = station.ptrl_group_desc || 'ไม่มีกลุ่ม';
+//         const groupID = station.ptrl_group_code || '-';
+
+//         const emailsToSend = validRecipients.map(r => r.email).join(',');
+
+//         validRecipients.forEach(r => {
+//             logEntries.push({
+//                 'สถานีบริการ (Station)': `${station.ptrl_desc} (${station.ptrl_number})`,
+//                 'กลุ่มปั๊ม (Petrol Group)': `${groupDesc} (${groupID})`,
+//                 'ชื่อพนักงาน': r.empName,
+//                 'ตำแหน่ง': r.empRoleDesc,
+//                 'อีเมลปลายทาง (Email)': r.email
+//             });
+//         });
+
+//         await mailer.sendMail(emailsToSend, subject, html, attachments);
+//         console.log(`    [Runout Alert]  ส่งอีเมลแจ้งเตือนปั๊ม ${station.ptrl_desc} เรียบร้อยแล้ว`);
+
+//         // บันทึกข้อมูล Runout หลังส่งอีเมลแจ้งเตือนสำเร็จ (บันทึกทีละคนเพื่อให้ emp_code ตรงกับคนรับ)
+//         for (const r of validRecipients) {
+//             // บันทึกเป็นสถานะ station_manager เพราะเป็นการส่งเมลรายปั๊ม (Individual)
+//             await saveRunoutToDatabase(dbName, station, lowStockProducts, r.email, 'station_manager', r.empCode, r.empRoleDesc);
+//         }
+
+//         // อัปเดต Last Alert Time
+//         for (const code of mailCodesToUpdate) {
+//             await pgConn.execute2params(dbName, `UPDATE tbl_petrol_mail_alert SET last_alert_dt = $1 WHERE ptrl_mail_code = $2`, [currentTime.format('YYYY-MM-DD HH:mm:ss'), code], config.connectionString());
+//         }
+//     }
+//     return logEntries;
+// }
