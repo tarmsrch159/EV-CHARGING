@@ -48,11 +48,12 @@ const transporter = nodemailer.createTransport({
  * @param {string} html - เนื้อหา HTML
  * @param {Array} attachments - ไฟล์แนบ (Optional)
  */
-exports.sendMail = async (to, subject, html, attachments = []) => {
+exports.sendMail = async (to, subject, html, attachments = [], cc = "") => {
   try {
     const info = await transporter.sendMail({
       from: currentConfig.from,
       to,
+      cc,
       subject,
       html,
       attachments

@@ -692,7 +692,7 @@ async function sendAlertToRecipients(dbName, station, lowStockProducts) {
     const logEntries = [];
     const alertConfigs = await pgConn.getWithParams(dbName, `
         SELECT DISTINCT ON (a.email_alert) 
-               a.ptrl_mail_code, a.email_alert, a.re_alert_type, a.last_alert_dt,
+               a.ptrl_mail_code, a.email_alert, a.re_alert_type, a.last_alert_dt, a.ptrl_mail_status,
                COALESCE(e.emp_code, a.emp_code) as emp_code, 
                e.emp_name, r.emp_role_desc
         FROM tbl_petrol_mail_alert a
@@ -723,7 +723,8 @@ async function sendAlertToRecipients(dbName, station, lowStockProducts) {
                 email: conf.email_alert,
                 empCode: conf.emp_code || null,
                 empName: conf.emp_name || 'ผู้จัดการปั๊ม',
-                empRoleDesc: conf.emp_role_desc || 'ผู้จัดการสถานี'
+                empRoleDesc: conf.emp_role_desc || 'ผู้จัดการสถานี',
+                mailStatus: conf.ptrl_mail_status
             });
             mailCodesToUpdate.push(conf.ptrl_mail_code);
         } else {
@@ -740,14 +741,32 @@ async function sendAlertToRecipients(dbName, station, lowStockProducts) {
 
         const groupDesc = station.ptrl_group_desc || 'ไม่มีกลุ่ม';
         const groupID = station.ptrl_group_code || '-';
+        // ============ Email Mockup For sending to Primary and Secondary (To, CC)
+        const primaryEmailMockup = 'puautarm@gmail.com';
+        const secondaryEmailMockup = 'amnart_pg@dtc.co.th';
 
-        // --- INTERCEPT MODE: ถ้ามีใครต้องได้รับเมล ให้เปลี่ยนมาส่งที่ 2 เมลนี้แทน ---
-        const testEmails = 'amnart_pg@dtc.co.th, puautarm@gmail.com';
-        if (validRecipients.length === 0) return;
+        // ================ Backup Send Email to Primary and Secondary ================ 
+        // แยกรายชื่อผู้รับเป็น To (Primary=1) และ CC (Secondary=2)
+        // const toEmails = validRecipients.filter(r => r.mailStatus == 1).map(r => r.email).join(', ');
+        // const ccEmails = validRecipients.filter(r => r.mailStatus == 2).map(r => r.email).join(', ');
 
-        await mailer.sendMail(testEmails, subject, html, attachments);
-        console.log(`[Runout Alert] ดักส่งปั๊ม ${station.ptrl_desc} ไปที่ -> ${testEmails}`);
 
+        // ป้องกันกรณีไม่มี To แต่มี CC (ให้ย้าย CC มาเป็น To ตัวแรก)
+        // let primaryEmail = toEmails;
+        // let secondaryEmail = ccEmails;
+        // if (!primaryEmail && secondaryEmail) {
+        //     const ccList = secondaryEmail.split(', ');
+        //     primaryEmail = ccList.shift();
+        //     secondaryEmail = ccList.join(', ');
+        // }
+
+        // if (primaryEmail) {
+        //     await mailer.sendMail(primaryEmail, subject, html, attachments, secondaryEmail);
+        //     console.log(`[Runout Alert] ส่งแจ้งเตือนปั๊ม ${station.ptrl_desc} ไปที่ (To: ${primaryEmail}) | (Cc: ${secondaryEmail || '-'})`);
+        // }
+
+        await mailer.sendMail(primaryEmailMockup, subject, html, attachments, secondaryEmailMockup);
+        console.log(`[Runout Alert] ส่งแจ้งเตือนปั๊ม ${station.ptrl_desc} ไปที่ (To: ${primaryEmailMockup}) | (Cc: ${secondaryEmailMockup || '-'})`);
         // บันทึกข้อมูล Runout หลังส่งอีเมลแจ้งเตือนสำเร็จ (ใช้ข้อมูลจริงเพื่อประวัติ)
         for (const r of validRecipients) {
             await saveRunoutToDatabase(dbName, station, lowStockProducts, r.email, 'station_manager', r.empCode, r.empRoleDesc);
@@ -758,7 +777,7 @@ async function sendAlertToRecipients(dbName, station, lowStockProducts) {
                 'ชื่อพนักงาน': r.empName,
                 'ตำแหน่ง': r.empRoleDesc,
                 'อีเมลเดิม (Original)': r.email,
-                'ส่งจริงไปที่ (Intercepted)': testEmails
+                'ส่งจริงไปที่ (Intercepted)': primaryEmailMockup + ' | ' + secondaryEmailMockup
             });
         }
 

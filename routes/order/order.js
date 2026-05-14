@@ -4791,6 +4791,8 @@ exports.editOrderItem = async (req, res, next) => {
           });
 
 
+
+
           for (let i = 0; i < validationItems.length; i++) {
             let item_quantity_check = validationItems[i].item_quantity;
             let itm_material_number = validationItems[i].itm_material_number;
@@ -4883,6 +4885,8 @@ exports.editOrderItem = async (req, res, next) => {
               return;
             }
           }
+
+          console.log('validationItems', validationItems)
         }
       }
 
