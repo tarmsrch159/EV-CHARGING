@@ -3817,6 +3817,45 @@ exports.addOrderInformation = async (req, res, next) => {
       return;
     }
 
+    // Petrol Query
+    let scriptPetrol = `select ptrl_code from tbl_petrol where ptrl_number = $1 and ptrl_flag = '1'`;
+    let resultPetrol = await pgConn.getWithParams(
+      dbPrefix + lic_code,
+      scriptPetrol,
+      [ship_to],
+      config.connectionString(),
+    );
+
+    if (resultPetrol.code) {
+      let response = [
+        {
+          status: "error",
+          invalid_code: "-1",
+          message:
+            "ไม่สามารถบันทึกข้อมูล, เนื่องจากข้อมูลพารามิเตอร์ไม่ถูกต้อง",
+          data: [],
+          response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+        },
+      ];
+      res.status(200).send(response);
+      return;
+    }
+
+    if (resultPetrol.data.length === 0) {
+      let response = [
+        {
+          status: "error",
+          invalid_code: "-1",
+          message:
+            "ไม่สามารถบันทึกข้อมูล, เนื่องจากข้อมูลพารามิเตอร์ไม่ถูกต้อง",
+          data: [],
+          response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+        },
+      ];
+      res.status(200).send(response);
+      return;
+    }
+
     // ============== Set Default Value ==============
     chanel = chanel === undefined || chanel === "" ? "01" : chanel;
     division = division === undefined || division === "" ? "04" : division;
@@ -3829,35 +3868,7 @@ exports.addOrderInformation = async (req, res, next) => {
     // =========== Order-No Mockup ===========
     let order_no = "ord-" + moment().format("x");
 
-    // ====================== เช็ค Validate item_quantity ======================
-    if (order_item && Array.isArray(order_item) && order_item.length > 0) {
-      for (var i = 0; i < order_item.length; i++) {
-        var item_quantity_check = order_item[i].item_quantity;
-        if (!/^\d+(\.\d+)?$/.test(String(item_quantity_check))) {
-          let response = [
-            {
-              status: "error",
-              invalid_code: "-1",
-              message:
-                "ไม่สามารถบันทึกข้อมูล Order ได้ เนื่องจาก item_quantity ต้องเป็นตัวเลขที่ถูกต้องเท่านั้น (ห้ามมีเครื่องหมายพิเศษ หน้าข้อความ)",
-              data: [],
-              response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
-            },
-          ];
-          res.status(200).send(response);
-          let logPayload = { order_no: "-", ...req.body[0] };
-          await xglobal.action_logs(
-            lic_code,
-            action[0].id,
-            "เพิ่ม Order",
-            JSON.stringify(logPayload),
-            "ไม่สามารถบันทึกข้อมูล Order ได้ เนื่องจาก item_quantity ต้องเป็นตัวเลขที่ถูกต้องเท่านั้น (ห้ามมีเครื่องหมายพิเศษ หน้าข้อความ)",
-            action[0].value,
-          );
-          return;
-        }
-      }
-    }
+
 
     // ====================== เช็คก่อนว่า มีรหัสน้ำมันในระบบรึเปล่า ======================
     let hasValidItem = false;
@@ -3903,6 +3914,144 @@ exports.addOrderInformation = async (req, res, next) => {
       return;
     }
     // ====================== จบการเช็ค ======================
+
+    // ====================== เช็ค Validate item_quantity & Compartment Capacity (แยกรายน้ำมัน) ======================
+    if (order_item && Array.isArray(order_item) && order_item.length > 0) {
+
+      // ดึงข้อมูล Capacity ที่อนุญาตจากแป้นน้ำมันมาก่อน
+      let script_check_capacity = `select tvcl.veh_compartment_level from tbl_vehicle_compartment_level tvcl where tvcl.veh_compartment_level_flag = '1'`;
+      let checkCapacityResult = await pgConn.get(
+        dbPrefix + lic_code,
+        script_check_capacity,
+        config.connectionString(),
+      );
+
+      // ============ แป้นน้ำมันที่มีค่ามากกว่า 0 ============== 
+      let allowedLevels = [];
+      if (!checkCapacityResult.code && checkCapacityResult.data.length > 0) {
+        allowedLevels = checkCapacityResult.data.map(item => parseFloat(item.veh_compartment_level)).filter(l => l > 0);
+      }
+
+      // จัดกลุ่มน้ำมัน ถ้าเป็นน้ำมันเดียวกันให้รวมน้ำมันแล้วเช็คแป้นน้ำมัน ถ้าคนละตัวให้เช็ครายน้ำมัน
+      let validationItems = [];
+      order_item.forEach(item => {
+        let existing = validationItems.find(g => g.itm_material_number === item.itm_material_number);
+        if (existing) {
+          existing.item_quantity = parseFloat(existing.item_quantity) + (parseFloat(item.item_quantity) || 0);
+        } else {
+          validationItems.push({
+            itm_material_number: item.itm_material_number,
+            item_quantity: parseFloat(item.item_quantity) || 0
+          });
+        }
+      });
+
+      // Loop ตรวจสอบทีละ Material (ที่รวมจำนวนแล้ว)
+      for (var i = 0; i < validationItems.length; i++) {
+        var item_quantity_check = validationItems[i].item_quantity;
+        var itm_material_number = validationItems[i].itm_material_number;
+
+        // ตรวจสอบว่าเป็นตัวเลขหรือไม่
+        if (isNaN(item_quantity_check)) {
+          let response = [
+            {
+              status: "error",
+              invalid_code: "-1",
+              message: `รายการน้ำมัน (${itm_material_number}): จำนวนต้องเป็นตัวเลขเท่านั้น`,
+              data: [],
+              response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+            },
+          ];
+          res.status(200).send(response);
+          return;
+        }
+
+        let currentQty = parseFloat(item_quantity_check);
+
+        //  ตรวจสอบ "จำนวนน้ำมัน" ตรงกับแป้นน้ำมันของระบบหรือไม่ (Volume Check)
+        let scriptCheckAnyVolume = `SELECT 1 FROM tbl_vehicle_type_compartment_level WHERE veh_compartment_type_level = $1 AND veh_compartment_type_level_flag = '1' LIMIT 1`;
+        let anyVolumeResult = await pgConn.getWithParams(
+          dbPrefix + lic_code,
+          scriptCheckAnyVolume,
+          [currentQty],
+          config.connectionString(),
+        );
+
+        if (!anyVolumeResult.data || anyVolumeResult.data.length === 0) {
+          let response = [
+            {
+              status: "error",
+              invalid_code: "-1",
+              message: `รายการน้ำมัน (${itm_material_number}): จำนวนรวม ${currentQty} ไม่ตรงกับขนาดช่องบรรจุใดๆ ในระบบ`,
+              data: [],
+              response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+            },
+          ];
+          res.status(200).send(response);
+          return;
+        }
+
+        // เช็คจำนวนมันว่าน้ำมันสามารถดูดเข้าแป้นน้ำมันของรถคันไหนได้บ้าง ครอบคลุมถึงปั๊มน้ำมันที่ไม่มีประรถที่กำหนดด้วย
+        let petrolParams = [currentQty, resultPetrol.data[0].ptrl_code];
+        let scriptCheckPetroVehicleType = `select vtc.id, vtc.veh_type_code ,
+            tvt.veh_type_desc,
+            vtc.compartment_total,
+            vtcl.veh_compartment_type_level,
+            vtc.compartment_no,
+            vtcl.veh_compartment_type_level_number    
+            from tbl_vehicle_type_compartment_level vtcl
+            left join tbl_vehicle_type_compartment vtc on vtcl.compartment_item_id = vtc.id
+            left join tbl_vehicle_type tvt on vtc.veh_type_code = tvt.veh_type_code
+            left join tbl_petrol_vehicle_type tpvt on vtc.veh_type_code = tpvt.veh_type_code
+            where veh_compartment_type_level = $1 and tpvt.ptrl_code = $2 and vtcl.veh_compartment_type_level_flag = '1'
+            order by vtc.veh_type_code asc, vtcl.veh_compartment_type_code asc, vtc.compartment_no asc`;
+        let scriptCheckPetroVehicleTypeResult = await pgConn.getWithParams(
+          dbPrefix + lic_code,
+          scriptCheckPetroVehicleType,
+          petrolParams,
+          config.connectionString(),
+        );
+
+        // เช็คกรณีที่จำนวนนน้ำมันไม่สามารถเช้าแป้นน้ำมันไหนได้เลย แล้วไปเช็คว่ามีรถคันไหนผูกกับปั๊มไหน ถ้ามีให้ส่ง error
+        if (!scriptCheckPetroVehicleTypeResult.data || scriptCheckPetroVehicleTypeResult.data.length === 0) {
+          // เช็คปั๊มว่ามีการผูกกับรถหรือเปล่า
+          let scriptCheckRestriction = `SELECT 1 FROM tbl_petrol_vehicle_type WHERE ptrl_code = $1 LIMIT 1`;
+          let restrictionResult = await pgConn.getWithParams(
+            dbPrefix + lic_code,
+            scriptCheckRestriction,
+            [resultPetrol.data[0].ptrl_code],
+            config.connectionString(),
+          );
+
+          if (restrictionResult.data && restrictionResult.data.length > 0) {
+            // จำนวนน้ำมันไม่สามารถเข้าแป้นน้ำมันของรถได้ 
+            let response = [
+              {
+                status: "error",
+                invalid_code: "-1",
+                message: `รายการน้ำมัน (${itm_material_number}): จำนวนรวม ${currentQty} ตรงตามขนาดแป้นน้ำมัน แต่ปั๊มน้ำมันนี้ไม่รองรับรถประเภทดังกล่าว`,
+                data: [],
+                response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+              },
+            ];
+            res.status(200).send(response);
+
+            // Log ข้อมูลความผิดพลาด
+            let logPayload = { order_no: "-", item: itm_material_number, quantity: currentQty, station: resultPetrol.data[0].ptrl_code };
+            await xglobal.action_logs(
+              lic_code,
+              action[0].id,
+              "เพิ่ม Order",
+              JSON.stringify(logPayload),
+              `ปั๊มไม่รองรับรถประเภทที่บรรจุน้ำมันจำนวนนี้ได้`,
+              action[0].value,
+            );
+            return;
+          }
+
+        }
+      }
+    }
 
     cus_date_ref = deli_date_req;
     sh_cus_date_ref = deli_date_req;
@@ -4246,9 +4395,9 @@ exports.setOrderInformation = async (req, res, next) => {
     );
 
     if (
-      oldOrderResult.code ||
-      oldOrderResult.data.length === 0 ||
-      oldOrderResult.data[0].status_deli != "A"
+      checkOrderNo.code ||
+      checkOrderNo.data.length === 0 ||
+      checkOrderNo.data[0].status_deli != "A"
     ) {
       let response = [
         {
@@ -4273,7 +4422,7 @@ exports.setOrderInformation = async (req, res, next) => {
       );
       return;
     } else {
-      let oldOrder = oldOrderResult.data[0];
+      let oldOrder = checkOrderNo.data[0];
 
       let addOrderScript = `
                 UPDATE tbl_order SET 
