@@ -3968,7 +3968,7 @@ exports.addOrderInformation = async (req, res, next) => {
 
         let currentQty = parseFloat(item_quantity_check);
 
-        //  ตรวจสอบ "จำนวนน้ำมัน" ตรงกับแป้นน้ำมันของระบบหรือไม่ (Volume Check)
+        // ============ ตรวจสอบจำนวนน้ำมันที่สามารถลงกับแป้นน้ำมันของรถทุกคัน รวมถึงปั๊มน้ำมันที่ไม่กำหนดประเภทรถ ============
         let scriptCheckAnyVolume = `SELECT 1 FROM tbl_vehicle_type_compartment_level WHERE veh_compartment_type_level = $1 AND veh_compartment_type_level_flag = '1' LIMIT 1`;
         let anyVolumeResult = await pgConn.getWithParams(
           dbPrefix + lic_code,
@@ -3991,20 +3991,21 @@ exports.addOrderInformation = async (req, res, next) => {
           return;
         }
 
-        // เช็คจำนวนมันว่าน้ำมันสามารถดูดเข้าแป้นน้ำมันของรถคันไหนได้บ้าง ครอบคลุมถึงปั๊มน้ำมันที่ไม่มีประรถที่กำหนดด้วย
+        // ================ ตรวจสอบจำนวนน้ำมันกับประเภทรถที่ถูกผูกไว้กับปั๊มน้ำมัน กรณีที่จำนวนน้ำมันสามารถเข้าแป้นน้ำมันได้ทุกคัน แต่ประเภทรถที่ผูกไว้กับปั๊มไม่สามารถรองรับจำนวนน้ำมันที่กรอก ==================
         let petrolParams = [currentQty, resultPetrol.data[0].ptrl_code];
-        let scriptCheckPetroVehicleType = `select vtc.id, vtc.veh_type_code ,
-            tvt.veh_type_desc,
-            vtc.compartment_total,
-            vtcl.veh_compartment_type_level,
-            vtc.compartment_no,
-            vtcl.veh_compartment_type_level_number    
-            from tbl_vehicle_type_compartment_level vtcl
-            left join tbl_vehicle_type_compartment vtc on vtcl.compartment_item_id = vtc.id
-            left join tbl_vehicle_type tvt on vtc.veh_type_code = tvt.veh_type_code
-            left join tbl_petrol_vehicle_type tpvt on vtc.veh_type_code = tpvt.veh_type_code
-            where veh_compartment_type_level = $1 and tpvt.ptrl_code = $2 and vtcl.veh_compartment_type_level_flag = '1'
-            order by vtc.veh_type_code asc, vtcl.veh_compartment_type_code asc, vtc.compartment_no asc`;
+        let scriptCheckPetroVehicleType = `
+            SELECT vtc.id, vtc.veh_type_code 
+            FROM tbl_vehicle_type_compartment_level vtcl
+            LEFT JOIN tbl_vehicle_type_compartment vtc ON vtcl.compartment_item_id = vtc.id
+            LEFT JOIN tbl_petrol_vehicle_type tpvt ON vtc.veh_type_code = tpvt.veh_type_code
+            WHERE vtcl.veh_compartment_type_level = $1 
+            AND vtcl.veh_compartment_type_level_flag = '1'
+            AND (
+                tpvt.ptrl_code = $2 
+                OR NOT EXISTS (SELECT 1 FROM tbl_petrol_vehicle_type WHERE ptrl_code = $2)
+            )
+            LIMIT 1`;
+
         let scriptCheckPetroVehicleTypeResult = await pgConn.getWithParams(
           dbPrefix + lic_code,
           scriptCheckPetroVehicleType,
@@ -4012,43 +4013,30 @@ exports.addOrderInformation = async (req, res, next) => {
           config.connectionString(),
         );
 
-        // เช็คกรณีที่จำนวนนน้ำมันไม่สามารถเช้าแป้นน้ำมันไหนได้เลย แล้วไปเช็คว่ามีรถคันไหนผูกกับปั๊มไหน ถ้ามีให้ส่ง error
-        if (!scriptCheckPetroVehicleTypeResult.data || scriptCheckPetroVehicleTypeResult.data.length === 0) {
-          // เช็คปั๊มว่ามีการผูกกับรถหรือเปล่า
-          let scriptCheckRestriction = `SELECT 1 FROM tbl_petrol_vehicle_type WHERE ptrl_code = $1 LIMIT 1`;
-          let restrictionResult = await pgConn.getWithParams(
-            dbPrefix + lic_code,
-            scriptCheckRestriction,
-            [resultPetrol.data[0].ptrl_code],
-            config.connectionString(),
+        if (!scriptCheckPetroVehicleTypeResult.code && scriptCheckPetroVehicleTypeResult.data.length === 0) {
+          // กรณีนี้หมายความว่า จำนวนน้ำมันถูกต้องตามระบบ แต่ประเภทรถที่ถูกผูกไว้กับปั๊มไม่สามารถรองรับจำนวนน้ำมันที่กรอก
+          let response = [
+            {
+              status: "error",
+              invalid_code: "-1",
+              message: `รายการน้ำมัน (${itm_material_number}): จำนวนรวม ${currentQty} ตรงตามขนาดแป้นน้ำมัน แต่ประเภทรถที่ถูกผูกไว้กับปั๊มไม่สามารถรองรับจำนวนน้ำมันที่กรอกได้`,
+              data: [],
+              response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+            },
+          ];
+          res.status(200).send(response);
+
+          // Log ข้อมูลความผิดพลาด
+          let logPayload = { order_no: "-", item: itm_material_number, quantity: currentQty, station: resultPetrol.data[0].ptrl_code };
+          await xglobal.action_logs(
+            lic_code,
+            action[0].id,
+            "เพิ่ม Order",
+            JSON.stringify(logPayload),
+            `ปั๊มไม่รองรับรถประเภทที่บรรจุน้ำมันจำนวนนี้ได้`,
+            action[0].value,
           );
-
-          if (restrictionResult.data && restrictionResult.data.length > 0) {
-            // จำนวนน้ำมันไม่สามารถเข้าแป้นน้ำมันของรถได้ 
-            let response = [
-              {
-                status: "error",
-                invalid_code: "-1",
-                message: `รายการน้ำมัน (${itm_material_number}): จำนวนรวม ${currentQty} ตรงตามขนาดแป้นน้ำมัน แต่ปั๊มน้ำมันนี้ไม่รองรับรถประเภทดังกล่าว`,
-                data: [],
-                response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
-              },
-            ];
-            res.status(200).send(response);
-
-            // Log ข้อมูลความผิดพลาด
-            let logPayload = { order_no: "-", item: itm_material_number, quantity: currentQty, station: resultPetrol.data[0].ptrl_code };
-            await xglobal.action_logs(
-              lic_code,
-              action[0].id,
-              "เพิ่ม Order",
-              JSON.stringify(logPayload),
-              `ปั๊มไม่รองรับรถประเภทที่บรรจุน้ำมันจำนวนนี้ได้`,
-              action[0].value,
-            );
-            return;
-          }
-
+          return;
         }
       }
     }
