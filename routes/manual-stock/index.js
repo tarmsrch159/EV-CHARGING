@@ -6,5 +6,6 @@ const moment = require('moment');
 const manualStock = require('./manual-stock');
 
 router.put('/information', manualStock.updateManualStock);
+router.post('/manual-logs', manualStock.getManualStockLogs);
 
 module.exports = router;
