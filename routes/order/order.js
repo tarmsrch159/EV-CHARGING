@@ -1424,7 +1424,7 @@ exports.getLoggingOrderInformation = async (req, res, next) => {
     // =========================================================
     //      จัดการเงื่อนไข WHERE แบบรวมศูนย์ (Dynamic Conditions)
     // =========================================================
-    // นิยามตัวแปรช่วยในการดึงข้อมูลจาก JSON อย่างปลอดภัย (ป้องกัน Error 22P02)
+    // นิยามตัวแปรช่วยในการดึงข้อมูลจาก JSON 
     const safeJson = `(CASE WHEN tbl_action_logs.action_body ~ '^\\s*\\{.*\\}\\s*$' THEN tbl_action_logs.action_body::json ELSE NULL END)`;
     const safeShipTo = `COALESCE(${safeJson}->'body'->>'ship_to', ${safeJson}->>'ship_to')`;
     const safeOrderId = `COALESCE(${safeJson}->>'order_id', ${safeJson}->'body'->>'order_id', ${safeJson}->>'id')`;
@@ -1513,7 +1513,8 @@ exports.getLoggingOrderInformation = async (req, res, next) => {
             tbl_action_logs.action_body,
             tbl_action_logs.ist_dt as action_date,
             tbl_petrol_group.ptrl_group_desc as station_group,
-            tbl_order.order_no
+            tbl_order.order_no,
+            tbl_order.sh_cus_ref as aos_order_no
             FROM tbl_action_logs 
             LEFT JOIN tbl_employee ON tbl_action_logs.action_code = tbl_employee.emp_code
             LEFT JOIN tbl_employee_role ON tbl_employee.emp_role_code = tbl_employee_role.emp_role_code
@@ -1524,7 +1525,7 @@ exports.getLoggingOrderInformation = async (req, res, next) => {
             ${whereClause}
             ORDER BY tbl_action_logs.ist_dt DESC 
             OFFSET (${page_index}*${page_limit}) LIMIT ${page_limit};`;
-
+    console.log(script)
     let mainLogResult = await pgConn.get(
       dbPrefix + lic_code,
       script,

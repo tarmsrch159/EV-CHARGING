@@ -5409,6 +5409,7 @@ exports.formatAuditLogs = (dbData) => {
 
     let flatItem = {
       order_no: item.order_no && item.order_no !== "" ? item.order_no : "-",
+      aos_order_no: item.aos_order_no || "-",
       ship_to: "",
       station_name: "",
       station_group: item.station_group || "",
