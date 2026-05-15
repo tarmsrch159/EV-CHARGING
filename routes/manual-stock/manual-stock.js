@@ -104,7 +104,9 @@ exports.updateManualStock = async (req, res, next) => {
                         }
 
                         if (beforeValue !== String(targetStock)) {
+                            // ============ Item change Before After =============
                             item_changes.push({ field: `${label} (${targetDate})`, before: beforeValue, after: String(targetStock) });
+                            // ============ Item logs change Before After =============
                             item_logs_change.push({ field: `${label}`, before: beforeValue, after: String(targetStock) })
                         }
                     };
@@ -132,11 +134,15 @@ exports.updateManualStock = async (req, res, next) => {
                         }
                     };
 
+
+
                     await syncTank(resultEndStock, stock_at_date, 'Stock สิ้นวัน');
                     await syncTank(tank_start, dayBefore_stock_at_date, 'Stock เริ่มวัน');
                     if (day_sales !== undefined && day_sales !== null && day_sales !== '') {
                         await syncSales(day_sales, stock_at_date);
                     }
+
+                    console.log("item_logs_change : ", item_logs_change)
 
                     // บันทึก Log ราย Item (Audit Log)
                     if (item_changes.length > 0 && action && action.length > 0) {

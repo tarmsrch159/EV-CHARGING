@@ -370,9 +370,13 @@ exports.getOrderInformationByID = async (req, res, next) => {
                 tbl_order.auto_order,
                 tbl_petrol.ptrl_address,
                 tbl_petrol.ptrl_zip_code,
-                tbl_employee.emp_name, tbl_employee.emp_surname, tbl_employee_role.emp_role_desc
+                tbl_employee.emp_name, tbl_employee.emp_surname, tbl_employee_role.emp_role_desc,
+                case 
+	                when tbl_order.created_by_tms = 'automatic' then 'automatic'
+	                else emp.emp_name
+                end as created_name
             FROM tbl_order  
-            
+            LEFT JOIN tbl_employee emp on tbl_order.created_by_tms = emp.emp_code 
             LEFT JOIN tbl_order_type ON tbl_order.order_type = tbl_order_type.ord_type_code
             LEFT JOIN tbl_petrol_group ON tbl_petrol_group.ptrl_group_code = tbl_order.order_group
             LEFT JOIN tbl_petrol ON tbl_order.ship_to = tbl_petrol.ptrl_number
@@ -539,7 +543,6 @@ exports.getOrderInformationByID = async (req, res, next) => {
         )
         ORDER BY tank_number ASC`;
 
-    console.log('itemScript', itemScript)
 
     // ======== ยิง Query เพื่อดึงรายการสินค้า (Items) และจัดการข้อมูล null ========
     let itemResult = await pgConn.get(

@@ -842,7 +842,7 @@ exports.processLowStockAlerts = async (lic_code, filter_sales_org = null, filter
         const activeStations = await pgConn.getWithParams(dbName, scriptSql, params, config.connectionString());
         if (!activeStations.data?.length) return console.log(`[Runout Alert]  ไม่มีปั๊มที่ต้องตรวจสอบในรอบนี้`);
 
-        // 2. ดึงข้อมูลพนักงาน CS/Planner (กรองเฉพาะคนที่จะเทสใน SQL เลย)
+        // 2. ดึงข้อมูลพนักงาน CS/Planner 
         const csDataQuery = await pgConn.get(dbName, `
             SELECT e.emp_code, e.emp_email, e.emp_name, epg.ptrl_group_code, pg.ptrl_group_desc, r.emp_role_desc
             FROM tbl_employee e
@@ -873,8 +873,9 @@ exports.processLowStockAlerts = async (lic_code, filter_sales_org = null, filter
         let globalLowStockData = [];
         let allDebugLogs = [];
 
-        // 4. เริ่มประมวลผลรายปั๊ม...
-        for (const station of activeStations.data) {
+        // 4. เริ่มประมวลผลรายปั๊ม... (จำกัดแค่ 2 ปั๊มแรกเพื่อทดสอบ ป้องกัน Mail Spam)
+        // for (const station of activeStations.data) {
+        for (const station of activeStations.data.slice(0, 2)) {
             console.log(`[Runout Alert] ประมวลผลปั๊ม: ${station.ptrl_desc} (${station.ptrl_number}) [Org: ${station.sales_org_code} | Type: ${station.sales_order_type}]`);
             const coverageLimit = parseFloat(station.coverage_days) || 3;
 

@@ -385,7 +385,9 @@ const processAutoOrderMails = async (lic_code) => {
         }
 
         const mailDataList = [];
-        for (const item of result.data) {
+        // [DEV TEST] จำกัดให้รันแค่ 2 ปั๊มแรก ป้องกัน Mail Spam
+        // for (const item of result.data) {
+        for (const item of result.data.slice(0, 2)) {
             const data = await getDataForStation(lic_code, item);
             if (data) {
                 mailDataList.push(data);
@@ -450,8 +452,10 @@ exports.runAutoOrderMailTask = async () => {
         console.log(`✅ [Auto Order Mail] พบรายการทั้งหมด: ${autoList.length} แห่ง`);
 
         // 1. อ่านข้อมูลทั้งหมดแบบ Parallel เพื่อความเร็วสูงสุด (Speed up reading)
-        console.log(`⏳ [Auto Order Mail] กำลังอ่านข้อมูลทุกสถานีพร้อมกัน...`);
-        const stationDataResults = await Promise.all(autoList.map(item => getDataForStation(lic_code, item)));
+        // [DEV TEST] จำกัดให้รันแค่ 2 ปั๊มแรก ป้องกัน Mail Spam
+        console.log(`⏳ [Auto Order Mail] กำลังอ่านข้อมูล (จำกัด 2 ปั๊มแรก)...`);
+        // const stationDataResults = await Promise.all(autoList.map(item => getDataForStation(lic_code, item)));
+        const stationDataResults = await Promise.all(autoList.slice(0, 2).map(item => getDataForStation(lic_code, item)));
         const validStationData = stationDataResults.filter(d => d !== null);
 
         console.log(`🚀 [Auto Order Mail] เริ่มส่งเมล (Batch Processing)...`);
