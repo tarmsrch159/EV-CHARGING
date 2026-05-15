@@ -108,7 +108,8 @@ exports.getPetrolGroupInformation = async (req, res, next) => {
             tbl_petrol_group.ist_dt, tbl_petrol_group.mdf_dt, tbl_petrol_group.rm_dt, 
             tbl_petrol_group.off_code, tbl_office.off_desc,
             tbl_order_type.sales_order_type, tbl_petrol_group.ptrl_group_sales_org,
-            tbl_petrol_group.ptrl_group_order_type
+            tbl_petrol_group.ptrl_group_order_type,
+            (SELECT COUNT(*) FROM tbl_petrol WHERE tbl_petrol.ptrl_group_code = tbl_petrol_group.ptrl_group_code AND tbl_petrol.ptrl_flag = '1') as ptrl_count
             FROM tbl_petrol_group 
             LEFT JOIN tbl_office ON tbl_petrol_group.off_code = tbl_office.off_code
             LEFT JOIN tbl_order_type ON tbl_petrol_group.ptrl_group_order_type = tbl_order_type.ord_type_code
@@ -127,6 +128,7 @@ exports.getPetrolGroupInformation = async (req, res, next) => {
                 tbl_temporary.data = JSON.parse(
                     JSON.stringify(tbl_temporary.data).replace(/\:null/gi, '\:""'),
                 );
+
 
                 // ดึงข้อมูลที่อยู่และประเภทรถของแต่ละกลุ่มปั้ม
                 for (let i = 0; i < tbl_temporary.data.length; i++) {

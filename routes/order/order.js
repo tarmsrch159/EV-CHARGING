@@ -3937,15 +3937,18 @@ exports.addOrderInformation = async (req, res, next) => {
       }
 
       // จัดกลุ่มน้ำมัน ถ้าเป็นน้ำมันเดียวกันให้รวมน้ำมันแล้วเช็คแป้นน้ำมัน ถ้าคนละตัวให้เช็ครายน้ำมัน
+      let totalOrderQty = 0;
       let validationItems = [];
       order_item.forEach(item => {
+        let qty = parseFloat(item.item_quantity) || 0;
+        totalOrderQty += qty;
         let existing = validationItems.find(g => g.itm_material_number === item.itm_material_number);
         if (existing) {
-          existing.item_quantity = parseFloat(existing.item_quantity) + (parseFloat(item.item_quantity) || 0);
+          existing.item_quantity = parseFloat(existing.item_quantity) + qty;
         } else {
           validationItems.push({
             itm_material_number: item.itm_material_number,
-            item_quantity: parseFloat(item.item_quantity) || 0
+            item_quantity: qty
           });
         }
       });
@@ -4038,6 +4041,52 @@ exports.addOrderInformation = async (req, res, next) => {
             "เพิ่ม Order",
             JSON.stringify(logPayload),
             `ปั๊มไม่รองรับรถประเภทที่บรรจุน้ำมันจำนวนนี้ได้`,
+            action[0].value,
+          );
+          return;
+        }
+      }
+
+      // ====================== ตรวจสอบความจุรวมตามประเภทรถที่ผูกไว้กับปั๊ม ======================
+      let scriptCheckVehCapacity = `SELECT 1 FROM tbl_petrol_vehicle_type WHERE ptrl_code = $1 LIMIT 1`;
+      let capacityResult = await pgConn.getWithParams(dbPrefix + lic_code, scriptCheckVehCapacity, [resultPetrol.data[0].ptrl_code], config.connectionString());
+
+      if (!capacityResult.code && capacityResult.data.length > 0) {
+        let scriptCheckCapacity = `
+            SELECT 1 
+            FROM tbl_vehicle_type tvt
+            JOIN tbl_petrol_vehicle_type pvt ON tvt.veh_type_code = pvt.veh_type_code
+            WHERE tvt.veh_type_flag = '1' 
+              AND pvt.ptrl_code = $1
+              AND tvt.capacity_min <= $2 
+              AND tvt.capacity_max >= $2
+            LIMIT 1`;
+
+        let capacityResult = await pgConn.getWithParams(
+          dbPrefix + lic_code,
+          scriptCheckCapacity,
+          [resultPetrol.data[0].ptrl_code, totalOrderQty],
+          config.connectionString()
+        );
+
+        if (!capacityResult.code && capacityResult.data.length === 0) {
+          let response = [
+            {
+              status: "error",
+              invalid_code: "-1",
+              message: `จำนวนน้ำมันรวมทั้งออเดอร์ (${totalOrderQty}) ไม่สามารถบรรจุลงในประเภทรถที่ผูกไว้กับปั๊มนี้ได้ (ความจุไม่เหมาะสม)`,
+              data: [],
+              response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+            },
+          ];
+          res.status(200).send(response);
+
+          await xglobal.action_logs(
+            lic_code,
+            action[0].id,
+            "เพิ่ม Order",
+            JSON.stringify({ total_qty: totalOrderQty, station: resultPetrol.data[0].ptrl_code }),
+            `ปั๊มไม่รองรับจำนวนน้ำมันรวม (${totalOrderQty}) ตามประเภทรถที่ผูกไว้`,
             action[0].value,
           );
           return;
