@@ -569,7 +569,6 @@ exports.setPetrolGroupInformation = async (req, res, next) => {
         if (
             ptrl_group_code == undefined ||
             ptrl_group_desc == undefined ||
-            ptrl_group_short_desc == undefined ||
             off_code == undefined ||
             action == undefined
         ) {
@@ -815,7 +814,6 @@ exports.addPetrolGroupInformation = async (req, res, next) => {
         //เช็คเฉพาะส่วนที่สำคัญ
         if (
             ptrl_group_desc == undefined ||
-            ptrl_group_short_desc == undefined ||
             off_code == undefined ||
             action == undefined ||
             lic_code == undefined
