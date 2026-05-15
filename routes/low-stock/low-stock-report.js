@@ -88,7 +88,6 @@ exports.getRunoutReportInformation = async (req, res, next) => {
             ORDER BY p.ptrl_number ASC, ri.tank_numbers ASC, ri.itm_code, DATE(ri.ist_dt), ri.ist_dt DESC
             OFFSET ${offset} LIMIT ${pageLimitInt};
         `;
-
         const tbl_temporary = await pgConn.getWithParams(dbName, script, params, config.connectionString());
 
         if (tbl_temporary.code) throw new Error(tbl_temporary.message);
@@ -100,7 +99,7 @@ exports.getRunoutReportInformation = async (req, res, next) => {
                 alert_date: moment(item.alert_date).format('DD/MM/YYYY'),
                 runout_status: 'Run-out', // ข้อมูลในตารางนี้คือรายการที่เข้าระบบ Run-out อยู่แล้ว
                 stock_qty: Number(item.stock),
-                day_sales: Number(item.day_sales),
+                day_sales: parseFloat(item.day_sales || 0).toFixed(2),
                 unpump_qty: Number(item.unpump)
             };
         });
