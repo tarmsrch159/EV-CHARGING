@@ -4047,7 +4047,7 @@ exports.addOrderInformation = async (req, res, next) => {
         }
       }
 
-      // ====================== ตรวจสอบความจุรวมตามประเภทรถที่ผูกไว้กับปั๊ม ======================
+      // ====================== ตรวจสอบปริมาณน้ำมันรวมตามประเภทรถที่ผูกไว้กับปั๊ม ======================
       let scriptCheckVehCapacity = `SELECT 1 FROM tbl_petrol_vehicle_type WHERE ptrl_code = $1 LIMIT 1`;
       let capacityResult = await pgConn.getWithParams(dbPrefix + lic_code, scriptCheckVehCapacity, [resultPetrol.data[0].ptrl_code], config.connectionString());
 
@@ -4074,7 +4074,7 @@ exports.addOrderInformation = async (req, res, next) => {
             {
               status: "error",
               invalid_code: "-1",
-              message: `จำนวนน้ำมันรวมทั้งออเดอร์ (${totalOrderQty}) ไม่สามารถบรรจุลงในประเภทรถที่ผูกไว้กับปั๊มนี้ได้ (ความจุไม่เหมาะสม)`,
+              message: `จำนวนน้ำมันรวมทั้งออเดอร์ (${totalOrderQty}) ไม่สามารถบรรจุลงในปริมาณบรรทุกของประเภทรถที่ผูกไว้กับปั๊มนี้ได้ (ปริมาณน้ำมันไม่เหมาะสม)`,
               data: [],
               response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
             },
