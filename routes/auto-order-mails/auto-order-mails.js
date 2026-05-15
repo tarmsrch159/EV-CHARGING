@@ -7,7 +7,6 @@ const sendResponse = xglobal.sendResponse;
 const config = require('../../configuration/connection');
 const pgConn = require('../../library/pgConnection');
 const mailer = require('../../middleware/nodemailer/mail');
-
 const dbPrefix = config.dbPrefix();
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -426,6 +425,9 @@ exports.runAutoOrderMailTask = async () => {
     console.log(`\n[Auto Order Mail] เริ่ม Background Task: ${moment().format('YYYY-MM-DD HH:mm:ss')}`);
 
     try {
+        // [Auto Order Cleanup] รันการล้างข้อมูลออเดอร์เก่าไปพร้อมกัน (ไม่ว่าจะพบข้อมูลส่งเมลหรือไม่)
+        await exports.runAutoOrderCleanupTask();
+
         const currentTime = moment().format('HH:mm:ss');
         const query = `
             SELECT ao.automatic_code, ao.ptrl_code, ao.ist_dt, ao.automatic_status,
@@ -444,7 +446,7 @@ exports.runAutoOrderMailTask = async () => {
         const result = await pgConn.get(dbPrefix + lic_code, query, config.connectionString());
 
         if (result.code || !result.data || result.data.length === 0) {
-            console.log(`[Auto Order Mail] ไม่มีรายการที่ต้องประมวลผล`);
+            console.log(`[\x1b[33m\x1b[1m${moment().format("HH:mm:ss")}\x1b[0m] [Auto Order Mail] ไม่มีรายการที่ต้องประมวลผล`);
             return { success: true };
         }
 
@@ -580,5 +582,96 @@ exports.decryptToken = async (req, res) => {
     } catch (err) {
         console.error('   ❌ [decryptToken Error]:', err);
         return sendResponse(res, 'error', '-4', 'เกิดข้อผิดพลาดภายในระบบ', []);
+    }
+};
+
+
+
+// ======================================================================= Remove Auto Order that over 3 days =====================================================================
+
+// Task สำหรับลบ Auto Order ที่ค้างเกิน 3 วัน (รันพร้อมกับรอบส่งเมล)
+exports.runAutoOrderCleanupTask = async () => {
+    try {
+        const lic_code = "aos01";
+        const dbName = dbPrefix + lic_code;
+
+        // วันที่ย้อนหลัง 3 วัน (นับจากวันนี้)
+        const thresholdDate = moment().subtract(3, "days").format("YYYY-MM-DD");
+
+        const updateScript = `
+            UPDATE tbl_order 
+            SET order_flag = '0', 
+                mdf_dt = CURRENT_TIMESTAMP 
+            WHERE auto_order = '1' 
+              AND order_flag = '1' 
+              AND order_status = '0' 
+              AND CURRENT_DATE >= (deli_date_req + INTERVAL '3 days')
+        `;
+
+        const result = await pgConn.execute(
+            dbName,
+            updateScript,
+            config.connectionString(),
+        );
+
+        if (result.rowaction > 0) {
+            console.log(
+                `[${moment().format("HH:mm:ss")}] [Auto Order Cleanup] อัปเดตออเดอร์ที่หมดอายุจำนวน ${result.rowaction} รายการ (ก่อนวันที่ ${thresholdDate})`
+            );
+        } else {
+            console.log(`[\x1b[33m\x1b[1m${moment().format("HH:mm:ss")}\x1b[0m] [Auto Order Cleanup] ไม่พบรายการที่ต้องลบสำหรับออเดอร์ที่มีอายุเกิน 3 วัน`);
+        }
+    } catch (error) {
+        console.error("❌ [Auto Order Cleanup Error]:", error);
+    }
+};
+
+// =========== API สำหรับ Test การอัปเดต Flag Auto Order ===========
+exports.updateAutoOrderFlag = async (req, res, next) => {
+    let lic_code = req.header("lic_code");
+    let dbName = dbPrefix + lic_code;
+
+    try {
+        const updateScript = `
+    UPDATE tbl_order 
+    SET order_flag = '0', 
+        mdf_dt = CURRENT_TIMESTAMP 
+    WHERE auto_order = '1' 
+      AND order_flag = '1' 
+      AND order_status = '0'
+      AND CURRENT_DATE >= (deli_date_req + INTERVAL '3 days')
+`;
+
+        const result = await pgConn.execute(
+            dbName,
+            updateScript,
+            config.connectionString(),
+        );
+        console.log(result)
+
+        let response = [
+            {
+                status: "success",
+                invalid_code: "0",
+                message: `ดำเนินการอัปเดตเรียบร้อย (พบรายการที่เข้าเงื่อนไข ${result.rowaction} รายการ)`,
+                data: {
+                    updated_count: result.rowaction,
+                },
+                response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+            },
+        ];
+        res.status(200).send(response);
+    } catch (error) {
+        console.error(error);
+        let response = [
+            {
+                status: "error",
+                invalid_code: "-1",
+                message: "เกิดข้อผิดพลาดในการอัปเดตข้อมูล",
+                data: error.message,
+                response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+            },
+        ];
+        res.status(200).send(response);
     }
 };
