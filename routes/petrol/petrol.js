@@ -747,22 +747,13 @@ exports.setPetrolInformation = async (req, res, next) => {
       ptrl_number == undefined ||
       ptrl_sitecode == undefined ||
       ptrl_desc == undefined ||
-      ptrl_short_desc == undefined ||
-      ptrl_address == undefined ||
-      ptrl_zip_code == undefined ||
-      ptrl_country_code == undefined ||
-      ptrl_unloading_minute == undefined ||
-      ptrl_expenses_per_km == undefined ||
-      ptrl_area == undefined ||
-      ptrl_option_pump == undefined ||
-      ptrl_option_mrge_orders == undefined ||
       ptrl_lat == undefined ||
       ptrl_lon == undefined ||
       off_code == undefined ||
       ptrl_group_code == undefined ||
+      action == undefined ||
       ptrl_sales_group == undefined ||
       ptrl_sales_type == undefined ||
-      action == undefined ||
       auto_order == undefined ||
       prov_code == undefined ||
       amph_code == undefined ||
@@ -958,15 +949,6 @@ exports.addPetrolInformation = async (req, res, next) => {
       ptrl_number == undefined ||
       ptrl_sitecode == undefined ||
       ptrl_desc == undefined ||
-      ptrl_short_desc == undefined ||
-      ptrl_address == undefined ||
-      ptrl_zip_code == undefined ||
-      ptrl_country_code == undefined ||
-      ptrl_unloading_minute == undefined ||
-      ptrl_expenses_per_km == undefined ||
-      ptrl_area == undefined ||
-      ptrl_option_pump == undefined ||
-      ptrl_option_mrge_orders == undefined ||
       ptrl_lat == undefined ||
       ptrl_lon == undefined ||
       off_code == undefined ||
