@@ -4849,6 +4849,7 @@ exports.editOrderItem = async (req, res, next) => {
 
       // ====================== เช็ค Validate item_quantity & Compartment Capacity (แยกรายน้ำมัน) ======================
       if (order_item && Array.isArray(order_item) && order_item.length > 0) {
+        let totalOrderQty = 0;
 
         // --- ดึงข้อมูลปั๊มน้ำมัน ---
         let scriptPetrol = `select * from tbl_petrol where ptrl_number = $1 limit 1`;
@@ -4858,7 +4859,6 @@ exports.editOrderItem = async (req, res, next) => {
           [oldOrder.ship_to],
           config.connectionString(),
         );
-
 
         if (!resultPetrol.code && resultPetrol.data.length > 0) {
           // ดึงข้อมูล itm_material_number สำหรับรายการที่ส่งมา
@@ -4876,24 +4876,28 @@ exports.editOrderItem = async (req, res, next) => {
           // จัดกลุ่มน้ำมัน ถ้าเป็นน้ำมันเดียวกันให้รวมน้ำมันแล้วเช็คแป้นน้ำมัน ถ้าคนละตัวให้เช็ครายน้ำมัน
           let validationItems = [];
           order_item.forEach(item => {
+            let qty = parseFloat(item.item_quantity) || 0;
+            totalOrderQty += qty;
             let matNum = materialMap[item.item_no] || "Unknown";
             let existing = validationItems.find(g => g.itm_material_number === matNum);
             if (existing) {
-              existing.item_quantity = parseFloat(existing.item_quantity) + (parseFloat(item.item_quantity) || 0);
+              existing.item_quantity = parseFloat(existing.item_quantity) + qty;
             } else {
               validationItems.push({
                 itm_material_number: matNum,
-                item_quantity: parseFloat(item.item_quantity) || 0
+                item_quantity: qty
               });
             }
           });
 
-
-
-
           for (let i = 0; i < validationItems.length; i++) {
             let item_quantity_check = validationItems[i].item_quantity;
             let itm_material_number = validationItems[i].itm_material_number;
+
+            let scriptCheckItem = `SELECT itm_desc from tbl_item where itm_material_number = '${itm_material_number}' and itm_flag = '1'`;
+            console.log("scriptCheckItem", scriptCheckItem);
+            let checkItemResult = await pgConn.get(dbPrefix + lic_code, scriptCheckItem, config.connectionString());
+            let item_desc = checkItemResult.data && checkItemResult.data.length > 0 ? checkItemResult.data[0].itm_desc : "";
 
             // ตรวจสอบว่าเป็นตัวเลขหรือไม่
             if (isNaN(item_quantity_check)) {
@@ -4901,7 +4905,7 @@ exports.editOrderItem = async (req, res, next) => {
                 {
                   status: "error",
                   invalid_code: "-1",
-                  message: `รายการน้ำมัน (${itm_material_number}): จำนวนต้องเป็นตัวเลขเท่านั้น`,
+                  message: `รายการน้ำมัน (${itm_material_number}) ${item_desc}: จำนวนต้องเป็นตัวเลขเท่านั้น`,
                   data: [],
                   response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
                 },
@@ -4926,7 +4930,7 @@ exports.editOrderItem = async (req, res, next) => {
                 {
                   status: "error",
                   invalid_code: "-1",
-                  message: `รายการน้ำมัน (${itm_material_number}): จำนวนรวม ${currentQty} ไม่ตรงกับขนาดช่องบรรจุใดๆ ในระบบ`,
+                  message: `รายการน้ำมัน (${itm_material_number}) ${item_desc} : จำนวนรวม ${currentQty} ไม่ตรงกับขนาดช่องบรรจุใดๆ ในระบบ`,
                   data: [],
                   response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
                 },
@@ -4958,12 +4962,35 @@ exports.editOrderItem = async (req, res, next) => {
             );
 
             if (!scriptCheckPetroVehicleTypeResult.code && scriptCheckPetroVehicleTypeResult.data.length === 0) {
+
+              let scriptCheckCompartment = `
+                SELECT p.ptrl_desc ,tpvt.veh_type_code ,tvtcl.veh_compartment_type_level_number , tvtcl.veh_compartment_type_level 
+                FROM tbl_vehicle_type_compartment_level tvtcl 
+                LEFT JOIN tbl_vehicle_type_compartment tvtc ON tvtcl.compartment_item_id = tvtc.id 
+                LEFT JOIN tbl_petrol_vehicle_type tpvt ON tpvt.veh_type_code = tvtc.veh_type_code 
+                LEFT JOIN tbl_petrol p ON tpvt.ptrl_code = p.ptrl_code 
+                WHERE tpvt.ptrl_code = '${resultPetrol.data[0].ptrl_code}' and 
+                tvtcl.veh_compartment_type_level_flag = '1' `;
+              let scriptCheckCompartmentResult = await pgConn.getWithParams(
+                dbPrefix + lic_code,
+                scriptCheckCompartment,
+                [],
+                config.connectionString(),
+              );
+
+              let compartmentTypes = [...new Set(scriptCheckCompartmentResult.data.map(item => Number(item.veh_compartment_type_level)))]
+                .sort((a, b) => a - b)
+                .map(qty => qty.toLocaleString())
+                .join(", ");
+
+              console.log("compartmentTypes", compartmentTypes);
+
               // กรณีนี้หมายความว่า จำนวนน้ำมันถูกต้องตามระบบ แต่ประเภทรถที่ถูกผูกไว้กับปั๊มไม่สามารถรองรับจำนวนน้ำมันที่กรอก
               let response = [
                 {
                   status: "error",
                   invalid_code: "-1",
-                  message: `รายการน้ำมัน (${itm_material_number}): จำนวนรวม ${currentQty} ตรงตามขนาดแป้นน้ำมัน แต่ประเภทรถที่ถูกผูกไว้กับปั๊มไม่สามารถรองรับจำนวนน้ำมันที่กรอกได้`,
+                  message: `รายการน้ำมัน (${itm_material_number}) ${item_desc}: จำนวนรวม ${currentQty.toLocaleString()} ลิตร ไม่ตรงกับขนาดแป้นของรถที่กำหนดสำหรับปั๊มนี้ [แป้นที่รองรับ: ${compartmentTypes} ลิตร]`,
                   data: [],
                   response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
                 },
@@ -4975,7 +5002,7 @@ exports.editOrderItem = async (req, res, next) => {
               await xglobal.action_logs(
                 lic_code,
                 action[0].id,
-                "เพิ่ม Order",
+                "แก้ไข Order",
                 JSON.stringify(logPayload),
                 `ปั๊มไม่รองรับรถประเภทที่บรรจุน้ำมันจำนวนนี้ได้`,
                 action[0].value,
@@ -4985,6 +5012,69 @@ exports.editOrderItem = async (req, res, next) => {
           }
 
           console.log('validationItems', validationItems)
+        }
+
+        // ====================== ตรวจสอบปริมาณน้ำมันรวมตามประเภทรถที่ผูกไว้กับปั๊ม ======================
+        let scriptCheckVehCapacity = `SELECT 1 FROM tbl_petrol_vehicle_type WHERE ptrl_code = $1 LIMIT 1`;
+        let capacityResult = await pgConn.getWithParams(dbPrefix + lic_code, scriptCheckVehCapacity, [resultPetrol.data[0].ptrl_code], config.connectionString());
+
+        if (!capacityResult.code && capacityResult.data.length > 0) {
+          let scriptCheckCapacity = `
+            SELECT 1 
+            FROM tbl_vehicle_type tvt
+            JOIN tbl_petrol_vehicle_type pvt ON tvt.veh_type_code = pvt.veh_type_code
+            WHERE tvt.veh_type_flag = '1' 
+              AND pvt.ptrl_code = $1
+              AND tvt.capacity_min <= $2 
+              AND tvt.capacity_max >= $2
+            LIMIT 1`;
+
+          let capacityResult = await pgConn.getWithParams(
+            dbPrefix + lic_code,
+            scriptCheckCapacity,
+            [resultPetrol.data[0].ptrl_code, totalOrderQty],
+            config.connectionString()
+          );
+
+          if (!capacityResult.code && capacityResult.data.length === 0) {
+
+            let scriptCheckMaxMinCapacity = `
+            select tpvt.ptrl_code , tvt.veh_type_code, tvt.capacity_max ,tvt.capacity_min, tvt.veh_type_desc    from tbl_petrol_vehicle_type tpvt 
+            left join tbl_vehicle_type tvt on tpvt.veh_type_code = tvt.veh_type_code 
+            where tpvt.ptrl_code = '${resultPetrol.data[0].ptrl_code}'`;
+
+            let scriptCheckMaxMinCapacityResult = await pgConn.getWithParams(
+              dbPrefix + lic_code,
+              scriptCheckMaxMinCapacity,
+              [],
+              config.connectionString()
+            );
+
+            let maxMinCapacity = scriptCheckMaxMinCapacityResult.data
+              .map(item => `[${item.veh_type_desc}: ${Number(item.capacity_min).toLocaleString()}-${Number(item.capacity_max).toLocaleString()} ลิตร]`)
+              .join(", ");
+
+            let response = [
+              {
+                status: "error",
+                invalid_code: "-1",
+                message: `จำนวนรวมทั้งออเดอร์ (${totalOrderQty.toLocaleString()} ลิตร) ไม่สอดคล้องกับขนาดบรรทุกของประเภทรถที่กำหนดสำหรับปั๊มนี้: ${maxMinCapacity}`,
+                data: [],
+                response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+              },
+            ];
+            res.status(200).send(response);
+
+            await xglobal.action_logs(
+              lic_code,
+              action[0].id,
+              "แก้ไข Order",
+              JSON.stringify({ total_qty: totalOrderQty, station: resultPetrol.data[0].ptrl_code }),
+              `ปั๊มไม่รองรับจำนวนน้ำมันรวม (${totalOrderQty}) ตามประเภทรถที่ผูกไว้`,
+              action[0].value,
+            );
+            return;
+          }
         }
       }
 
@@ -5052,93 +5142,7 @@ exports.editOrderItem = async (req, res, next) => {
         );
       }
 
-      // --- ดึงข้อมูลปั๊มน้ำมัน ---
-      let scriptPetrol = `select * from tbl_petrol where ptrl_sitecode = $1 limit 1`;
-      let resultPetrol = await pgConn.getWithParams(
-        dbPrefix + lic_code,
-        scriptPetrol,
-        [oldOrder.ship_to],
-        config.connectionString(),
-      );
 
-      if (!resultPetrol.code && resultPetrol.data.length > 0) {
-        // ดึงข้อมูล itm_material_number สำหรับรายการที่ส่งมาเพื่อใช้ในการตรวจสอบ Capacity
-        let materialMap = {};
-        let itemCodesForMaterial = order_item.map(i => `'${i.item_no}'`).join(",");
-        if (itemCodesForMaterial) {
-          let materialRes = await pgConn.get(dbPrefix + lic_code, `SELECT itm_code, itm_material_number FROM tbl_item WHERE itm_code IN (${itemCodesForMaterial})`, config.connectionString());
-          if (!materialRes.code) {
-            materialRes.data.forEach(m => {
-              materialMap[m.itm_code] = m.itm_material_number;
-            });
-          }
-        }
-
-        // จัดกลุ่มน้ำมันตาม itm_material_number และรวมจำนวน
-        let validationMap = {};
-        order_item.forEach(item => {
-          let matNum = materialMap[item.item_no] || "Unknown";
-          let qty = parseFloat(item.item_quantity) || 0;
-          if (validationMap[matNum]) {
-            validationMap[matNum] += qty;
-          } else {
-            validationMap[matNum] = qty;
-          }
-        });
-
-        // ตรวจสอบ Capacity ของแต่ละกลุ่มน้ำมัน
-        let validationKeys = Object.keys(validationMap);
-        for (let k = 0; k < validationKeys.length; k++) {
-          let itm_material_number_check = validationKeys[k];
-          let currentQty = validationMap[itm_material_number_check];
-
-          if (currentQty <= 0) continue;
-
-          // 1. ตรวจสอบ Volume พื้นฐานในระบบ
-          let scriptCheckAnyVolume = `SELECT 1 FROM tbl_vehicle_type_compartment_level WHERE veh_compartment_type_level = $1 AND veh_compartment_type_level_flag = '1' LIMIT 1`;
-          let anyVolumeResult = await pgConn.getWithParams(dbPrefix + lic_code, scriptCheckAnyVolume, [currentQty], config.connectionString());
-
-          if (!anyVolumeResult.data || anyVolumeResult.data.length === 0) {
-            let response = [{
-              status: "error",
-              invalid_code: "-1",
-              message: `รายการน้ำมัน (${itm_material_number_check}): จำนวนรวม ${currentQty} ไม่ตรงกับขนาดช่องบรรจุใดๆ ในระบบ`,
-              data: [],
-              response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
-            }];
-            res.status(200).send(response);
-            return;
-          }
-
-          // 2. ตรวจสอบความเข้ากันได้กับปั๊ม
-          let petrolParams = [currentQty, resultPetrol.data[0].ptrl_code];
-          let scriptCheckPetroVehicleType = `
-                  SELECT vtc.id, vtc.veh_type_code 
-                  FROM tbl_vehicle_type_compartment_level vtcl
-                  LEFT JOIN tbl_vehicle_type_compartment vtc ON vtcl.compartment_item_id = vtc.id
-                  LEFT JOIN tbl_petrol_vehicle_type tpvt ON vtc.veh_type_code = tpvt.veh_type_code
-                  WHERE vtcl.veh_compartment_type_level = $1 
-                  AND vtcl.veh_compartment_type_level_flag = '1'
-                  AND (
-                      tpvt.ptrl_code = $2 
-                      OR NOT EXISTS (SELECT 1 FROM tbl_petrol_vehicle_type WHERE ptrl_code = $2)
-                  )
-                  LIMIT 1`;
-          let scriptCheckPetroVehicleTypeResult = await pgConn.getWithParams(dbPrefix + lic_code, scriptCheckPetroVehicleType, petrolParams, config.connectionString());
-
-          if (!scriptCheckPetroVehicleTypeResult.code && scriptCheckPetroVehicleTypeResult.data.length === 0) {
-            let response = [{
-              status: "error",
-              invalid_code: "-1",
-              message: `รายการน้ำมัน (${itm_material_number_check}): จำนวนรวม ${currentQty} ตรงตามขนาดแป้นน้ำมัน แต่ประเภทรถที่ถูกผูกไว้กับปั๊มไม่สามารถรองรับจำนวนน้ำมันที่กรอกได้`,
-              data: [],
-              response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
-            }];
-            res.status(200).send(response);
-            return;
-          }
-        }
-      }
 
       for (let i = 0; i < order_item.length; i++) {
         let item = order_item[i];
