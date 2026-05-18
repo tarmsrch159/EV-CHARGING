@@ -4026,12 +4026,34 @@ exports.addOrderInformation = async (req, res, next) => {
         );
 
         if (!scriptCheckPetroVehicleTypeResult.code && scriptCheckPetroVehicleTypeResult.data.length === 0) {
+
+          let scriptCheckCompartment = `
+            SELECT p.ptrl_desc ,tpvt.veh_type_code ,tvtcl.veh_compartment_type_level_number , tvtcl.veh_compartment_type_level 
+            FROM tbl_vehicle_type_compartment_level tvtcl 
+            LEFT JOIN tbl_vehicle_type_compartment tvtc ON tvtcl.compartment_item_id = tvtc.id 
+            LEFT JOIN tbl_petrol_vehicle_type tpvt ON tpvt.veh_type_code = tvtc.veh_type_code 
+            LEFT JOIN tbl_petrol p ON tpvt.ptrl_code = p.ptrl_code 
+            WHERE tpvt.ptrl_code = '${resultPetrol.data[0].ptrl_code}' and 
+            tvtcl.veh_compartment_type_level_flag = '1' `
+          let scriptCheckCompartmentResult = await pgConn.getWithParams(
+            dbPrefix + lic_code,
+            scriptCheckCompartment,
+            [],
+            config.connectionString(),
+          );
+
+          let compartmentTypes = scriptCheckCompartmentResult.data
+            .map(item => item.veh_compartment_type_level)
+            .join(", ");
+
+          console.log("compartmentTypes", compartmentTypes);
+
           // กรณีนี้หมายความว่า จำนวนน้ำมันถูกต้องตามระบบ แต่ประเภทรถที่ถูกผูกไว้กับปั๊มไม่สามารถรองรับจำนวนน้ำมันที่กรอก
           let response = [
             {
               status: "error",
               invalid_code: "-1",
-              message: `รายการน้ำมัน (${itm_material_number}) ${item_desc}: จำนวนรวม ${currentQty} ตรงตามขนาดแป้นน้ำมัน แต่ประเภทรถที่ถูกผูกไว้กับปั๊มไม่สามารถรองรับจำนวนน้ำมันที่กรอกได้`,
+              message: `รายการน้ำมัน (${itm_material_number}) ${item_desc} : จำนวนรวม ${currentQty} กรุณากรอกให้ตรงตามขนาดแป้น ${compartmentTypes} หรือเลือกประเภทรถที่สามารถรองรับจำนวนน้ำมันที่กรอกได้`,
               data: [],
               response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
             },
@@ -4075,11 +4097,28 @@ exports.addOrderInformation = async (req, res, next) => {
         );
 
         if (!capacityResult.code && capacityResult.data.length === 0) {
+
+          let scriptCheckMaxMinCapacity = `
+            select tpvt.ptrl_code , tvt.veh_type_code, tvt.capacity_max ,tvt.capacity_min, tvt.veh_type_desc    from tbl_petrol_vehicle_type tpvt 
+            left join tbl_vehicle_type tvt on tpvt.veh_type_code = tvt.veh_type_code 
+            where tpvt.ptrl_code = '${resultPetrol.data[0].ptrl_code}'`;
+
+          let scriptCheckMaxMinCapacityResult = await pgConn.getWithParams(
+            dbPrefix + lic_code,
+            scriptCheckMaxMinCapacity,
+            [],
+            config.connectionString()
+          );
+
+          let maxMinCapacity = scriptCheckMaxMinCapacityResult.data
+            .map(item => `(${item.veh_type_desc} : ปริมาณบรรทุกต่ำสุด (ลิตร)${item.capacity_min} ปริมาณบรรทุกสูงสุด (ลิตร)${item.capacity_max})`)
+            .join(", ");
+
           let response = [
             {
               status: "error",
               invalid_code: "-1",
-              message: `จำนวนน้ำมันรวมทั้งออเดอร์ (${totalOrderQty}) ไม่สามารถบรรจุลงในปริมาณบรรทุกของประเภทรถที่ผูกไว้กับปั๊มนี้ได้ (ปริมาณน้ำมันไม่เหมาะสม)`,
+              message: `จำนวนน้ำมันรวมทั้งออเดอร์ (${totalOrderQty}) ไม่สามารถบรรจุลงในปริมาณบรรทุกของประเภทรถที่ผูกไว้กับปั๊มนี้ได้ (ปริมาณน้ำมันไม่เหมาะสม) ${maxMinCapacity}`,
               data: [],
               response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
             },
