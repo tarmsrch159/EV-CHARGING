@@ -1238,7 +1238,7 @@ exports.addVehicleTypeInformation = async (req, res, next) => {
             if (Array.isArray(level_data) && level_data.length > 0) {
               for (let j = 0; j < level_data.length; j++) {
                 let lvl = level_data[j];
-                let veh_compartment_level_type_code = `veh-com-lev-${moment().format("x")}-${j}`;
+                let veh_compartment_level_type_code = `veh-com-lev-${moment().format("x")}-${Math.floor(Math.random() * 1000000)}-${j}`;
                 let scriptInsertLevel = `INSERT INTO tbl_vehicle_type_compartment_level 
                                     (compartment_item_id, veh_compartment_level_type_code, veh_compartment_type_code, veh_compartment_type_level_number, veh_compartment_type_level, veh_compartment_type_level_flag, ist_dt) VALUES 
                                     ('${new_compartment_item_id}', '${veh_compartment_level_type_code}', '${current_compartment_no}', '${lvl.level_number}', ${lvl.level_capacity}, '1', '${moment().format("YYYY-MM-DD HH:mm:ss")}');`;
@@ -1435,7 +1435,7 @@ exports.addVehicleTypeCompartmentInformation = async (req, res, next) => {
             if (Array.isArray(level_data) && level_data.length > 0) {
               for (let j = 0; j < level_data.length; j++) {
                 let lvl = level_data[j];
-                let veh_compartment_level_type_code = `veh-com-lev-${moment().format("x")}-${j}`;
+                let veh_compartment_level_type_code = `veh-com-lev-${moment().format("x")}-${Math.floor(Math.random() * 1000000)}-${j}`;
                 let scriptInsertLevel = `INSERT INTO tbl_vehicle_type_compartment_level 
                                     (compartment_item_id, veh_compartment_level_type_code, veh_compartment_type_code, veh_compartment_type_level_number, veh_compartment_type_level, veh_compartment_type_level_flag, ist_dt) VALUES 
                                     ('${new_compartment_item_id}', '${veh_compartment_level_type_code}', '${current_compartment_no}', '${lvl.level_number}', ${lvl.level_capacity}, '1', '${moment().format("YYYY-MM-DD HH:mm:ss")}');`;
@@ -1574,7 +1574,7 @@ exports.addVehicleTypeCompartmentLevelInformation = async (req, res, next) => {
         if (Array.isArray(level_data) && level_data.length > 0) {
           for (let j = 0; j < level_data.length; j++) {
             let lvl = level_data[j];
-            let veh_compartment_level_type_code = `veh-com-lev-${moment().format("x")}-${j}`;
+            let veh_compartment_level_type_code = `veh-com-lev-${moment().format("x")}-${Math.floor(Math.random() * 1000000)}-${j}`;
             let scriptInsertLevel = `INSERT INTO tbl_vehicle_type_compartment_level 
                                     (compartment_item_id, veh_compartment_level_type_code, veh_compartment_type_code, veh_compartment_type_level_number, veh_compartment_type_level, veh_compartment_type_level_flag, ist_dt) VALUES 
                                     ('${compartment_id}', '${veh_compartment_level_type_code}', '${current_compartment_no}', '${lvl.level_number}', ${lvl.level_capacity}, '1', '${moment().format("YYYY-MM-DD HH:mm:ss")}');`;
@@ -1808,7 +1808,7 @@ exports.setVehicleTypeInformation = async (req, res, next) => {
                 if (Array.isArray(level_data) && level_data.length > 0) {
                   for (let j = 0; j < level_data.length; j++) {
                     let lvl = level_data[j];
-                    let veh_compartment_level_type_code = `veh-com-lev-${moment().format("x")}-${j}`;
+                    let veh_compartment_level_type_code = `veh-com-lev-${moment().format("x")}${Math.floor(Math.random() * 1000000)}`;
                     let scriptInsertLevel = `INSERT INTO tbl_vehicle_type_compartment_level 
                                           (compartment_item_id, veh_compartment_level_type_code, veh_compartment_type_code, veh_compartment_type_level_number, veh_compartment_type_level, veh_compartment_type_level_flag, ist_dt) VALUES 
                                           ('${new_compartment_item_id}', '${veh_compartment_level_type_code}', '${current_compartment_no}', '${lvl.level_number}', ${lvl.level_capacity}, '1', '${moment().format("YYYY-MM-DD HH:mm:ss")}');`;
