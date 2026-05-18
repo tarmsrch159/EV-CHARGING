@@ -3958,13 +3958,18 @@ exports.addOrderInformation = async (req, res, next) => {
         var item_quantity_check = validationItems[i].item_quantity;
         var itm_material_number = validationItems[i].itm_material_number;
 
+        let scriptCheckItem = `SELECT itm_desc from tbl_item where itm_material_number = '${itm_material_number}' and itm_flag = '1'`;
+        console.log("scriptCheckItem", scriptCheckItem);
+        let checkItemResult = await pgConn.get(dbPrefix + lic_code, scriptCheckItem, config.connectionString());
+        let item_desc = checkItemResult.data && checkItemResult.data.length > 0 ? checkItemResult.data[0].itm_desc : "";
+
         // ตรวจสอบว่าเป็นตัวเลขหรือไม่
         if (isNaN(item_quantity_check)) {
           let response = [
             {
               status: "error",
               invalid_code: "-1",
-              message: `รายการน้ำมัน (${itm_material_number}): จำนวนต้องเป็นตัวเลขเท่านั้น`,
+              message: `รายการน้ำมัน (${itm_material_number}) ${item_desc}: จำนวนต้องเป็นตัวเลขเท่านั้น`,
               data: [],
               response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
             },
@@ -3989,7 +3994,7 @@ exports.addOrderInformation = async (req, res, next) => {
             {
               status: "error",
               invalid_code: "-1",
-              message: `รายการน้ำมัน (${itm_material_number}): จำนวนรวม ${currentQty} ไม่ตรงกับขนาดช่องบรรจุใดๆ ในระบบ`,
+              message: `รายการน้ำมัน (${itm_material_number}) ${item_desc} : จำนวนรวม ${currentQty} ไม่ตรงกับขนาดช่องบรรจุใดๆ ในระบบ`,
               data: [],
               response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
             },
@@ -4026,7 +4031,7 @@ exports.addOrderInformation = async (req, res, next) => {
             {
               status: "error",
               invalid_code: "-1",
-              message: `รายการน้ำมัน (${itm_material_number}): จำนวนรวม ${currentQty} ตรงตามขนาดแป้นน้ำมัน แต่ประเภทรถที่ถูกผูกไว้กับปั๊มไม่สามารถรองรับจำนวนน้ำมันที่กรอกได้`,
+              message: `รายการน้ำมัน (${itm_material_number}) ${item_desc}: จำนวนรวม ${currentQty} ตรงตามขนาดแป้นน้ำมัน แต่ประเภทรถที่ถูกผูกไว้กับปั๊มไม่สามารถรองรับจำนวนน้ำมันที่กรอกได้`,
               data: [],
               response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
             },
