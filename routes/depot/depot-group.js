@@ -193,7 +193,7 @@ exports.setDepotGroupInformation = async (req, res, next) => {
         } = req.body[0];
 
         //เช็คเฉพาะส่วนที่สำคัญ
-        if (dpo_group_code == undefined || dpo_group_desc == undefined || dpo_group_short_desc == undefined || off_code == undefined || action == undefined) {
+        if (dpo_group_code == undefined || dpo_group_desc == undefined || off_code == undefined || action == undefined) {
             let response = [{
                 status: 'error',
                 invalid_code: '-1',
@@ -271,7 +271,7 @@ exports.addDepotGroupInformation = async (req, res, next) => {
         } = req.body[0];
 
         //เช็คเฉพาะส่วนที่สำคัญ
-        if (dpo_group_desc == undefined || dpo_group_short_desc == undefined
+        if (dpo_group_desc == undefined
             || off_code == undefined || action == undefined || lic_code == undefined) {
             let response = [{
                 status: 'error',
