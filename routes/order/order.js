@@ -4042,8 +4042,9 @@ exports.addOrderInformation = async (req, res, next) => {
             config.connectionString(),
           );
 
-          let compartmentTypes = scriptCheckCompartmentResult.data
-            .map(item => item.veh_compartment_type_level)
+          let compartmentTypes = [...new Set(scriptCheckCompartmentResult.data.map(item => Number(item.veh_compartment_type_level)))]
+            .sort((a, b) => a - b)
+            .map(qty => qty.toLocaleString())
             .join(", ");
 
           console.log("compartmentTypes", compartmentTypes);
@@ -4053,7 +4054,7 @@ exports.addOrderInformation = async (req, res, next) => {
             {
               status: "error",
               invalid_code: "-1",
-              message: `รายการน้ำมัน (${itm_material_number}) ${item_desc} : จำนวนรวม ${currentQty} กรุณากรอกให้ตรงตามขนาดแป้น ${compartmentTypes} หรือเลือกประเภทรถที่สามารถรองรับจำนวนน้ำมันที่กรอกได้`,
+              message: `รายการน้ำมัน (${itm_material_number}) ${item_desc}: จำนวนรวม ${currentQty.toLocaleString()} ลิตร ไม่ตรงกับขนาดแป้นของรถที่กำหนดสำหรับปั๊มนี้ [แป้นที่รองรับ: ${compartmentTypes} ลิตร]`,
               data: [],
               response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
             },
@@ -4111,14 +4112,14 @@ exports.addOrderInformation = async (req, res, next) => {
           );
 
           let maxMinCapacity = scriptCheckMaxMinCapacityResult.data
-            .map(item => `(${item.veh_type_desc} : ปริมาณบรรทุกต่ำสุด (ลิตร)${item.capacity_min} ปริมาณบรรทุกสูงสุด (ลิตร)${item.capacity_max})`)
+            .map(item => `[${item.veh_type_desc}: ${Number(item.capacity_min).toLocaleString()}-${Number(item.capacity_max).toLocaleString()} ลิตร]`)
             .join(", ");
 
           let response = [
             {
               status: "error",
               invalid_code: "-1",
-              message: `จำนวนน้ำมันรวมทั้งออเดอร์ (${totalOrderQty}) ไม่สามารถบรรจุลงในปริมาณบรรทุกของประเภทรถที่ผูกไว้กับปั๊มนี้ได้ (ปริมาณน้ำมันไม่เหมาะสม) ${maxMinCapacity}`,
+              message: `จำนวนรวมทั้งออเดอร์ (${totalOrderQty.toLocaleString()} ลิตร) ไม่สอดคล้องกับขนาดบรรทุกของประเภทรถที่กำหนดสำหรับปั๊มนี้: ${maxMinCapacity}`,
               data: [],
               response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
             },
