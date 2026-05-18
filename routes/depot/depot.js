@@ -337,19 +337,14 @@ exports.setDepotInformation = async (req, res, next) => {
         let missing = [];
         if (dpo_code == undefined) missing.push('dpo_code');
         if (dpo_number == undefined) missing.push('dpo_number');
-        if (dpo_city == undefined) missing.push('dpo_city');
         if (dpo_desc == undefined) missing.push('dpo_desc');
-        if (dpo_short_desc == undefined) missing.push('dpo_short_desc');
-        if (dpo_address == undefined) missing.push('dpo_address');
-        if (dpo_zip_code == undefined) missing.push('dpo_zip_code');
-        if (dpo_country_code == undefined) missing.push('dpo_country_code');
-        if (dpo_loading_minute == undefined) missing.push('dpo_loading_minute');
-        if (dpo_expenses_per_km == undefined) missing.push('dpo_expenses_per_km');
-        if (dpo_area == undefined) missing.push('dpo_area');
         if (dpo_lat == undefined) missing.push('dpo_lat');
         if (dpo_lon == undefined) missing.push('dpo_lon');
         if (off_code == undefined) missing.push('off_code');
         if (dpo_group_code == undefined) missing.push('dpo_group_code');
+        if (prov_code == undefined) missing.push('prov_code');
+        if (amph_code == undefined) missing.push('amph_code');
+        if (tamb_code == undefined) missing.push('tamb_code');
         if (action == undefined) missing.push('action');
 
         if (missing.length > 0) {
@@ -464,13 +459,6 @@ exports.addDepotInformation = async (req, res, next) => {
         let missing = [];
         if (dpo_number == undefined) missing.push('dpo_number');
         if (dpo_desc == undefined) missing.push('dpo_desc');
-        if (dpo_short_desc == undefined) missing.push('dpo_short_desc');
-        if (dpo_address == undefined) missing.push('dpo_address');
-        if (dpo_zip_code == undefined) missing.push('dpo_zip_code');
-        if (dpo_country_code == undefined) missing.push('dpo_country_code');
-        if (dpo_loading_minute == undefined) missing.push('dpo_loading_minute');
-        if (dpo_expenses_per_km == undefined) missing.push('dpo_expenses_per_km');
-        if (dpo_area == undefined) missing.push('dpo_area');
         if (dpo_lat == undefined) missing.push('dpo_lat');
         if (dpo_lon == undefined) missing.push('dpo_lon');
         if (off_code == undefined) missing.push('off_code');
