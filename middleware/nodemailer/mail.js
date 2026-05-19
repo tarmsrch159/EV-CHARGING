@@ -59,10 +59,10 @@ exports.sendMail = async (to, subject, html, attachments = [], cc = "") => {
       attachments
     });
 
-    console.log(`   ✅ [MAIL SENT] (Attachments: ${attachments.length})`);
+    // console.log(`   ✅ [MAIL SENT] (Attachments: ${attachments.length})`);
     return { success: true, messageId: info.messageId };
   } catch (error) {
-    console.error(`   ❌ [MAIL ERROR]:`, error.message);
+    // console.error(`   ❌ [MAIL ERROR]:`, error.message);
     return { success: false, error: error.message };
   }
 };

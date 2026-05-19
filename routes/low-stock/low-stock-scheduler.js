@@ -7,6 +7,10 @@ const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 
 
+const xglobal = require('../../middleware/global');
+const logInfo = xglobal.logInfo;
+const logError = xglobal.logError;
+
 /**
  * ฟังก์ชันหลักในการรัน Loop
  */
@@ -17,13 +21,13 @@ const executeLoop = async () => {
         const currentTime = moment();
         const currentHHmm = currentTime.format('HH:mm');
 
-        console.log(`\n[${currentTime.format('HH:mm:ss')}] [Run Out Alert] เริ่มต้นรอบการทำงาน...`);
+        logInfo('Runout Alert', 'เริ่มต้นรอบการทำงาน...');
 
         // เรียกประมวลผลแบบรวม (Controller จะเช็คเวลา Cut-off <= ปัจจุบันให้เอง)
         await lowStockAlertController.processLowStockAlerts(lic_code);
 
     } catch (error) {
-        console.error('❌ [Run Out Service Error] (executeLoop):', error);
+        logError('Runout Alert', 'Run Out Service Error (executeLoop)', error);
     }
 };
 

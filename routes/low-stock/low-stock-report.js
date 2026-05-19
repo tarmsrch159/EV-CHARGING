@@ -128,7 +128,7 @@ exports.getRunoutReportInformation = async (req, res, next) => {
         }
 
     } catch (err) {
-        console.error('❌ [getRunoutReportInformation Error]:', err);
+        console.error('[getRunoutReportInformation Error]:', err);
         xglobal.sendResponse(res, 'error', '-1', 'ไม่สามารถดึงข้อมูลได้: ' + err.message);
     }
 };

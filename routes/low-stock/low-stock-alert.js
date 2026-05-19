@@ -9,6 +9,9 @@ const path = require('path');
 
 const dbPrefix = config.dbPrefix();
 
+const logInfo = xglobal.logInfo;
+const logError = xglobal.logError;
+
 // ==========================================================================
 // 1. TEMPLATE GENERATORS (Email & Excel)
 // ==========================================================================
@@ -231,7 +234,7 @@ const generateLowStockExcel = async (petrolInfo, lowStockProducts) => {
 
         return await workbook.xlsx.writeBuffer();
     } catch (err) {
-        console.error('❌ [generateLowStockExcel Error]:', err.message);
+        console.error('[generateLowStockExcel Error]:', err.message);
         return null;
     }
 };
@@ -313,9 +316,9 @@ async function saveRunoutToDatabase(dbName, station, lowStockProducts, recipient
 
             await pgConn.execute2params(dbName, insertScript, params, config.connectionString());
         }
-        console.log(`[Runout Alert]  บันทึกข้อมูลลงฐานข้อมูล ${lowStockProducts.length} รายการ สำหรับ ${station.ptrl_desc} (${recipientType})`);
+        logInfo('Runout Alert', `บันทึกข้อมูลลงฐานข้อมูล ${lowStockProducts.length} รายการ สำหรับ ${station.ptrl_desc} (${recipientType})`);
     } catch (err) {
-        console.error('❌ [saveRunoutToDatabase Error]:', err.message);
+        logError('Runout Alert', `saveRunoutToDatabase Error: ${err.message}`);
     }
 }
 
@@ -604,7 +607,7 @@ const generateCSSummaryExcel = async (stationsData) => {
 
         return await workbook.xlsx.writeBuffer();
     } catch (err) {
-        console.error('[generateCSSummaryExcel Error]:', err.message);
+        logError('Runout Alert', `generateCSSummaryExcel Error: ${err.message}`);
         return null;
     }
 };
@@ -613,7 +616,7 @@ const generateCSSummaryExcel = async (stationsData) => {
 // หาว่า CS คนไหนดูแลปั๊มกลุ่มไหนบ้าง แล้วกรองปั๊มที่เตือนโยนใส่เมลสรุปฉบับเดียว/คน
 const sendSummaryAlertToCS = async (dbName, csData, summaryAlerts, historySet) => {
     const logEntries = [];
-    console.log(`[Runout Alert] ตรวจสอบการส่งสรุปให้ CS (CS Count: ${csData.length}, Alert Count: ${summaryAlerts.length})`);
+    logInfo('Runout Alert', `ตรวจสอบการส่งสรุปให้ CS (CS Count: ${csData.length}, Alert Count: ${summaryAlerts.length})`);
     try {
         const testEmails = 'amnart_pg@dtc.co.th, puautarm@gmail.com';
         const emailToGroups = {};
@@ -631,14 +634,14 @@ const sendSummaryAlertToCS = async (dbName, csData, summaryAlerts, historySet) =
             const relevantAlerts = [];
             for (const alert of summaryAlerts) {
                 if (!allowedGroups.has(alert.station.ptrl_group_code)) {
-                    console.log(`    [Runout Alert]  [Skip CS] ปั๊ม ${alert.station.ptrl_desc} ไม่อยู่ในกลุ่มที่ ${email} ดูแล`);
+                    logInfo('Runout Alert', `   [Skip CS] ปั๊ม ${alert.station.ptrl_desc} ไม่อยู่ในกลุ่มที่ ${email} ดูแล`);
                     continue;
                 }
 
                 const newProducts = alert.products.filter(p => {
                     const checkKey = `${alert.station.ptrl_code}_${p.itm_code}_${email}_${empCode}_cs_planner`;
                     const hasHistory = historySet.has(checkKey);
-                    if (hasHistory) console.log(`[Runout Alert] Skip CS รายการ ${alert.station.ptrl_desc} - ${p.product_name} ได้ทำการส่งให้ ${email} ในวันนี้แล้ว`);
+                    if (hasHistory) logInfo('Runout Alert', `Skip CS รายการ ${alert.station.ptrl_desc} - ${p.product_name} ได้ทำการส่งให้ ${email} ในวันนี้แล้ว`);
                     return !hasHistory;
                 });
 
@@ -654,7 +657,7 @@ const sendSummaryAlertToCS = async (dbName, csData, summaryAlerts, historySet) =
                 const attachments = excel ? [{ filename: `AOS_Order_Recommendation_Runout_${moment().format('YYYYMMDD')}.xlsx`, content: excel }] : [];
 
                 await mailer.sendMail(testEmails, subject, html, attachments);
-                console.log(`[Runout Alert] ส่งสรุปของ (${email}) ไปที่ -> ${testEmails}`);
+                logInfo('Runout Alert', `ส่งสรุปของ (${email}) ไปที่ -> ${testEmails}`);
 
                 // บันทึกประวัติ
                 const empName = empInfo?.emp_name || 'ไม่ทราบชื่อ';
@@ -728,7 +731,7 @@ async function sendAlertToRecipients(dbName, station, lowStockProducts) {
             });
             mailCodesToUpdate.push(conf.ptrl_mail_code);
         } else {
-            console.log(`[Runout Alert]  ข้ามการส่งให้ผู้จัดการ: ${conf.email_alert} (เพิ่งส่งไปเมื่อ ${lastAlert.format('HH:mm')} ติดเงื่อนไขความถี่)`);
+            logInfo('Runout Alert', `ข้ามการส่งให้ผู้จัดการ: ${conf.email_alert} (เพิ่งส่งไปเมื่อ ${lastAlert.format('HH:mm')} ติดเงื่อนไขความถี่)`);
         }
     }
 
@@ -766,7 +769,7 @@ async function sendAlertToRecipients(dbName, station, lowStockProducts) {
         // }
 
         await mailer.sendMail(primaryEmailMockup, subject, html, attachments, secondaryEmailMockup);
-        console.log(`[Runout Alert] ส่งแจ้งเตือนปั๊ม ${station.ptrl_desc} ไปที่ (To: ${primaryEmailMockup}) | (Cc: ${secondaryEmailMockup || '-'})`);
+        logInfo('Runout Alert', `ส่งแจ้งเตือนปั๊ม ${station.ptrl_desc} ไปที่ (To: ${primaryEmailMockup}) | (Cc: ${secondaryEmailMockup || '-'})`);
         // บันทึกข้อมูล Runout หลังส่งอีเมลแจ้งเตือนสำเร็จ (ใช้ข้อมูลจริงเพื่อประวัติ)
         for (const r of validRecipients) {
             await saveRunoutToDatabase(dbName, station, lowStockProducts, r.email, 'station_manager', r.empCode, r.empRoleDesc);
@@ -805,7 +808,7 @@ exports.processLowStockAlerts = async (lic_code, filter_sales_org = null, filter
     const dbName = dbPrefix + lic_code;
     try {
         const currentTime = moment();
-        console.log(`\n[Runout Alert] เริ่มตรวจสอบ (${lic_code}) เวลา ${currentTime.format('HH:mm:ss')}...`);
+        logInfo('Runout Alert', `เริ่มตรวจสอบ (${lic_code}) เวลา ${currentTime.format('HH:mm:ss')}...`);
 
         // 1. ดึงรายการปั๊มที่ถึงรอบการตรวจสอบ (อ้างอิงตาม Sales Org และ Order Type)
         let wh = "";
@@ -840,7 +843,10 @@ exports.processLowStockAlerts = async (lic_code, filter_sales_org = null, filter
                 ${wh}
         `;
         const activeStations = await pgConn.getWithParams(dbName, scriptSql, params, config.connectionString());
-        if (!activeStations.data?.length) return console.log(`[Runout Alert]  ไม่มีปั๊มที่ต้องตรวจสอบในรอบนี้`);
+        if (!activeStations.data?.length) {
+            logInfo('Runout Alert', 'ไม่มีปั๊มที่ต้องตรวจสอบในรอบนี้');
+            return;
+        }
 
         // 2. ดึงข้อมูลพนักงาน CS/Planner 
         const csDataQuery = await pgConn.get(dbName, `
@@ -876,7 +882,7 @@ exports.processLowStockAlerts = async (lic_code, filter_sales_org = null, filter
         // 4. เริ่มประมวลผลรายปั๊ม... (จำกัดแค่ 2 ปั๊มแรกเพื่อทดสอบ ป้องกัน Mail Spam)
         // for (const station of activeStations.data) {
         for (const station of activeStations.data.slice(0, 2)) {
-            console.log(`[Runout Alert] ประมวลผลปั๊ม: ${station.ptrl_desc} (${station.ptrl_number}) [Org: ${station.sales_org_code} | Type: ${station.sales_order_type}]`);
+            logInfo('Runout Alert', `ประมวลผลปั๊ม: ${station.ptrl_desc} (${station.ptrl_number}) [Org: ${station.sales_org_code} | Type: ${station.sales_order_type}]`);
             const coverageLimit = parseFloat(station.coverage_days) || 3;
 
             const script = `
@@ -928,7 +934,7 @@ exports.processLowStockAlerts = async (lic_code, filter_sales_org = null, filter
             for (const tank of tankData.data) {
                 // ถ้าข้อมูลย้อนหลังจาก stock_at ย้อนหลัง 1 วัน ไม่มีข้อมูล (หรือไม่อยู่ในเงื่อนไข SQL) -> ข้าม
                 if (!tank.stock_at) {
-                    console.log(`[Runout Alert] ข้ามถัง ${tank.tnk_number} (${station.ptrl_desc} [${station.sales_org_code} | ${station.sales_order_type}]) เนื่องจากไม่มีข้อมูล stock ล่าสุดภายใน 1 วัน`);
+                    logInfo('Runout Alert', `ข้ามถัง ${tank.tnk_number} (${station.ptrl_desc} [${station.sales_org_code} | ${station.sales_order_type}]) เนื่องจากไม่มีข้อมูล stock ล่าสุดภายใน 1 วัน`);
                     continue;
                 }
 
@@ -996,13 +1002,13 @@ exports.processLowStockAlerts = async (lic_code, filter_sales_org = null, filter
         }
 
         if (allDebugLogs.length > 0) {
-            console.log(`\n\x1b[32m\x1b[1m[Runout Alert Summary] ตารางสรุปการจัดส่งแจ้งเตือนสำเร็จ:\x1b[0m`);
+            logInfo('Runout Alert Summary', 'ตารางสรุปการจัดส่งแจ้งเตือนสำเร็จ:');
             console.table(allDebugLogs);
         } else {
-            console.log(`\n\x1b[33m[Runout Alert] ตรวจสอบเสร็จสิ้น ไม่พบบัญชีน้ำมันใกล้หมดที่จะต้องส่งแจ้งเตือนในรอบนี้\x1b[0m`);
+            logInfo('Runout Alert', 'ตรวจสอบเสร็จสิ้น ไม่พบบัญชีน้ำมันใกล้หมดที่จะต้องส่งแจ้งเตือนในรอบนี้');
         }
     } catch (error) {
-        console.error('❌ [processLowStockAlerts Error]:', error);
+        logError('Runout Alert', 'processLowStockAlerts Error', error);
     }
 };
 

@@ -8,6 +8,17 @@ const xutl_order_prod = ``;
 
 const dbPrefix = config.dbPrefix();
 
+// Uniform logging helper
+exports.logInfo = (service, event) => {
+    const prefix = `[${moment().format('HH:mm:ss')}] [${service}]`;
+    console.log(`${prefix.padEnd(33)} ${event}`);
+};
+
+exports.logError = (service, event, err) => {
+    const prefix = `[${moment().format('HH:mm:ss')}] [${service}]`;
+    console.error(`${prefix.padEnd(33)} ERROR: ${event}`, err || '');
+};
+
 exports.Xor = (s) => {
   //debugger;
   if (s.length % 2 == 0) {

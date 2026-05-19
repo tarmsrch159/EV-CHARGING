@@ -10,6 +10,9 @@ const mailer = require('../../middleware/nodemailer/mail');
 const dbPrefix = config.dbPrefix();
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
+const logInfo = xglobal.logInfo;
+const logError = xglobal.logError;
+
 // =========================================================
 //  Helpers: AES-256-CBC Encryption & Decryption
 // =========================================================
@@ -28,7 +31,7 @@ const encryptPayload = (text) => {
         encrypted = Buffer.concat([encrypted, cipher.final()]);
         return iv.toString('hex') + ':' + encrypted.toString('hex');
     } catch (err) {
-        console.error('   ❌ [encryptPayload Error]:', err.message);
+        logError('Auto Order Mail', `encryptPayload Error: ${err.message}`);
         return null;
     }
 };
@@ -39,11 +42,11 @@ const encryptPayload = (text) => {
 const decryptPayload = (text) => {
     try {
         if (!text) return null;
-        console.log(`   🔍 กำลังถอดรหัส Token: ${text.substring(0, 20)}...`);
+        logInfo('Auto Order Mail', `กำลังถอดรหัส Token: ${text.substring(0, 20)}...`);
 
         const parts = text.split(':');
         if (parts.length !== 2) {
-            console.error('   ❌ Token Format ผิด (ไม่มีเครื่องหมาย :)');
+            logError('Auto Order Mail', 'Token Format ผิด (ไม่มีเครื่องหมาย :)');
             return null;
         }
 
@@ -55,7 +58,7 @@ const decryptPayload = (text) => {
         decrypted = Buffer.concat([decrypted, decipher.final()]);
         return decrypted.toString('utf8');
     } catch (err) {
-        console.error('   ❌ [decryptPayload Error]:', err.message);
+        logError('Auto Order Mail', `decryptPayload Error: ${err.message}`);
         return null;
     }
 };
@@ -240,7 +243,7 @@ const generateFullEmailHtml = (stationName, confirmUrl, ordersHtml, hasOrders = 
  */
 const getDataForStation = async (lic_code, autoItem) => {
     try {
-        console.log(`\n🔍 [Auto Order Mail] อ่านข้อมูลปั๊ม: ${autoItem.ptrl_desc} (${autoItem.ptrl_number})`);
+        logInfo('Auto Order Mail', `อ่านข้อมูลปั๊ม: ${autoItem.ptrl_desc} (${autoItem.ptrl_number})`);
 
         const orderScript = `
             SELECT id, order_no, sh_cus_ref, ship_to, order_type, order_status, deli_date_req, description, ist_dt
@@ -272,7 +275,7 @@ const getDataForStation = async (lic_code, autoItem) => {
                 };
             }));
         }
-        console.log(`   👤 ผู้จัดการปั๊ม: ${manager ? manager.emp_code : 'ไม่พบ'}`);
+        logInfo('Auto Order Mail', `   ผู้จัดการปั๊ม: ${manager ? manager.emp_code : 'ไม่พบ'}`);
         return {
             lic_code: lic_code,
             automatic_code: autoItem.automatic_code,
@@ -289,7 +292,7 @@ const getDataForStation = async (lic_code, autoItem) => {
             orders: orderDetails
         };
     } catch (err) {
-        console.error(`❌ [Auto Order Mail Data Error] ${autoItem.ptrl_number}:`, err);
+        logError('Auto Order Mail', `Auto Order Mail Data Error ${autoItem.ptrl_number}`, err);
         return null;
     }
 };
@@ -331,7 +334,7 @@ const sendAutoOrderEmail = async (stationData) => {
         } else {
             // =========== กรณีไม่Auto Order ของปั๊มนั้นๆ ===========
             subject = `[Auto Order] ไม่มียอดสั่งน้ำมันในวันนี้ - ${stationData.ptrl_desc}`;
-            console.log(`   ℹ️  ไม่มียอดสั่งซื้อ: เตรียมส่งเมลแจ้งเตือนไม่มียอดสั่งน้ำมัน`);
+            logInfo('Auto Order Mail', 'ไม่มียอดสั่งซื้อ: เตรียมส่งเมลแจ้งเตือนไม่มียอดสั่งน้ำมัน');
         }
 
         const htmlContent = generateFullEmailHtml(stationName, confirmUrl, rowsHtml, hasOrders);
@@ -365,7 +368,7 @@ const sendAutoOrderEmail = async (stationData) => {
  * ดึงข้อมูลปั๊มที่มีการคำนวณ Auto Order เพื่อเอาไปใช้หารายการสั่งซื้อ
  */
 const processAutoOrderMails = async (lic_code) => {
-    console.log(`\n📧 [Auto Order Mail] เริ่มประมวลผล: ${moment().format('YYYY-MM-DD HH:mm:ss')}`);
+    logInfo('Auto Order Mail', `เริ่มประมวลผล: ${moment().format('YYYY-MM-DD HH:mm:ss')}`);
     try {
         const query = `
             SELECT ao.automatic_code, ao.ptrl_code, ao.ist_dt, ao.result, ao.automatic_status,
@@ -395,7 +398,7 @@ const processAutoOrderMails = async (lic_code) => {
         }
         return { success: true, message: `พบข้อมูล ${mailDataList.length} แห่ง`, data: mailDataList };
     } catch (err) {
-        console.error('❌ [processAutoOrderMails Error]:', err);
+        logError('Auto Order Mail', 'processAutoOrderMails Error', err);
         return { success: false, message: err.message };
     }
 };
@@ -422,7 +425,7 @@ exports.getAutoOrderMailData = async (req, res) => {
  */
 exports.runAutoOrderMailTask = async () => {
     const lic_code = 'aos01';
-    console.log(`\n[Auto Order Mail] เริ่ม Background Task: ${moment().format('YYYY-MM-DD HH:mm:ss')}`);
+    logInfo('Auto Order Mail', 'เริ่ม Background Task...');
 
     try {
         // [Auto Order Cleanup] รันการล้างข้อมูลออเดอร์เก่าไปพร้อมกัน (ไม่ว่าจะพบข้อมูลส่งเมลหรือไม่)
@@ -444,29 +447,28 @@ exports.runAutoOrderMailTask = async () => {
             ORDER BY ao.ist_dt DESC 
         `;
         const result = await pgConn.get(dbPrefix + lic_code, query, config.connectionString());
-
         if (result.code || !result.data || result.data.length === 0) {
-            console.log(`[\x1b[33m\x1b[1m${moment().format("HH:mm:ss")}\x1b[0m] [Auto Order Mail] ไม่มีรายการที่ต้องประมวลผล`);
+            logInfo('Auto Order Mail', 'ไม่มีรายการที่ต้องประมวลผล');
             return { success: true };
         }
 
         const autoList = result.data;
-        console.log(`✅ [Auto Order Mail] พบรายการทั้งหมด: ${autoList.length} แห่ง`);
+        logInfo('Auto Order Mail', `พบรายการทั้งหมด: ${autoList.length} แห่ง`);
 
         // 1. อ่านข้อมูลทั้งหมดแบบ Parallel เพื่อความเร็วสูงสุด (Speed up reading)
         // [DEV TEST] จำกัดให้รันแค่ 2 ปั๊มแรก ป้องกัน Mail Spam
-        console.log(`⏳ [Auto Order Mail] กำลังอ่านข้อมูล (จำกัด 2 ปั๊มแรก)...`);
+        logInfo('Auto Order Mail', 'กำลังอ่านข้อมูล (จำกัด 2 ปั๊มแรก)...');
         // const stationDataResults = await Promise.all(autoList.map(item => getDataForStation(lic_code, item)));
         const stationDataResults = await Promise.all(autoList.slice(0, 2).map(item => getDataForStation(lic_code, item)));
         const validStationData = stationDataResults.filter(d => d !== null);
 
-        console.log(`🚀 [Auto Order Mail] เริ่มส่งเมล (Batch Processing)...`);
+        logInfo('Auto Order Mail', 'เริ่มส่งเมล (Batch Processing)...');
 
         await processEmailBatches(lic_code, validStationData);
 
         return { success: true };
     } catch (err) {
-        console.error('❌ [runAutoOrderMailTask Error]:', err);
+        logError('Auto Order Mail', 'runAutoOrderMailTask Error', err);
         return { success: false };
     }
 };
@@ -482,7 +484,7 @@ const processEmailBatches = async (lic_code, stationList) => {
         if (isLimitHit) break;
 
         const batch = stationList.slice(i, i + BATCH_SIZE);
-        console.log(`\n📬 [Batch] ${i + 1} - ${Math.min(i + BATCH_SIZE, stationList.length)} จาก ${stationList.length}`);
+        logInfo('Auto Order Mail', `[Batch] กลุ่ม ${i / BATCH_SIZE + 1}: สถานีลำดับที่ ${i + 1} - ${Math.min(i + BATCH_SIZE, stationList.length)} จาก ${stationList.length}`);
 
         const results = await Promise.all(batch.map(station => processStationEmail(lic_code, station)));
 
@@ -493,7 +495,7 @@ const processEmailBatches = async (lic_code, stationList) => {
 
         // พักเพื่อป้องกันสแปม
         if (!isLimitHit && i + BATCH_SIZE < stationList.length) {
-            console.log(`   พัก 3 วินาที...`);
+            logInfo('Auto Order Mail', 'พัก 3 วินาทีเพื่อป้องกันสแปม...');
             await sleep(3000);
         }
     }
@@ -504,22 +506,22 @@ const processEmailBatches = async (lic_code, stationList) => {
  */
 const processStationEmail = async (lic_code, station) => {
     try {
-        console.log(`   📧 [SEND] -> ${station.manager_email}`);
+        logInfo('Auto Order Mail', `   [SEND] -> ${station.manager_email}`);
         const success = await sendAutoOrderEmail(station);
 
         if (success) {
             const query = `UPDATE tbl_automatics_orders SET automatic_status = '2', mdf_dt = NOW() WHERE automatic_code = $1`;
             await pgConn.getWithParams(dbPrefix + lic_code, query, [station.automatic_code], config.connectionString());
-            console.log(`   ✅ [SUCCESS] ${station.ptrl_number}`);
+            logInfo('Auto Order Mail', `   [SUCCESS] ${station.ptrl_number}`);
         }
         return { success: true };
     } catch (err) {
         const msg = err.message || '';
         if (msg.includes('limit exceeded') || msg.includes('550')) {
-            console.error('⚠️ [CRITICAL] Gmail Daily Limit Exceeded.');
+            logError('Auto Order Mail', 'Gmail Daily Limit Exceeded');
             return { success: false, limitExceeded: true };
         }
-        console.error(`   ❌ [ERROR] ${station.ptrl_number}:`, msg);
+        logError('Auto Order Mail', `[ERROR] ${station.ptrl_number}: ${msg}`);
         return { success: false };
     }
 };
@@ -548,7 +550,7 @@ exports.processAutoOrderMails = processAutoOrderMails;
 exports.decryptToken = async (req, res) => {
     try {
         const { token } = req.body[0] || {};
-        console.log(`\n📥 [API Decrypt] ได้รับ Request, Token ยาว: ${token ? token.length : 0} ตัวอักษร`);
+        logInfo('Auto Order Mail', `[API Decrypt] ได้รับ Request, Token ยาว: ${token ? token.length : 0} ตัวอักษร`);
 
         if (!token) {
             return sendResponse(res, 'error', '-1', 'ไม่พบ token', []);
@@ -563,11 +565,11 @@ exports.decryptToken = async (req, res) => {
         }
 
         const payload = JSON.parse(decrypted);
-        console.log(`   ✅ ถอดรหัสสำเร็จ: order_id=${payload.order_id}`);
+        logInfo('Auto Order Mail', `ถอดรหัสสำเร็จ: order_id=${payload.order_id}`);
 
         // ตรวจสอบ Expiration
         if (payload.exp && Date.now() > payload.exp) {
-            console.warn('   ⚠️ ลิงก์หมดอายุแล้ว');
+            logInfo('Auto Order Mail', 'ลิงก์หมดอายุแล้ว');
             return sendResponse(res, 'error', '-5', 'ลิงก์หมดอายุแล้ว', []);
         }
 
@@ -580,7 +582,7 @@ exports.decryptToken = async (req, res) => {
             expire_date: payload.exp || '',
         }]);
     } catch (err) {
-        console.error('   ❌ [decryptToken Error]:', err);
+        logError('Auto Order Mail', 'decryptToken Error', err);
         return sendResponse(res, 'error', '-4', 'เกิดข้อผิดพลาดภายในระบบ', []);
     }
 };
@@ -615,14 +617,12 @@ exports.runAutoOrderCleanupTask = async () => {
         );
 
         if (result.rowaction > 0) {
-            console.log(
-                `[${moment().format("HH:mm:ss")}] [Auto Order Cleanup] อัปเดตออเดอร์ที่หมดอายุจำนวน ${result.rowaction} รายการ (ก่อนวันที่ ${thresholdDate})`
-            );
+            logInfo('Auto Order Cleanup', `อัปเดตออเดอร์ที่หมดอายุจำนวน ${result.rowaction} รายการ (ก่อนวันที่ ${thresholdDate})`);
         } else {
-            console.log(`[\x1b[33m\x1b[1m${moment().format("HH:mm:ss")}\x1b[0m] [Auto Order Cleanup] ไม่พบรายการที่ต้องลบสำหรับออเดอร์ที่มีอายุเกิน 3 วัน`);
+            logInfo('Auto Order Cleanup', 'ไม่พบรายการที่ต้องลบสำหรับออเดอร์ที่มีอายุเกิน 3 วัน');
         }
     } catch (error) {
-        console.error("❌ [Auto Order Cleanup Error]:", error);
+        logError('Auto Order Cleanup', 'Auto Order Cleanup Error', error);
     }
 };
 
@@ -647,7 +647,7 @@ exports.updateAutoOrderFlag = async (req, res, next) => {
             updateScript,
             config.connectionString(),
         );
-        console.log(result)
+        logInfo('Auto Order Mail', `updateAutoOrderFlag success: rowaction=${result.rowaction}`);
 
         let response = [
             {
@@ -662,7 +662,7 @@ exports.updateAutoOrderFlag = async (req, res, next) => {
         ];
         res.status(200).send(response);
     } catch (error) {
-        console.error(error);
+        logError('Auto Order Mail', 'updateAutoOrderFlag Error', error);
         let response = [
             {
                 status: "error",
