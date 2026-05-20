@@ -2736,6 +2736,7 @@ exports.getOrderInformationHana = async (req, res, next) => {
               for (let j = 0; j < salesOrder.Items.length; j++) {
                 let item = salesOrder.Items[j];
                 let itm_code = "";
+                let Quantity = salesOrder.Items[j].OrderQuantity;
 
                 // ===== ค้นหา itm_code จาก material number ของ SAP =====
                 if (item.Material) {
@@ -2755,6 +2756,7 @@ exports.getOrderInformationHana = async (req, res, next) => {
 
                 let update_item_script = `UPDATE tbl_order_item SET 
                                     item_no = '${itm_code || ""}',
+                                    item_qty = '${Quantity || ""}',
                                     sales_order_item = '${item.SalesOrderItem || ""}',
                                     sd_reject_reason = '${item.SalesDocumentRjcnReason || ""}',
                                     sd_process_status = '${item.SDProcessStatus || ""}',
