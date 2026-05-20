@@ -284,7 +284,8 @@ const getDataForStation = async (lic_code, autoItem) => {
             ptrl_desc: autoItem.ptrl_desc,
             ptrl_short_desc: autoItem.ptrl_short_desc || '',
             // --- INTERCEPT MODE: ถ้ามีผู้รับในระบบ ให้เปลี่ยนมาส่งที่ 2 เมลนี้แทน ---
-            manager_email: cleanEmails(autoItem.ptrl_remark) ? 'amnart_pg@dtc.co.th, puautarm@gmail.com' : '',
+            manager_email: cleanEmails(autoItem.ptrl_remark) ? 'prattananien@gmail.com, puautarm@gmail.com' : '',
+            // manager_email: cleanEmails(autoItem.ptrl_remark) ? 'amnart_pg@dtc.co.th, puautarm@gmail.com' : '',
             // ------------------------------------------------------------------
             manager_emp_code: manager ? manager.emp_code : '',
             manager_username: manager ? manager.emp_username : '',

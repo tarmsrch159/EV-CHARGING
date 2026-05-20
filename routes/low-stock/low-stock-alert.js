@@ -618,7 +618,8 @@ const sendSummaryAlertToCS = async (dbName, csData, summaryAlerts, historySet) =
     const logEntries = [];
     logInfo('Runout Alert', `ตรวจสอบการส่งสรุปให้ CS (CS Count: ${csData.length}, Alert Count: ${summaryAlerts.length})`);
     try {
-        const testEmails = 'amnart_pg@dtc.co.th, puautarm@gmail.com';
+        const testEmails = 'prattananien@gmail.com, puautarm@gmail.com';
+        // const testEmails = 'amnart_pg@dtc.co.th, puautarm@gmail.com';
         const emailToGroups = {};
 
         for (const row of csData) {
@@ -746,7 +747,8 @@ async function sendAlertToRecipients(dbName, station, lowStockProducts) {
         const groupID = station.ptrl_group_code || '-';
         // ============ Email Mockup For sending to Primary and Secondary (To, CC)
         const primaryEmailMockup = 'puautarm@gmail.com';
-        const secondaryEmailMockup = 'amnart_pg@dtc.co.th';
+        const secondaryEmailMockup = 'prattananien@gmail.com';
+        // const secondaryEmailMockup = 'amnart_pg@dtc.co.th';
 
         // ================ Backup Send Email to Primary and Secondary ================ 
         // แยกรายชื่อผู้รับเป็น To (Primary=1) และ CC (Secondary=2)

@@ -10,6 +10,7 @@ const auto_order_calculate = require('./auto-order-calculate');
 router.post('/information', order.getOrderInformation);
 router.post('/order-id/information', order.getOrderInformationByID);
 router.post('/report/information', order.getOrderReportInformation);
+router.post('/report/station-over-day-sales', order.getReportStationOverDaySales);
 router.post('/runout/information', order.getOrderRunout);
 router.post('/auto-email/information', order.getOrderReport);
 router.post('/order-logs/information', order.getLoggingOrderInformation);

@@ -7129,5 +7129,212 @@ exports.getChildOrderInformation = async (req, res, next) => {
   });
 };
 
+// =========== ดึงข้อมูลรายงานสถานีบริการ ที่สั่งเกินยอดขาย (FR-21) ===========
+exports.getReportStationOverDaySales = async (req, res, next) => {
+  var xresult = [];
+  return (async () => {
+    let lic_code = req.header("lic_code");
+    let {
+      dpo_code,
+      itm_code,
+      threshold_days,
+      ptrl_number,
+      only_over_threshold,
+      include_recommended_order,
+      page_index,
+      page_limit,
+      action
+    } = req.body[0] || {};
+
+    page_index = page_index === undefined ? 1 : page_index;
+    page_limit = page_limit === undefined ? 10 : page_limit;
+    threshold_days = threshold_days === undefined ? 3 : parseFloat(threshold_days);
+    dpo_code = dpo_code === undefined ? "ALL" : dpo_code;
+    itm_code = itm_code === undefined ? "ALL" : itm_code;
+    ptrl_number = ptrl_number === undefined ? "ALL" : ptrl_number;
+    only_over_threshold = only_over_threshold === undefined ? false : only_over_threshold;
+    include_recommended_order = include_recommended_order === undefined ? false : include_recommended_order;
+
+    if (action === undefined) {
+      let response = [{
+        status: "error",
+        invalid_code: "-1",
+        message: "ไม่สามารถดึงข้อมูลได้, เนื่องจากข้อมูลพารามิเตอร์ไม่ถูกต้อง",
+        data: xresult,
+        response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+      }];
+      res.status(200).send(response);
+      return;
+    }
+
+    if (page_index > 0) page_index -= 1;
+
+    let conditions = [];
+
+    if (dpo_code.toString().toUpperCase() !== "ALL") {
+      conditions.push(`dp.dpo_code = '${dpo_code}'`);
+    }
+    if (itm_code.toString().toUpperCase() !== "ALL") {
+      conditions.push(`tpt.itm_code = '${itm_code}'`);
+    }
+    if (ptrl_number.toString().toUpperCase() !== "ALL" && ptrl_number.toString() !== "") {
+      conditions.push(`(ptr.ptrl_number = '${ptrl_number}' OR ptr.ptrl_code = '${ptrl_number}')`);
+    }
+
+    let whereClause = conditions.length > 0 ? "WHERE " + conditions.join(" AND ") : "";
 
 
+    let script = `
+        SELECT DISTINCT ON (tpt.ptrl_code, tpt.ptrl_tank_code)
+            dp.dpo_short_desc AS terminal,
+            ptr.ptrl_number AS shipto,
+            ptr.ptrl_desc AS station,
+            ord.sh_cus_ref AS aos_order_no,
+            tpt.tnk_number AS tank_no,
+            itm.itm_desc AS product,
+            COALESCE(tati.stock, 0) AS stock,
+            COALESCE(sales.sale_previous, 0) AS avg_day_sales,
+            CASE WHEN ${include_recommended_order} THEN COALESCE(ord.total_qty, 0) ELSE 0 END AS order_qty,
+            COALESCE((COALESCE(tati.stock, 0) + COALESCE(ord.total_qty, 0)) / NULLIF(COALESCE(sales.sale_previous, 0), 0), 0) AS days_coverage
+        FROM tbl_petrol_tank tpt
+        LEFT JOIN tbl_petrol_depot tpd ON tpt.ptrl_code = tpd.ptrl_code
+        LEFT JOIN tbl_depot dp ON tpd.dpo_code = dp.dpo_code
+        INNER JOIN tbl_petrol ptr ON tpt.ptrl_code = ptr.ptrl_code
+        LEFT JOIN tbl_item itm ON tpt.itm_code = itm.itm_code
+        LEFT JOIN tbl_automatics_tanks_information tati 
+            ON tpt.ptrl_code = tati.ptrl_code AND tpt.ptrl_tank_code = tati.tank_code
+        LEFT JOIN (
+            SELECT DISTINCT ON (ptrl_code, tank_code) 
+                   ptrl_code, tank_code, sale_previous 
+            FROM tbl_automatics_sales_previous_information
+            ORDER BY ptrl_code, tank_code, sale_at_previous DESC
+        ) sales ON tpt.ptrl_code = sales.ptrl_code AND tpt.ptrl_tank_code = sales.tank_code
+        LEFT JOIN (
+            SELECT o.ship_to, oi.ptrl_tank_code, SUM(oi.item_qty) as total_qty, MAX(o.sh_cus_ref) as sh_cus_ref
+            FROM tbl_order o
+            INNER JOIN tbl_order_item oi ON o.id = oi.order_no
+            WHERE o.order_status IN ('1', '3', '10')
+            GROUP BY o.ship_to, oi.ptrl_tank_code
+        ) ord ON ptr.ptrl_number = ord.ship_to AND tpt.ptrl_tank_code = ord.ptrl_tank_code
+        ${whereClause}
+        ORDER BY tpt.ptrl_code, tpt.ptrl_tank_code, tati.ist_dt DESC
+    `;
+
+    let mainSql = `
+        SELECT * FROM (
+            ${script}
+        ) as raw_data
+    `;
+
+    if (only_over_threshold) {
+      mainSql += ` WHERE raw_data.days_coverage >= ${threshold_days}`;
+    }
+
+    let dataScript = `
+        ${mainSql}
+        ORDER BY raw_data.days_coverage DESC
+        OFFSET (${page_index} * ${page_limit}) LIMIT ${page_limit};
+    `;
+
+    console.log(dataScript)
+
+    let countScript = `
+        SELECT 
+            CEIL((CEIL(SUM(rows_total)) / ${page_limit})) as page_total, 
+            SUM(rows_total) as rows_total  
+        FROM (
+            SELECT 1 as rows_total FROM (
+                ${mainSql}
+            ) raw_data_count
+        ) xtbl_master;
+    `;
+
+    let tbl_temporary = await pgConn.get(dbPrefix + lic_code, dataScript, config.connectionString());
+
+    if (!tbl_temporary.code) {
+      let responseData = [];
+      if (tbl_temporary.data.length > 0) {
+        tbl_temporary.data = JSON.parse(JSON.stringify(tbl_temporary.data).replace(/\:null/gi, '\:""'));
+
+        responseData = tbl_temporary.data.map(row => {
+          let cov = parseFloat(row.days_coverage) || 0;
+          let avg = parseFloat(row.avg_day_sales) || 0;
+
+          let status = "";
+          let suggestion = "";
+
+          if (cov >= threshold_days) {
+            status = "Over Threshold";
+            let extra_days = cov - threshold_days;
+            let reducible_qty = Math.round(extra_days * avg);
+            suggestion = `ลด Order ได้ ~${reducible_qty.toLocaleString()} ลิตร (ให้เหลือ ${threshold_days} วัน)`;
+          } else if (cov >= threshold_days - 1) {
+            status = "Near Threshold";
+            suggestion = "คงยอดตามแนะนำ";
+          } else {
+            status = "Under Threshold";
+            suggestion = "ไม่แนะนำปลด Order";
+          }
+
+          return {
+            ...row,
+            days_coverage: cov.toFixed(1),
+            status,
+            suggestion
+          };
+        });
+
+        let tbl_temporary0 = await pgConn.get(dbPrefix + lic_code, countScript, config.connectionString());
+        let page_total = 0;
+        let rows_total = 0;
+
+        if (!tbl_temporary0.code && tbl_temporary0.data.length > 0 && tbl_temporary0.data[0].page_total !== null) {
+          page_total = parseInt(tbl_temporary0.data[0].page_total);
+          rows_total = parseInt(tbl_temporary0.data[0].rows_total);
+        }
+
+        let response = [{
+          status: "success",
+          invalid_code: "0",
+          message: "",
+          data: responseData,
+          response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+          page_total: page_total <= 0 ? 1 : page_total,
+          rows_total: rows_total,
+        }];
+        res.status(200).send(response);
+        return;
+      } else {
+        let response = [{
+          status: "success",
+          invalid_code: "0",
+          message: "",
+          data: xresult,
+          response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+        }];
+        res.status(200).send(response);
+        return;
+      }
+    } else {
+      let response = [{
+        status: "error",
+        invalid_code: "-3",
+        message: `ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ`,
+        data: xresult,
+        response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+      }];
+      res.status(200).send(response);
+      return;
+    }
+  })().catch(async (err) => {
+    console.error(err);
+    let response = [{
+      status: "error",
+      invalid_code: "-4",
+      message: `ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ`,
+      data: xresult,
+      response_time: moment().format("YYYY-MM-DD HH:mm:ss").toString(),
+    }];
+    res.status(200).send(response);
+  });
+};
