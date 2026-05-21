@@ -12,7 +12,7 @@ exports.getPetrolGroupInformation = async (req, res, next) => {
 
     return (async () => {
         let lic_code = req.header("lic_code");
-        let { ptrl_group_code, off_code, action, ptrl_group_sales_org, ptrl_group_order_type } = req.body[0] || {};
+        let { ptrl_group_code, off_code, action, ptrl_group_sales_org, ptrl_group_order_type, prov_code } = req.body[0] || {};
 
         // เช็คเฉพาะส่วนที่สำคัญ
         if (
@@ -66,6 +66,23 @@ exports.getPetrolGroupInformation = async (req, res, next) => {
             )`);
         }
 
+        // กรองตาม prov_code ถ้ามีการส่งมา (ถ้าจังหวัดไม่ได้ผูกกับโซนเลย ให้ return ทุกโซน)
+        if (prov_code && prov_code.toString().toUpperCase() !== "ALL") {
+            conditions.push(`(
+                EXISTS (
+                    SELECT 1 FROM tbl_petrol_group_address pga 
+                    WHERE pga.ptrl_group_code = tbl_petrol_group.ptrl_group_code 
+                    AND pga.prov_code = '${prov_code}'
+                    AND pga.flag = '1'
+                )
+                OR NOT EXISTS (
+                    SELECT 1 FROM tbl_petrol_group_address pga 
+                    WHERE pga.prov_code = '${prov_code}'
+                    AND pga.flag = '1'
+                )
+            )`);
+        }
+
 
         // =========================================================================
         // กรองข้อมูลตามสิทธิ์การเข้าถึง (Role Authorization)
@@ -116,6 +133,7 @@ exports.getPetrolGroupInformation = async (req, res, next) => {
             ${whereClause}
             ORDER BY tbl_petrol_group.ist_dt DESC;
         `;
+
 
         let tbl_temporary = await pgConn.get(
             dbPrefix + lic_code,
@@ -260,7 +278,7 @@ exports.getPetrolGroupInformationFilter = async (req, res, next) => {
 
     return (async () => {
         let lic_code = req.header("lic_code");
-        let { ptrl_group_code, action, ptrl_group_sales_org, ptrl_group_order_type } = req.body[0] || {};
+        let { ptrl_group_code, action, ptrl_group_sales_org, ptrl_group_order_type, prov_code } = req.body[0] || {};
 
         // เช็คเฉพาะส่วนที่สำคัญ
         if (
@@ -306,6 +324,23 @@ exports.getPetrolGroupInformationFilter = async (req, res, next) => {
             conditions.push(`(
                 tbl_petrol_group.ptrl_group_order_type IN (${orderTypes})
                 OR tbl_petrol_group.ptrl_group_order_type IN (SELECT ord_type_code FROM tbl_order_type WHERE sales_order_type IN (${orderTypes}))
+            )`);
+        }
+
+        // กรองตาม prov_code ถ้ามีการส่งมา (ถ้าจังหวัดไม่ได้ผูกกับโซนเลย ให้ return ทุกโซน)
+        if (prov_code && prov_code.toString().toUpperCase() !== "ALL") {
+            conditions.push(`(
+                EXISTS (
+                    SELECT 1 FROM tbl_petrol_group_address pga 
+                    WHERE pga.ptrl_group_code = tbl_petrol_group.ptrl_group_code 
+                    AND pga.prov_code = '${prov_code}'
+                    AND pga.flag = '1'
+                )
+                OR NOT EXISTS (
+                    SELECT 1 FROM tbl_petrol_group_address pga 
+                    WHERE pga.prov_code = '${prov_code}'
+                    AND pga.flag = '1'
+                )
             )`);
         }
 
