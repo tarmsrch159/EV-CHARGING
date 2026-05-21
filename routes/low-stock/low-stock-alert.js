@@ -618,7 +618,7 @@ const sendSummaryAlertToCS = async (dbName, csData, summaryAlerts, historySet) =
     const logEntries = [];
     logInfo('Runout Alert', `ตรวจสอบการส่งสรุปให้ CS (CS Count: ${csData.length}, Alert Count: ${summaryAlerts.length})`);
     try {
-        const testEmails = 'prattananien@gmail.com, puautarm@gmail.com';
+        // const testEmails = 'prattananien@gmail.com, puautarm@gmail.com';
         // const testEmails = 'amnart_pg@dtc.co.th, puautarm@gmail.com';
         const emailToGroups = {};
 
@@ -631,7 +631,8 @@ const sendSummaryAlertToCS = async (dbName, csData, summaryAlerts, historySet) =
             const empInfo = csData.find(e => e.emp_email === email);
             const empCode = empInfo?.emp_code || null;
             const allowedGroups = emailToGroups[email];
-
+            console.log('allowedGroups', allowedGroups);
+            console.log('email', email);
             const relevantAlerts = [];
             for (const alert of summaryAlerts) {
                 if (!allowedGroups.has(alert.station.ptrl_group_code)) {
@@ -657,8 +658,9 @@ const sendSummaryAlertToCS = async (dbName, csData, summaryAlerts, historySet) =
                 const excel = await generateCSSummaryExcel(relevantAlerts);
                 const attachments = excel ? [{ filename: `AOS_Order_Recommendation_Runout_${moment().format('YYYYMMDD')}.xlsx`, content: excel }] : [];
 
-                await mailer.sendMail(testEmails, subject, html, attachments);
-                logInfo('Runout Alert', `ส่งสรุปของ (${email}) ไปที่ -> ${testEmails}`);
+                await mailer.sendMail(email, subject, html, attachments);
+                // await mailer.sendMail(testEmails, subject, html, attachments);
+                logInfo('Runout Alert', `ส่งสรุปของ (${email}) ไปที่ -> ${email}`);
 
                 // บันทึกประวัติ
                 const empName = empInfo?.emp_name || 'ไม่ทราบชื่อ';
@@ -675,7 +677,7 @@ const sendSummaryAlertToCS = async (dbName, csData, summaryAlerts, historySet) =
                         'ชื่อพนักงาน': empName,
                         'ตำแหน่ง': empRoleDesc,
                         'อีเมลเดิม (Original)': email,
-                        'ส่งจริงไปที่ (Intercepted)': testEmails
+                        // 'ส่งจริงไปที่ (Intercepted)': testEmails
                     });
                 }
             }
@@ -704,7 +706,7 @@ async function sendAlertToRecipients(dbName, station, lowStockProducts) {
         LEFT JOIN tbl_employee_role r ON e.emp_role_code = r.emp_role_code
         WHERE a.ptrl_code = $1 
               AND a.alert_status = '1' AND a.rm_dt IS NULL
-              AND a.email_alert IN ('amnart_pg@dtc.co.th', 'puautarm@gmail.com')
+            
         `, [station.ptrl_code], config.connectionString());
 
     if (!alertConfigs.data?.length) return logEntries;
@@ -859,7 +861,7 @@ exports.processLowStockAlerts = async (lic_code, filter_sales_org = null, filter
             LEFT JOIN tbl_petrol_group pg ON epg.ptrl_group_code = pg.ptrl_group_code
             WHERE e.emp_flag = '1' 
               AND epg.emp_pgrp_flag = '1'
-              AND e.emp_email IN ('amnart_pg@dtc.co.th', 'puautarm@gmail.com')
+              AND e.emp_email IS NOT NULL AND e.emp_email != ''
         `, config.connectionString());
 
         const csData = csDataQuery.data || [];
@@ -883,7 +885,7 @@ exports.processLowStockAlerts = async (lic_code, filter_sales_org = null, filter
 
         // 4. เริ่มประมวลผลรายปั๊ม... (จำกัดแค่ 2 ปั๊มแรกเพื่อทดสอบ ป้องกัน Mail Spam)
         // for (const station of activeStations.data) {
-        for (const station of activeStations.data.slice(0, 2)) {
+        for (const station of activeStations.data) {
             logInfo('Runout Alert', `ประมวลผลปั๊ม: ${station.ptrl_desc} (${station.ptrl_number}) [Org: ${station.sales_org_code} | Type: ${station.sales_order_type}]`);
             const coverageLimit = parseFloat(station.coverage_days) || 3;
 
