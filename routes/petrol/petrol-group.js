@@ -77,8 +77,10 @@ exports.getPetrolGroupInformation = async (req, res, next) => {
                 )
                 OR NOT EXISTS (
                     SELECT 1 FROM tbl_petrol_group_address pga 
+                    JOIN tbl_petrol_group tpg ON pga.ptrl_group_code = tpg.ptrl_group_code
                     WHERE pga.prov_code = '${prov_code}'
                     AND pga.flag = '1'
+                    AND tpg.ptrl_group_flag = '1'
                 )
             )`);
         }
@@ -338,8 +340,10 @@ exports.getPetrolGroupInformationFilter = async (req, res, next) => {
                 )
                 OR NOT EXISTS (
                     SELECT 1 FROM tbl_petrol_group_address pga 
+                    JOIN tbl_petrol_group tpg ON pga.ptrl_group_code = tpg.ptrl_group_code
                     WHERE pga.prov_code = '${prov_code}'
                     AND pga.flag = '1'
+                    AND tpg.ptrl_group_flag = '1'
                 )
             )`);
         }
