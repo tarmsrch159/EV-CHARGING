@@ -2683,9 +2683,11 @@ exports.getOrderInformationHana = async (req, res, next) => {
               );
               current_order_status = 9;
             }
-
+            let DoCreate = salesOrder.OverallDeliveryStatus;
             let rejection = salesOrder.OverallSDDocumentRejectionSts;
             if (rejection === "C") current_order_status = 2;
+            if (DoCreate === "C") current_order_status = 10;
+
 
             // ================ อัพเดต tbl_order ==================
             // Lookup internal code for order_type (SAP code -> Internal code)
