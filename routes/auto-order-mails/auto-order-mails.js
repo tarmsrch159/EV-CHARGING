@@ -994,7 +994,7 @@ const runAutoOrderToSapTask = async (lic_code = 'aos01') => {
             config.connectionString()
         );
 
-        console.log(result)
+
 
         if (result.code || !result.data || result.data.length === 0) {
             logInfo('Auto Order SAP Background', 'ไม่พบรายการออเดอร์อัตโนมัติที่ค้างส่งในรอบนี้');
