@@ -989,7 +989,7 @@ const runAutoOrderToSapTask = async (lic_code = 'aos01') => {
         `;
 
         const result = await pgConn.get(
-            dbPrefix + lic_code,
+            dbPrefix + 'aos01',
             checkAutoOrderScript,
             config.connectionString()
         );
@@ -1006,14 +1006,14 @@ const runAutoOrderToSapTask = async (lic_code = 'aos01') => {
 
         for (const order of result.data) {
             // logInfo('Auto Order SAP Background', `กำลังส่งออเดอร์ ID: ${order.order_id} ของสถานี: ${order.ptrl_desc}`);
-            console.log(`Auto Order SAP Background [${lic_code}] กำลังส่งออเดอร์ ID: ${order.order_id} ของสถานี: ${order.ptrl_desc}`)
+            console.log(`Auto Order SAP Background [aos01] กำลังส่งออเดอร์ ID: ${order.order_id} ของสถานี: ${order.ptrl_desc}`)
             const targetOrderId = String(order.order_id);
-            const sapResult = await getConfirmOrder(lic_code, targetOrderId, 'auto');
+            const sapResult = await getConfirmOrder('aos01', targetOrderId, 'auto');
 
             // เช็คสถานะการส่งเพื่อเก็บ Log เบื้องต้น
             if (sapResult && sapResult[0] && sapResult[0].status === 'success') {
                 // logInfo('Auto Order SAP Background', `   ✔️ ส่งออเดอร์ ID: ${order.order_id} เข้า SAP สำเร็จ`);
-                console.log(`Auto Order SAP Background [${lic_code}] ส่งออเดอร์ ID: ${order.order_id} ของสถานี: ${order.ptrl_desc} สำเร็จ`)
+                console.log(`Auto Order SAP Background [aos01] ส่งออเดอร์ ID: ${order.order_id} ของสถานี: ${order.ptrl_desc} สำเร็จ`)
             } else {
                 // logError('Auto Order SAP Background', `   ❌ ส่งออเดอร์ ID: ${order.order_id} ล้มเหลว: ${sapResult[0]?.message || 'Unknown Error'}`);
                 console.log(`Auto Order SAP Background [aos01] ส่งออเดอร์ ID: ${order.order_id} ของสถานี: ${order.ptrl_desc} ล้มเหลว`)
@@ -1027,6 +1027,67 @@ const runAutoOrderToSapTask = async (lic_code = 'aos01') => {
         return { success: false };
     }
 };
+
+/**
+ * ฟังก์ชันหลักสำหรับ Background Process ดึงออเดอร์ที่เข้าเงื่อนไขส่งเข้า SAP [AOS01 AND AOS02]
+ */
+// const runAutoOrderToSapTask = async (lic_code = 'aos01') => {
+//     currentLicCode = lic_code;
+//     logInfo('Auto Order SAP Background', `เริ่มตรวจสอบรายการ Auto Order ประจำรอบเวลา ${moment().format('HH:mm:ss')}`);
+
+//     try {
+//         // ใช้ SQL ตัวอย่างของคุณมาปรับเงื่อนไขดักจับเฉพาะตัวที่ 'ยังไม่ได้ส่ง' 
+//         // โดยเช็คสถานะ order_status = '0' และยังมีสิทธิ์ใช้งานอยู่ (order_flag = '1' และ rm_dt IS NULL)
+//         const checkAutoOrderScript = `
+//             SELECT o.id AS order_id, o.order_no, o.ship_to, p.ptrl_desc, o.auto_order AS o_auto, p.auto_order AS p_auto  
+//             FROM tbl_order o 
+//             LEFT JOIN tbl_petrol p ON o.ship_to = p.ptrl_number 
+//             WHERE o.auto_order = '1' 
+//               AND p.auto_order = 1 
+//               AND o.order_status = '0'   
+//               AND o.order_flag = '1'     
+//               AND o.rm_dt IS NULL        
+//         `;
+
+//         const result = await pgConn.get(
+//             dbPrefix + lic_code,
+//             checkAutoOrderScript,
+//             config.connectionString()
+//         );
+
+
+
+//         if (result.code || !result.data || result.data.length === 0) {
+//             logInfo('Auto Order SAP Background', 'ไม่พบรายการออเดอร์อัตโนมัติที่ค้างส่งในรอบนี้');
+//             return { success: true };
+//         }
+
+//         // logInfo('Auto Order SAP Background', `พบออเดอร์ระบบอัตโนมัติค้างส่งจำนวน ${result.data.length} รายการ`);
+//         console.log(`Auto Order SAP Background [aos01] พบออเดอร์ระบบอัตโนมัติจำนวน ${result.data.length} รายการ`)
+
+//         for (const order of result.data) {
+//             // logInfo('Auto Order SAP Background', `กำลังส่งออเดอร์ ID: ${order.order_id} ของสถานี: ${order.ptrl_desc}`);
+//             console.log(`Auto Order SAP Background [${lic_code}] กำลังส่งออเดอร์ ID: ${order.order_id} ของสถานี: ${order.ptrl_desc}`)
+//             const targetOrderId = String(order.order_id);
+//             const sapResult = await getConfirmOrder(lic_code, targetOrderId, 'auto');
+
+//             // เช็คสถานะการส่งเพื่อเก็บ Log เบื้องต้น
+//             if (sapResult && sapResult[0] && sapResult[0].status === 'success') {
+//                 // logInfo('Auto Order SAP Background', `   ✔️ ส่งออเดอร์ ID: ${order.order_id} เข้า SAP สำเร็จ`);
+//                 console.log(`Auto Order SAP Background [${lic_code}] ส่งออเดอร์ ID: ${order.order_id} ของสถานี: ${order.ptrl_desc} สำเร็จ`)
+//             } else {
+//                 // logError('Auto Order SAP Background', `   ❌ ส่งออเดอร์ ID: ${order.order_id} ล้มเหลว: ${sapResult[0]?.message || 'Unknown Error'}`);
+//                 console.log(`Auto Order SAP Background [aos01] ส่งออเดอร์ ID: ${order.order_id} ของสถานี: ${order.ptrl_desc} ล้มเหลว`)
+//             }
+//         }
+
+//         return { success: true };
+
+//     } catch (error) {
+//         logError('Auto Order SAP Background', 'เกิดข้อผิดพลาดในการทำงานของ Task Auto Order To SAP', error);
+//         return { success: false };
+//     }
+// };
 
 
 exports.runAutoOrderToSapTask = runAutoOrderToSapTask;
