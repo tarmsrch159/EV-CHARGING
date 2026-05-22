@@ -9,4 +9,6 @@ router.post('/decrypt-token', controller.decryptToken);
 // ============== Auto Order Cleanup ==============
 router.patch('/auto-order/cleanup/test', controller.updateAutoOrderFlag);
 
+// ============== Auto Order Send To SAP ==============
+router.post('/run/auto-order-to-sap', controller.runAutoOrderToSapTask);
 module.exports = router;

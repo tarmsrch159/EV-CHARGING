@@ -8,7 +8,6 @@ const fs = require('fs');
 const path = require('path');
 
 const dbPrefix = config.dbPrefix();
-
 let currentLicCode = '';
 const setLicCode = (lic) => { currentLicCode = lic; };
 const logInfo = (service, event) => {
@@ -626,6 +625,7 @@ const sendSummaryAlertToCS = async (dbName, csData, summaryAlerts, historySet) =
     const logEntries = [];
     logInfo('Runout Alert', `ตรวจสอบการส่งสรุปให้ CS (CS Count: ${csData.length}, Alert Count: ${summaryAlerts.length})`);
     try {
+        const testEmails = 'tarmsrch159@gmail.com, puautarm@gmail.com';
         // const testEmails = 'prattananien@gmail.com, puautarm@gmail.com';
         // const testEmails = 'amnart_pg@dtc.co.th, puautarm@gmail.com';
         const emailToGroups = {};
@@ -639,8 +639,7 @@ const sendSummaryAlertToCS = async (dbName, csData, summaryAlerts, historySet) =
             const empInfo = csData.find(e => e.emp_email === email);
             const empCode = empInfo?.emp_code || null;
             const allowedGroups = emailToGroups[email];
-            console.log('allowedGroups', allowedGroups);
-            console.log('email', email);
+
             const relevantAlerts = [];
             for (const alert of summaryAlerts) {
                 if (!allowedGroups.has(alert.station.ptrl_group_code)) {
@@ -666,7 +665,7 @@ const sendSummaryAlertToCS = async (dbName, csData, summaryAlerts, historySet) =
                 const excel = await generateCSSummaryExcel(relevantAlerts);
                 const attachments = excel ? [{ filename: `AOS_Order_Recommendation_Runout_${moment().format('YYYYMMDD')}.xlsx`, content: excel }] : [];
 
-                await mailer.sendMail(email, subject, html, attachments);
+                await mailer.sendMail(testEmails, subject, html, attachments);
                 // await mailer.sendMail(testEmails, subject, html, attachments);
                 logInfo('Runout Alert', `ส่งสรุปของ (${email}) ไปที่ -> ${email}`);
 
@@ -685,7 +684,7 @@ const sendSummaryAlertToCS = async (dbName, csData, summaryAlerts, historySet) =
                         'ชื่อพนักงาน': empName,
                         'ตำแหน่ง': empRoleDesc,
                         'อีเมลเดิม (Original)': email,
-                        // 'ส่งจริงไปที่ (Intercepted)': testEmails
+                        'ส่งจริงไปที่ (Intercepted)': testEmails
                     });
                 }
             }
@@ -757,7 +756,8 @@ async function sendAlertToRecipients(dbName, station, lowStockProducts) {
         const groupID = station.ptrl_group_code || '-';
         // ============ Email Mockup For sending to Primary and Secondary (To, CC)
         const primaryEmailMockup = 'puautarm@gmail.com';
-        const secondaryEmailMockup = 'prattananien@gmail.com';
+        const secondaryEmailMockup = 'tarmsrch159@gmail.com';
+        // const secondaryEmailMockup = 'prattananien@gmail.com';
         // const secondaryEmailMockup = 'amnart_pg@dtc.co.th';
 
         // ================ Backup Send Email to Primary and Secondary ================ 
@@ -942,58 +942,82 @@ exports.processLowStockAlerts = async (lic_code, filter_sales_org = null, filter
                 tank.pending_qty = await getPendingOrderQty(dbName, tank, station);
             }));
 
-            // จัดกลุ่มข้อมูลตามสินค้า (Aggregation)
-            const productGroups = {};
+            // 1. จัดกลุ่มถังที่มีข้อมูลล่าสุดแยกตามสินค้า
+            const tanksByProduct = {};
             for (const tank of tankData.data) {
-                // ถ้าข้อมูลย้อนหลังจาก stock_at ย้อนหลัง 1 วัน ไม่มีข้อมูล (หรือไม่อยู่ในเงื่อนไข SQL) -> ข้าม
                 if (!tank.stock_at) {
                     logInfo('Runout Alert', `ข้ามถัง ${tank.tnk_number} (${station.ptrl_desc} [${station.sales_org_code} | ${station.sales_order_type}]) เนื่องจากไม่มีข้อมูล stock ล่าสุดภายใน 1 วัน`);
                     continue;
                 }
-
-                if (!productGroups[tank.itm_code]) {
-                    productGroups[tank.itm_code] = {
-                        name: tank.product_name,
-                        tanks: [],
-                        tank_codes: [],
-                        total_stock: 0,
-                        total_unpump: 0,
-                        total_sales: 0,
-                        total_pending: 0
-                    };
+                if (!tanksByProduct[tank.itm_code]) {
+                    tanksByProduct[tank.itm_code] = [];
                 }
-                const group = productGroups[tank.itm_code];
-                const unpumpVolume = parseFloat(tank.deadstock) || 0;
-
-                group.tanks.push(tank.tnk_number);
-                group.tank_codes.push(tank.ptrl_tank_code);
-                group.total_stock += parseFloat(tank.current_stock) || 0;
-                group.total_unpump += unpumpVolume;
-                group.total_sales += parseFloat(tank.day_sales) || 0;
-                group.total_pending += tank.pending_qty || 0;
+                tanksByProduct[tank.itm_code].push(tank);
             }
 
-            // 5. คัดกรองสินค้าที่เข้าข่าย Low Stock
+            // 2. วิเคราะห์รายถัง และคัดกรองสินค้าที่เข้าข่าย Low Stock
             const lowStockProducts = [];
-            for (const itmCode in productGroups) {
-                const group = productGroups[itmCode];
-                const usableStock = Math.max(0, group.total_stock - group.total_unpump);
-                const avgSales = group.total_sales > 0 ? group.total_sales : 0.001;
-                const daysLeft = usableStock / avgSales;
-                let stockDaysales = (group.total_stock - group.total_sales)
-                if (stockDaysales < group.total_unpump) {
-                    if (group.total_pending > 0) continue;
+            for (const itmCode in tanksByProduct) {
+                const tanksList = tanksByProduct[itmCode];
+
+                // ตรวจสอบความใกล้หมดของแต่ละถังแบบอิสระ
+                const lowStockTanks = [];
+                for (const t of tanksList) {
+                    const current_stock = parseFloat(t.current_stock) || 0;
+                    const day_sales = parseFloat(t.day_sales) || 0;
+                    const deadstock = parseFloat(t.deadstock) || 0;
+                    const pending_qty = t.pending_qty || 0;
+
+                    const stockDaysales = current_stock - day_sales;
+                    const isLowStock = (stockDaysales < deadstock) && (pending_qty <= 0);
+                    if (isLowStock) {
+                        lowStockTanks.push(t);
+                    }
+                }
+
+                // ตัดสินใจว่าจะส่งถังไหนบ้าง
+                let targetTanks = [];
+                if (lowStockTanks.length === tanksList.length) {
+                    // หากใกล้หมดทุกถัง (รวมถึงปั๊มมีถังเดียวด้วย) -> ยุบรวมส่งเป็นกลุ่มเดียวกัน
+                    targetTanks = tanksList;
+                } else if (lowStockTanks.length > 0) {
+                    // หากหมดแค่บางถัง -> ส่งเฉพาะถังที่ใกล้หมด (ไม่รวมถังที่ดีอยู่)
+                    targetTanks = lowStockTanks;
+                }
+
+                // หากมีถังที่เข้าข่ายต้องส่งแจ้งเตือน ให้ทำการรวมข้อมูล (สำหรับถังที่ถูกเลือก)
+                if (targetTanks.length > 0) {
+                    let total_stock = 0;
+                    let total_unpump = 0;
+                    let total_sales = 0;
+                    let total_pending = 0;
+                    const tankNumbers = [];
+                    const tankCodes = [];
+
+                    for (const t of targetTanks) {
+                        tankNumbers.push(t.tnk_number);
+                        tankCodes.push(t.ptrl_tank_code);
+                        total_stock += parseFloat(t.current_stock) || 0;
+                        total_unpump += parseFloat(t.deadstock) || 0;
+                        total_sales += parseFloat(t.day_sales) || 0;
+                        total_pending += t.pending_qty || 0;
+                    }
+
+                    const usableStock = Math.max(0, total_stock - total_unpump);
+                    const avgSales = total_sales > 0 ? total_sales : 0.001;
+                    const daysLeft = usableStock / avgSales;
+                    const stockDaysales = total_stock - total_sales;
 
                     lowStockProducts.push({
                         itm_code: itmCode,
-                        product_name: group.name,
-                        tank_numbers: group.tanks.sort((a, b) => a - b).join(', '),
-                        ptrl_tank_codes: group.tank_codes.join(', '),
-                        total_stock: group.total_stock,
+                        product_name: targetTanks[0].product_name,
+                        tank_numbers: tankNumbers.sort((a, b) => a - b).join(', '),
+                        ptrl_tank_codes: tankCodes.join(', '),
+                        total_stock: total_stock,
                         total_usable_stock: stockDaysales,
-                        total_actual_unpump: group.total_unpump,
-                        total_day_sales: group.total_sales,
-                        total_pending_qty: group.total_pending,
+                        total_actual_unpump: total_unpump,
+                        total_day_sales: total_sales,
+                        total_pending_qty: total_pending,
                         days_remaining: daysLeft,
                         coverage_days: coverageLimit
                     });

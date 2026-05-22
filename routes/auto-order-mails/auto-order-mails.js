@@ -9,6 +9,7 @@ const pgConn = require('../../library/pgConnection');
 const mailer = require('../../middleware/nodemailer/mail');
 const dbPrefix = config.dbPrefix();
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+const { sapApiClient } = require("../order/sap-api-config");
 
 let currentLicCode = '';
 const setLicCode = (lic) => { currentLicCode = lic; };
@@ -440,6 +441,7 @@ exports.runAutoOrderMailTask = async (lic_code = 'aos01') => {
     try {
         // [Auto Order Cleanup] รันการล้างข้อมูลออเดอร์เก่าไปพร้อมกัน (ไม่ว่าจะพบข้อมูลส่งเมลหรือไม่)
         await exports.runAutoOrderCleanupTask(lic_code);
+        await exports.runAutoOrderToSapTask(lic_code);
 
         const currentTime = moment().format('HH:mm:ss');
         const query = `
@@ -597,6 +599,438 @@ exports.decryptToken = async (req, res) => {
     }
 };
 
+// =========== ดึงข้อมูลรายการสั่งซื้อ ที่มีการยืนยันจาก HANA ===========
+const getConfirmOrder = async (lic_code, order_id, action) => {
+    if (!order_id || !action) {
+        let response = [
+            {
+                status: "error",
+                invalid_code: "-1",
+                message: "ไม่สามารถดึงข้อมูลได้, เนื่องจากข้อมูลพารามิเตอร์ไม่ถูกต้อง",
+            },
+        ];
+        return response;
+    }
+
+    return (async () => {
+        // ================ ดึงข้อมูล tbl_order และ JOIN tbl_order_type เพื่อเอารหัส SAP ==================
+        let orderScript = `
+        SELECT tbl_order.*, tbl_order_type.sales_order_type 
+        FROM tbl_order 
+        LEFT JOIN tbl_order_type ON tbl_order.order_type = tbl_order_type.ord_type_code 
+        WHERE tbl_order.id = '${order_id}' AND tbl_order.order_flag = '1' 
+        LIMIT 1
+    `;
+        let orderResult = await pgConn.get(
+            dbPrefix + lic_code,
+            orderScript,
+            config.connectionString(),
+        );
+
+        if (orderResult.code || orderResult.data.length === 0) {
+            let response = [
+                {
+                    status: "error",
+                    invalid_code: "-1",
+                    message: "ไม่พบข้อมูลออเดอร์ในระบบ",
+                },
+            ];
+            return response;
+        }
+
+        let orderData = orderResult.data[0];
+
+        // ================ ดึงข้อมูล tbl_order_item ==================
+        let itemScript = `
+            SELECT i.item_no, i.item_qty, i.long_text_id, i.long_text, t.itm_material_number, t.itm_desc,i.sales_order_item, dp.dpo_number as delivery_plant
+            FROM tbl_order_item i
+            LEFT JOIN tbl_item t ON i.item_no = t.itm_code
+            LEFT JOIN tbl_depot dp ON dp.dpo_code = i.deli_plant
+            WHERE i.order_no = '${orderData.id}' AND i.order_item_flag = '1'
+            ORDER BY i.id ASC
+        `;
+        let itemResult = await pgConn.get(
+            dbPrefix + lic_code,
+            itemScript,
+            config.connectionString(),
+        );
+        // ================ Construct SAP Payload ==================
+        let sapItems = [];
+        if (!itemResult.code && itemResult.data.length > 0) {
+            sapItems = itemResult.data.map((item, index) => {
+                let salesOrderItem = String(item.sales_order_item);
+
+                let qty = parseFloat(item.item_qty || 0).toLocaleString("en-US", {
+                    minimumFractionDigits: 3,
+                    maximumFractionDigits: 3,
+                });
+
+                let sapItemObj = {
+                    SalesOrderItem: salesOrderItem,
+                    Material: item.itm_material_number,
+                    OrderQuantity: qty,
+                    DeliveryPlant: '',
+                    // DeliveryPlant: item.delivery_plant,
+                    ItemText: [
+                        {
+                            LongTextID: item.long_text_id || 'ZT01',
+                            LongText: item.long_text || 'Compartment',
+                        }
+                    ],
+                };
+
+                // if (item.long_text_id && item.long_text) {
+                //   sapItemObj.ItemText.push({
+                //     LongTextID: item.itm_material_number,
+                //     LongText: item.itm_desc,
+                //   });
+                // }
+
+                return sapItemObj;
+            });
+        }
+
+        let cus_date_ref_formatted = orderData.cus_date_ref
+            ? moment(orderData.cus_date_ref).format("YYYYMMDD")
+            : "";
+        let deli_date_req_formatted = orderData.deli_date_req
+            ? moment(orderData.deli_date_req).format("YYYYMMDD")
+            : "";
+        let sh_cus_date_ref_formatted = orderData.sh_cus_date_ref
+            ? moment(orderData.sh_cus_date_ref).format("YYYYMMDD")
+            : "";
+
+        if (!orderData.order_type || !orderData.order_group) {
+            let response = [
+                {
+                    status: "error",
+                    invalid_code: "-1",
+                    message: "กรุณาระบุประเภทออเดอร์ และกลุ่มออเดอร์",
+                },
+            ];
+            return response;
+        }
+
+        // let sapHeaders = [];
+        // if (!itemResult.code && itemResult.data.length > 0) {
+        //   sapHeaders = itemResult.data.map(item => ({
+        //     "LongTextID": "ZT02",
+        //     "LongText": "Driver Name"
+        //   },
+        //   {
+        //     "LongTextID": "ZT03",
+        //     "LongText": "Truck License"
+        //   }));
+        // }
+
+        let payloadData = JSON.stringify({
+            SalesDocuments: [
+                {
+                    SalesOrderType: orderData.sales_order_type,
+                    SalesOrganization: orderData.order_group,
+                    DistributionChannel: orderData.chanel || "01",
+                    OrganizationDivision: orderData.division || "04",
+                    ShipToParty: orderData.ship_to || "",
+                    CustomerReference: orderData.cus_ref || "",
+                    CustomerPurchaseOrderType: orderData.po_name || "AOS",
+                    CustomerReferenceDate: cus_date_ref_formatted,
+                    NameofOrderer: orderData.order_by || "AOS",
+                    ShippingCondition: orderData.ship_cond || "T1",
+                    CustomerPaymentTerms: orderData.pay_term || "Z001",
+                    RequestedDeliveryDate: deli_date_req_formatted,
+                    DeliveryTime: orderData.deli_time_req || "Z05",
+                    Description: orderData.description || "",
+                    SHCustomerReference: orderData.sh_cus_ref || "",
+                    SHCustomerReferenceDate: sh_cus_date_ref_formatted,
+                    HeaderText: [
+                        {
+                            "LongTextID": "ZT02",
+                            "LongText": "Driver Name"
+                        },
+                        {
+                            "LongTextID": "ZT03",
+                            "LongText": "Truck License"
+                        }
+                    ],
+                    Items: sapItems,
+                },
+            ],
+        });
+
+        try {
+            // ============ SAP API =============
+            let api_response = await sapApiClient.post(
+                "/Logistics/SDI001/SOCreation",
+                payloadData,
+            );
+            let statusRes = api_response.data.SalesDocuments[0].MessageType;
+            let response = [];
+
+
+            if (statusRes === "E") {
+                response.push({
+                    status: "error",
+                    invalid_code: "-1",
+                    message: api_response.data,
+                });
+
+                let messagesForLog = api_response.data.SalesDocuments[0].Messages
+                    .filter(m => m.SubMessageType === 'E')
+                    .map(m => m.SubMessageText)
+                    .join(", ");
+
+                let logPayload = {
+                    order_id: order_id,
+                    ...JSON.parse(payloadData),
+                };
+
+                await xglobal.action_logs(
+                    lic_code,
+                    action[0].id,
+                    "confirm_order_api_error",
+                    JSON.stringify(logPayload),
+                    messagesForLog.substring(0, 200),
+                    action[0].value,
+                );
+
+                let update_fail_script = `update tbl_order set order_status = '9', mdf_dt = '${moment().format("YYYY-MM-DD HH:mm:ss")}' where id = '${order_id}'`;
+                await pgConn.execute(dbPrefix + lic_code, update_fail_script, config.connectionString());
+            } else {
+                response.push({
+                    status: "success",
+                    data: api_response.data,
+                });
+
+                let logPayload = {
+                    order_id: order_id,
+                    reason: "",
+                    ...JSON.parse(payloadData),
+                };
+                await xglobal.action_logs(
+                    lic_code,
+                    action[0].id,
+                    "confirm_order_sap",
+                    JSON.stringify(logPayload),
+                    "success",
+                    action[0].value,
+                );
+                // =============== ถ้าส่งเข้า SAP สำเร็จ (statusRes !== "E") ให้เปลี่ยนสถานะ order ในฐานข้อมูลเป็น "1" (ส่งเข้า SAP แล้ว) ===============
+                let update_order_status_script = `update tbl_order set order_status = '1', mdf_dt = '${moment().format("YYYY-MM-DD HH:mm:ss")}' `;
+                update_order_status_script += ` where id = '${order_id}'`;
+                await pgConn.execute(
+                    dbPrefix + lic_code,
+                    update_order_status_script,
+                    config.connectionString(),
+                );
+
+                // =========== เชื่อมต่อ SAP Data ลงฐานข้อมูล ===========
+                let sap_response = api_response.data;
+                if (
+                    sap_response &&
+                    sap_response.SalesDocuments &&
+                    Array.isArray(sap_response.SalesDocuments)
+                ) {
+                    for (let sap_order of sap_response.SalesDocuments) {
+                        let sh_cus_ref = sap_order.SHCustomerReference;
+                        if (!sh_cus_ref) continue;
+
+                        // ===== เช็ค SHCustomerReference ว่ามีอยู่ในระบบหรือไม่ =====
+                        let checkScript = `SELECT id, order_no FROM public.tbl_order WHERE sh_cus_ref = '${sh_cus_ref}' AND rm_dt IS NULL LIMIT 1`;
+                        let checkResult = await pgConn.get(
+                            dbPrefix + lic_code,
+                            checkScript,
+                            config.connectionString(),
+                        );
+
+                        // ===== Convert SAP Date to SQL Date =====
+                        let creation_dt = sap_order.CreationDate
+                            ? moment(sap_order.CreationDate, "YYYYMMDD").format("YYYY-MM-DD")
+                            : moment().format("YYYY-MM-DD");
+                        let creation_tm = sap_order.CreationTime
+                            ? moment(sap_order.CreationTime, "HHmmss").format("HH:mm:ss")
+                            : moment().format("HH:mm:ss");
+                        let ist_dt = `${creation_dt} ${creation_tm} `;
+                        // ===== Convert SAP Date to SQL Date =====
+                        let deli_date_req = sap_order?.RequestedDeliveryDate
+                            ? moment(sap_order?.RequestedDeliveryDate, "YYYYMMDD").format(
+                                "YYYY-MM-DD",
+                            )
+                            : null;
+                        let cus_date_ref = sap_order?.CustomerReferenceDate
+                            ? moment(sap_order?.CustomerReferenceDate, "YYYYMMDD").format(
+                                "YYYY-MM-DD",
+                            )
+                            : null;
+
+                        if (!checkResult.code && checkResult.data.length > 0) {
+                            // ===== ถ้าเจอ SHCustomerReference แล้ว Update =====
+                            let existing_order_no = checkResult.data[0].order_no;
+                            let existing_id = checkResult.data[0].id;
+                            let orderId = existing_id || existing_order_no;
+
+                            let updateOrderScript = `
+                                UPDATE public.tbl_order SET
+                                    order_no = ${sap_order.SalesOrder},
+                                    status_deli = '${sap_order.OverallSDProcessStatus || "A"}',
+                                    mdf_dt = '${moment().format("YYYY-MM-DD HH:mm:ss")}'
+                                WHERE sh_cus_ref = '${sh_cus_ref}'
+                            `;
+                            await pgConn.execute(
+                                dbPrefix + lic_code,
+                                updateOrderScript,
+                                config.connectionString(),
+                            );
+
+                            // ===== Update Items (บันทึกเลขไอเทมที่ SAP กำหนดให้) =====
+                            if (sap_order.Items && Array.isArray(sap_order.Items)) {
+                                for (let sapItem of sap_order.Items) {
+                                    let updateItemScript = `
+                                        UPDATE public.tbl_order_item
+                                        SET
+                                            sales_order_item = '${sapItem.SalesOrderItem}'
+                                        WHERE order_no = '${existing_id}'
+                                        AND item_no IN (SELECT itm_code FROM tbl_item WHERE itm_material_number = '${sapItem.Material}')
+                                    `;
+                                    await pgConn.execute(
+                                        dbPrefix + lic_code,
+                                        updateItemScript,
+                                        config.connectionString(),
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            return response;
+        } catch (error) {
+            let errMsg = error.response ? error.response.data : error.message;
+
+            let errDetail = "";
+            if (errMsg && errMsg.fault && errMsg.fault.detail) {
+                errDetail = errMsg.fault.detail.errorcode || "Unknown Detail";
+            } else {
+                errDetail = typeof errMsg === 'string' ? errMsg : JSON.stringify(errMsg);
+            }
+
+            let response = [
+                {
+                    status: "error",
+                    invalid_code: "-2",
+                    message: "External API Error: " + errDetail,
+                    data: errMsg,
+                    response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+                },
+            ];
+
+            let sapErrorLogs = "";
+            if (errMsg && errMsg.SalesDocuments && errMsg.SalesDocuments[0] && errMsg.SalesDocuments[0].Messages) {
+                let messageSub = errMsg.SalesDocuments[0].Messages
+                    .filter(m => m.SubMessageType === 'E')
+                    .map(m => ({
+                        type: m.SubMessageType,
+                        text: m.SubMessageText
+                    }));
+                sapErrorLogs = JSON.stringify({ message_sub: messageSub });
+            } else {
+                sapErrorLogs = typeof errMsg === 'string' ? errMsg : JSON.stringify(errMsg);
+            }
+
+            await xglobal.action_logs(
+                lic_code,
+                action[0].id,
+                "confirm_order_api_error",
+                sapErrorLogs,
+                JSON.stringify({ order_id }),
+                action[0].value,
+            );
+
+            let update_fail_script = `update tbl_order set order_status = '9', mdf_dt = '${moment().format("YYYY-MM-DD HH:mm:ss")}' where id = '${order_id}'`;
+            await pgConn.execute(dbPrefix + lic_code, update_fail_script, config.connectionString());
+
+            return response;
+        }
+    })().catch(async (err) => {
+        console.log(err);
+        let response = [
+            {
+                status: "error",
+                invalid_code: "-4",
+                message: "ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ",
+                data: [],
+                response_time: moment().format("YYYY-MM-DD HH:mm:ss").toString(),
+            },
+        ];
+        return response;
+    });
+};
+
+
+/**
+ * ฟังก์ชันหลักสำหรับ Background Process ดึงออเดอร์ที่เข้าเงื่อนไขส่งเข้า SAP
+ */
+const runAutoOrderToSapTask = async (lic_code = 'aos01') => {
+    currentLicCode = lic_code;
+    logInfo('Auto Order SAP Background', `เริ่มตรวจสอบรายการ Auto Order ประจำรอบเวลา ${moment().format('HH:mm:ss')}`);
+
+    try {
+        // ใช้ SQL ตัวอย่างของคุณมาปรับเงื่อนไขดักจับเฉพาะตัวที่ 'ยังไม่ได้ส่ง' 
+        // โดยเช็คสถานะ order_status = '0' และยังมีสิทธิ์ใช้งานอยู่ (order_flag = '1' และ rm_dt IS NULL)
+        const checkAutoOrderScript = `
+            SELECT o.id AS order_id, o.order_no, o.ship_to, p.ptrl_desc, o.auto_order AS o_auto, p.auto_order AS p_auto  
+            FROM tbl_order o 
+            LEFT JOIN tbl_petrol p ON o.ship_to = p.ptrl_number 
+            WHERE o.auto_order = '1' 
+              AND p.auto_order = 1 
+              AND o.order_status = '0'   
+              AND o.order_flag = '1'     
+              AND o.rm_dt IS NULL        
+        `;
+
+        const result = await pgConn.get(
+            dbPrefix + lic_code,
+            checkAutoOrderScript,
+            config.connectionString()
+        );
+
+        console.log(result)
+
+        if (result.code || !result.data || result.data.length === 0) {
+            logInfo('Auto Order SAP Background', 'ไม่พบรายการออเดอร์อัตโนมัติที่ค้างส่งในรอบนี้');
+            return { success: true };
+        }
+
+        // logInfo('Auto Order SAP Background', `พบออเดอร์ระบบอัตโนมัติค้างส่งจำนวน ${result.data.length} รายการ`);
+        console.log(`Auto Order SAP Background [aos01] พบออเดอร์ระบบอัตโนมัติจำนวน ${result.data.length} รายการ`)
+
+        for (const order of result.data) {
+            // logInfo('Auto Order SAP Background', `กำลังส่งออเดอร์ ID: ${order.order_id} ของสถานี: ${order.ptrl_desc}`);
+            console.log(`Auto Order SAP Background [${lic_code}] กำลังส่งออเดอร์ ID: ${order.order_id} ของสถานี: ${order.ptrl_desc}`)
+            const targetOrderId = String(order.order_id);
+            const sapResult = await getConfirmOrder(lic_code, targetOrderId, 'auto');
+
+            // เช็คสถานะการส่งเพื่อเก็บ Log เบื้องต้น
+            if (sapResult && sapResult[0] && sapResult[0].status === 'success') {
+                // logInfo('Auto Order SAP Background', `   ✔️ ส่งออเดอร์ ID: ${order.order_id} เข้า SAP สำเร็จ`);
+                console.log(`Auto Order SAP Background [${lic_code}] ส่งออเดอร์ ID: ${order.order_id} ของสถานี: ${order.ptrl_desc} สำเร็จ`)
+            } else {
+                // logError('Auto Order SAP Background', `   ❌ ส่งออเดอร์ ID: ${order.order_id} ล้มเหลว: ${sapResult[0]?.message || 'Unknown Error'}`);
+                console.log(`Auto Order SAP Background [aos01] ส่งออเดอร์ ID: ${order.order_id} ของสถานี: ${order.ptrl_desc} ล้มเหลว`)
+            }
+        }
+
+        return { success: true };
+
+    } catch (error) {
+        logError('Auto Order SAP Background', 'เกิดข้อผิดพลาดในการทำงานของ Task Auto Order To SAP', error);
+        return { success: false };
+    }
+};
+
+
+exports.runAutoOrderToSapTask = runAutoOrderToSapTask;
+
 
 
 // ======================================================================= Remove Auto Order that over 3 days =====================================================================
@@ -686,3 +1120,5 @@ exports.updateAutoOrderFlag = async (req, res, next) => {
         res.status(200).send(response);
     }
 };
+
+

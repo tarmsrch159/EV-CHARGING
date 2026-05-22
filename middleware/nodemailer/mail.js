@@ -21,8 +21,8 @@ const MAIL_CONFIGS = {
     port: 587,
     secure: false,
     auth: {
-      user: "mrxon2486@gmail.com",
-      pass: "sdbtxvlriokbbjxw"
+      user: "tarmsrch159@gmail.com",
+      pass: "rktnhwltpbsupyht"
     },
     from: '"AOS System (SIT)" <noreply@bangchak.co.th>'
   }
