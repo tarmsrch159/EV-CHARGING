@@ -399,7 +399,7 @@ exports.getPetrolGroupInformationFilter = async (req, res, next) => {
             ORDER BY tbl_petrol_group.ist_dt DESC;
         `;
 
-        console.log("DEBUG SCRIPT:", script);
+
 
         let tbl_temporary = await pgConn.get(
             dbPrefix + lic_code,
