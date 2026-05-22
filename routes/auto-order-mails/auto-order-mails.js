@@ -10,8 +10,16 @@ const mailer = require('../../middleware/nodemailer/mail');
 const dbPrefix = config.dbPrefix();
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-const logInfo = xglobal.logInfo;
-const logError = xglobal.logError;
+let currentLicCode = '';
+const setLicCode = (lic) => { currentLicCode = lic; };
+const logInfo = (service, event) => {
+    const prefix = currentLicCode ? `[${currentLicCode}] ` : '';
+    xglobal.logInfo(service, prefix + event);
+};
+const logError = (service, event, err) => {
+    const prefix = currentLicCode ? `[${currentLicCode}] ` : '';
+    xglobal.logError(service, prefix + event, err);
+};
 
 // =========================================================
 //  Helpers: AES-256-CBC Encryption & Decryption
@@ -369,6 +377,7 @@ const sendAutoOrderEmail = async (stationData) => {
  * ดึงข้อมูลปั๊มที่มีการคำนวณ Auto Order เพื่อเอาไปใช้หารายการสั่งซื้อ
  */
 const processAutoOrderMails = async (lic_code) => {
+    setLicCode(lic_code);
     logInfo('Auto Order Mail', `เริ่มประมวลผล: ${moment().format('YYYY-MM-DD HH:mm:ss')}`);
     try {
         const query = `
@@ -424,13 +433,13 @@ exports.getAutoOrderMailData = async (req, res) => {
 /**
  * Background Process
  */
-exports.runAutoOrderMailTask = async () => {
-    const lic_code = 'aos01';
-    logInfo('Auto Order Mail', 'เริ่ม Background Task...');
+exports.runAutoOrderMailTask = async (lic_code = 'aos01') => {
+    setLicCode(lic_code);
+    logInfo('Auto Order Mail', `เริ่ม Background Task สำหรับ ${lic_code}...`);
 
     try {
         // [Auto Order Cleanup] รันการล้างข้อมูลออเดอร์เก่าไปพร้อมกัน (ไม่ว่าจะพบข้อมูลส่งเมลหรือไม่)
-        await exports.runAutoOrderCleanupTask();
+        await exports.runAutoOrderCleanupTask(lic_code);
 
         const currentTime = moment().format('HH:mm:ss');
         const query = `
@@ -593,9 +602,9 @@ exports.decryptToken = async (req, res) => {
 // ======================================================================= Remove Auto Order that over 3 days =====================================================================
 
 // Task สำหรับลบ Auto Order ที่ค้างเกิน 3 วัน (รันพร้อมกับรอบส่งเมล)
-exports.runAutoOrderCleanupTask = async () => {
+exports.runAutoOrderCleanupTask = async (lic_code = 'aos01') => {
+    setLicCode(lic_code);
     try {
-        const lic_code = "aos01";
         const dbName = dbPrefix + lic_code;
 
         // วันที่ย้อนหลัง 3 วัน (นับจากวันนี้)
@@ -630,6 +639,7 @@ exports.runAutoOrderCleanupTask = async () => {
 // =========== API สำหรับ Test การอัปเดต Flag Auto Order ===========
 exports.updateAutoOrderFlag = async (req, res, next) => {
     let lic_code = req.header("lic_code");
+    setLicCode(lic_code);
     let dbName = dbPrefix + lic_code;
 
     try {

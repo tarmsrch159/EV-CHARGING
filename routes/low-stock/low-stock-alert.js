@@ -9,8 +9,16 @@ const path = require('path');
 
 const dbPrefix = config.dbPrefix();
 
-const logInfo = xglobal.logInfo;
-const logError = xglobal.logError;
+let currentLicCode = '';
+const setLicCode = (lic) => { currentLicCode = lic; };
+const logInfo = (service, event) => {
+    const prefix = currentLicCode ? `[${currentLicCode}] ` : '';
+    xglobal.logInfo(service, prefix + event);
+};
+const logError = (service, event, err) => {
+    const prefix = currentLicCode ? `[${currentLicCode}] ` : '';
+    xglobal.logError(service, prefix + event, err);
+};
 
 // ==========================================================================
 // 1. TEMPLATE GENERATORS (Email & Excel)
@@ -809,6 +817,7 @@ async function sendAlertToRecipients(dbName, station, lowStockProducts) {
  */
 exports.processLowStockAlerts = async (lic_code, filter_sales_org = null, filter_order_type = null) => {
     if (!lic_code) return;
+    setLicCode(lic_code);
     const dbName = dbPrefix + lic_code;
     try {
         const currentTime = moment();

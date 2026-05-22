@@ -16,15 +16,13 @@ const logError = xglobal.logError;
  */
 const executeLoop = async () => {
     try {
-        const lic_code = "aos01";
-        const dbName = config.dbPrefix() + lic_code;
-        const currentTime = moment();
-        const currentHHmm = currentTime.format('HH:mm');
-
         logInfo('Runout Alert', 'เริ่มต้นรอบการทำงาน...');
 
-        // เรียกประมวลผลแบบรวม (Controller จะเช็คเวลา Cut-off <= ปัจจุบันให้เอง)
-        await lowStockAlertController.processLowStockAlerts(lic_code);
+        const licCodes = ['aos01', 'aos02'];
+        for (const lic_code of licCodes) {
+            logInfo('Runout Alert', `[${lic_code}] กำลังตรวจสอบ...`);
+            await lowStockAlertController.processLowStockAlerts(lic_code);
+        }
 
     } catch (error) {
         logError('Runout Alert', 'Run Out Service Error (executeLoop)', error);

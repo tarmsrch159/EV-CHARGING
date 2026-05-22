@@ -46,8 +46,8 @@ const executeLoop = async (startTimeStr, endTimeStr, pauseMinutes) => {
             const timeCtx = checkInTimeWindow(startTimeStr, endTimeStr);
             // ======== เริ่มทำงานของรอบวัน ============
             if (timeCtx.isInWindow) {
-                logInfo('Auto Order Mail', 'อยู่ในช่วงเวลาทำงาน | เริ่มประมวลผล...');
-                await autoOrderMailsController.runAutoOrderMailTask();
+                await autoOrderMailsController.runAutoOrderMailTask('aos01');
+                await autoOrderMailsController.runAutoOrderMailTask('aos02');
 
                 const finishTime = moment();
                 const currentWindow = checkInTimeWindow(startTimeStr, endTimeStr);
@@ -108,8 +108,8 @@ exports.startAutoOrderMailLoopTest = async () => {
     console.log(`====================================================================\x1b[0m`);
     while (true) {
         try {
-            logInfo('Auto Order Mail', '[TEST] เริ่มประมวลผล...');
-            await autoOrderMailsController.runAutoOrderMailTask();
+            await autoOrderMailsController.runAutoOrderMailTask('aos01');
+            await autoOrderMailsController.runAutoOrderMailTask('aos02');
             logInfo('Auto Order Mail', '[TEST] พัก 10 วินาที...');
             await sleep(10000);
         } catch (err) {
