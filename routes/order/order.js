@@ -1391,6 +1391,7 @@ exports.getLoggingOrderInformation = async (req, res, next) => {
 
     page_index = page_index == undefined ? 1 : page_index;
     page_limit = page_limit == undefined ? 10 : page_limit;
+    
 
     // =========================================================
     //          ตรวจสอบความถูกต้องของพารามิเตอร์เบื้องต้น
@@ -1525,7 +1526,7 @@ exports.getLoggingOrderInformation = async (req, res, next) => {
             ${whereClause}
             ORDER BY tbl_action_logs.ist_dt DESC 
             OFFSET (${page_index}*${page_limit}) LIMIT ${page_limit};`;
-    console.log(script)
+  
     let mainLogResult = await pgConn.get(
       dbPrefix + lic_code,
       script,
@@ -3447,7 +3448,7 @@ exports.cancelOrderInformationHana = async (req, res, next) => {
     let payloadData = [];
     for (let id of order_id) {
       var script_check_sales_order = `
-                SELECT ti.sales_order_item, tod.order_no, tod.order_status
+                SELECT ti.sales_order_item, tod.order_no, tod.id as order_id,tod.order_status
                 FROM tbl_order_item ti
                 INNER JOIN tbl_order tod ON ti.order_no = tod.id
                 WHERE tod.id = ${id} AND tod.order_no IS NOT NULL
@@ -3492,6 +3493,7 @@ exports.cancelOrderInformationHana = async (req, res, next) => {
 
       let sapItems = [];
       let order_no = check_sales_order.data[0].order_no;
+      let order_id = check_sales_order.data[0].order_id;
       for (let item of check_sales_order.data) {
         sapItems.push({
           SalesOrderItem: item.sales_order_item,
@@ -3503,6 +3505,7 @@ exports.cancelOrderInformationHana = async (req, res, next) => {
         SalesDocuments: [
           {
             SalesOrder: order_no,
+            order_id: order_id,
             Items: sapItems,
           },
         ],
@@ -3510,7 +3513,26 @@ exports.cancelOrderInformationHana = async (req, res, next) => {
     }
 
     const updateStatusOrder = async (payload) => {
+      console.log(payload);
       let order_no = payload.SalesDocuments[0].SalesOrder;
+      let order_id = payload.SalesDocuments[0].order_id;
+      let scriptCheckShipTo = `SELECT ship_to FROM tbl_order WHERE id = '${order_id}' LIMIT 1`;
+      let shipToResult = ''
+      let checkShipToResutl = await pgConn.get(
+        dbPrefix + lic_code,
+        scriptCheckShipTo,
+        config.connectionString(),
+      );
+
+      console.log('order_id', order_id)
+      console.log('order_no', order_no)
+      console.log('scriptCheckShipTo', scriptCheckShipTo)
+      console.log('checkShipToResutl', checkShipToResutl)
+      if (!checkShipToResutl.code && checkShipToResutl.data.length > 0) {
+        shipToResult = checkShipToResutl.data[0].ship_to;
+      }
+
+      console.log('shipto', shipToResult)
 
       try {
         // ============ SAP API =============
@@ -3548,6 +3570,14 @@ exports.cancelOrderInformationHana = async (req, res, next) => {
         ];
 
         let logPayloadSuccess = {
+          order_no,
+          order_id,
+          ship_to: shipToResult || "",
+        };
+
+        let logPayloadSuccess2 = {
+          order_no,
+          order_id,
           ...payload,
         };
         await xglobal.action_logs(
@@ -3555,6 +3585,15 @@ exports.cancelOrderInformationHana = async (req, res, next) => {
           action[0].id,
           "cancel_order_sap",
           JSON.stringify(logPayloadSuccess),
+          "success",
+          action[0].value,
+        );
+
+        await xglobal.action_logs(
+          lic_code,
+          action[0].id,
+          "cancel_order_sap_payload",
+          JSON.stringify(logPayloadSuccess2),
           "success",
           action[0].value,
         );
@@ -3589,6 +3628,7 @@ exports.cancelOrderInformationHana = async (req, res, next) => {
     let response = [];
     let status = false;
     for (let item of payloadData) {
+      console.log('Processing item:', item);
       let res = await updateStatusOrder(item);
       response.push(res);
 
