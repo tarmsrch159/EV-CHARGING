@@ -7236,7 +7236,7 @@ exports.getReportStationOverDaySales = async (req, res, next) => {
              COALESCE(tati.current_stock, tati.yester_day_stock) AS stock,
             COALESCE(sales.sale_previous, 0) AS avg_day_sales,
             CASE WHEN true THEN COALESCE(ord.total_qty, 0) ELSE 0 END AS order_qty,
-            COALESCE((COALESCE(tati.current_stock, 0) + COALESCE(ord.total_qty, 0)) / NULLIF(COALESCE(sales.sale_previous, 0), 0), 0) AS days_coverage
+            COALESCE((COALESCE(tati.current_stock, tati.yester_day_stock) + COALESCE(ord.total_qty, 0)) / NULLIF(COALESCE(sales.sale_previous, 0), 0), 0) AS days_coverage
         FROM tbl_petrol_tank tpt
         LEFT JOIN tbl_petrol_depot tpd ON tpt.ptrl_code = tpd.ptrl_code
         LEFT JOIN tbl_depot dp ON tpd.dpo_code = dp.dpo_code
