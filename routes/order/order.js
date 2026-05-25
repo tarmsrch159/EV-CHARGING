@@ -3548,7 +3548,6 @@ exports.cancelOrderInformationHana = async (req, res, next) => {
         ];
 
         let logPayloadSuccess = {
-          reason: req.body[0].reason || "",
           ...payload,
         };
         await xglobal.action_logs(
@@ -7238,7 +7237,6 @@ exports.getReportStationOverDaySales = async (req, res, next) => {
         OFFSET (${page_index} * ${page_limit}) LIMIT ${page_limit};
     `;
 
-    console.log(dataScript)
 
     let countScript = `
         SELECT 
