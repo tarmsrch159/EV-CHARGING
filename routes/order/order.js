@@ -7233,17 +7233,25 @@ exports.getReportStationOverDaySales = async (req, res, next) => {
             ord.sh_cus_ref AS aos_order_no,
             tpt.tnk_number AS tank_no,
             itm.itm_desc AS product,
-            COALESCE(tati.stock, 0) AS stock,
+             COALESCE(tati.current_stock, tati.yester_day_stock) AS stock,
             COALESCE(sales.sale_previous, 0) AS avg_day_sales,
-            CASE WHEN ${include_recommended_order} THEN COALESCE(ord.total_qty, 0) ELSE 0 END AS order_qty,
-            COALESCE((COALESCE(tati.stock, 0) + COALESCE(ord.total_qty, 0)) / NULLIF(COALESCE(sales.sale_previous, 0), 0), 0) AS days_coverage
+            CASE WHEN true THEN COALESCE(ord.total_qty, 0) ELSE 0 END AS order_qty,
+            COALESCE((COALESCE(tati.current_stock, 0) + COALESCE(ord.total_qty, 0)) / NULLIF(COALESCE(sales.sale_previous, 0), 0), 0) AS days_coverage
         FROM tbl_petrol_tank tpt
         LEFT JOIN tbl_petrol_depot tpd ON tpt.ptrl_code = tpd.ptrl_code
         LEFT JOIN tbl_depot dp ON tpd.dpo_code = dp.dpo_code
         INNER JOIN tbl_petrol ptr ON tpt.ptrl_code = ptr.ptrl_code
         LEFT JOIN tbl_item itm ON tpt.itm_code = itm.itm_code
-        LEFT JOIN tbl_automatics_tanks_information tati 
-            ON tpt.ptrl_code = tati.ptrl_code AND tpt.ptrl_tank_code = tati.tank_code
+        left join (
+        SELECT 
+                    ptrl_code, 
+                    tank_code,
+                    ist_dt,
+                    MAX(CASE WHEN stock_at::date = current_date::date - INTERVAL '1 day' THEN stock END) as yester_day_stock,
+                    MAX(CASE WHEN stock_at::date = current_date::date THEN stock END) as current_stock
+                FROM tbl_automatics_tanks_information
+                GROUP BY ptrl_code, tank_code, ist_dt
+        ) tati on tpt.ptrl_code = tati.ptrl_code and tpt.ptrl_tank_code = tati.tank_code
         LEFT JOIN (
             SELECT DISTINCT ON (ptrl_code, tank_code) 
                    ptrl_code, tank_code, sale_previous 
@@ -7260,6 +7268,8 @@ exports.getReportStationOverDaySales = async (req, res, next) => {
         ${whereClause}
         ORDER BY tpt.ptrl_code, tpt.ptrl_tank_code, tati.ist_dt DESC
     `;
+
+    console.log(script)
 
     let mainSql = `
         SELECT * FROM (
