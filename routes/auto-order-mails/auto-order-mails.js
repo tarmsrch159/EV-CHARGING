@@ -437,7 +437,7 @@ exports.getAutoOrderMailData = async (req, res) => {
 exports.runAutoOrderMailTask = async (lic_code = 'aos01') => {
     setLicCode(lic_code);
     logInfo('Auto Order Mail', `เริ่ม Background Task สำหรับ ${lic_code}...`);
-
+    
     try {
         // [Auto Order Cleanup] รันการล้างข้อมูลออเดอร์เก่าไปพร้อมกัน (ไม่ว่าจะพบข้อมูลส่งเมลหรือไม่)
         await exports.runAutoOrderCleanupTask(lic_code);
@@ -598,6 +598,8 @@ exports.decryptToken = async (req, res) => {
         return sendResponse(res, 'error', '-4', 'เกิดข้อผิดพลาดภายในระบบ', []);
     }
 };
+
+// ======================================================================= Auto Send to Sap Task =====================================================================
 
 // =========== ดึงข้อมูลรายการสั่งซื้อ ที่มีการยืนยันจาก HANA ===========
 const getConfirmOrder = async (lic_code, order_id, action) => {
@@ -973,6 +975,7 @@ const getConfirmOrder = async (lic_code, order_id, action) => {
 const runAutoOrderToSapTask = async (lic_code = 'aos01') => {
     currentLicCode = lic_code;
     logInfo('Auto Order SAP Background', `เริ่มตรวจสอบรายการ Auto Order ประจำรอบเวลา ${moment().format('HH:mm:ss')}`);
+    //  console.log(`Auto Order SAP Background [aos01] เริ่มตรวจสอบรายการ Auto Order ประจำรอบเวลา ${moment().format('HH:mm:ss')}`)
 
     try {
         // ใช้ SQL ตัวอย่างของคุณมาปรับเงื่อนไขดักจับเฉพาะตัวที่ 'ยังไม่ได้ส่ง' 
@@ -998,6 +1001,7 @@ const runAutoOrderToSapTask = async (lic_code = 'aos01') => {
 
         if (result.code || !result.data || result.data.length === 0) {
             logInfo('Auto Order SAP Background', 'ไม่พบรายการออเดอร์อัตโนมัติที่ค้างส่งในรอบนี้');
+            // console.log(`Auto Order SAP Background [aos01] ไม่พบรายการออเดอร์อัตโนมัติที่ค้างส่งในรอบนี้`)
             return { success: true };
         }
 
@@ -1108,7 +1112,7 @@ exports.runAutoOrderCleanupTask = async (lic_code = 'aos01') => {
         const updateScript = `
             UPDATE tbl_order 
             SET order_flag = '0', 
-                mdf_dt = CURRENT_TIMESTAMP 
+                rm_dt = CURRENT_TIMESTAMP 
             WHERE auto_order = '1' 
               AND order_flag = '1' 
               AND order_status = '0' 
@@ -1141,7 +1145,7 @@ exports.updateAutoOrderFlag = async (req, res, next) => {
         const updateScript = `
     UPDATE tbl_order 
     SET order_flag = '0', 
-        mdf_dt = CURRENT_TIMESTAMP 
+        rm_dt = CURRENT_TIMESTAMP 
     WHERE auto_order = '1' 
       AND order_flag = '1' 
       AND order_status = '0'
