@@ -7269,7 +7269,7 @@ exports.getReportStationOverDaySales = async (req, res, next) => {
         ORDER BY tpt.ptrl_code, tpt.ptrl_tank_code, tati.ist_dt DESC
     `;
 
-    console.log(script)
+   
 
     let mainSql = `
         SELECT * FROM (
