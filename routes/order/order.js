@@ -4090,7 +4090,6 @@ exports.addOrderInformation = async (req, res, next) => {
             .map(qty => qty.toLocaleString())
             .join(", ");
 
-          console.log("compartmentTypes", compartmentTypes);
 
           // กรณีนี้หมายความว่า จำนวนน้ำมันถูกต้องตามระบบ แต่ประเภทรถที่ถูกผูกไว้กับปั๊มไม่สามารถรองรับจำนวนน้ำมันที่กรอก
           let response = [
