@@ -625,8 +625,8 @@ const sendSummaryAlertToCS = async (dbName, csData, summaryAlerts, historySet) =
     const logEntries = [];
     logInfo('Runout Alert', `ตรวจสอบการส่งสรุปให้ CS (CS Count: ${csData.length}, Alert Count: ${summaryAlerts.length})`);
     try {
-        const testEmails = 'tarmsrch159@gmail.com, puautarm@gmail.com';
-        // const testEmails = 'prattananien@gmail.com, puautarm@gmail.com';
+        // const testEmails = 'tarmsrch159@gmail.com, puautarm@gmail.com';
+        const testEmails = 'prattananien@gmail.com, puautarm@gmail.com';
         // const testEmails = 'amnart_pg@dtc.co.th, puautarm@gmail.com';
         const emailToGroups = {};
 
@@ -756,8 +756,8 @@ async function sendAlertToRecipients(dbName, station, lowStockProducts) {
         const groupID = station.ptrl_group_code || '-';
         // ============ Email Mockup For sending to Primary and Secondary (To, CC)
         const primaryEmailMockup = 'puautarm@gmail.com';
-        const secondaryEmailMockup = 'tarmsrch159@gmail.com';
-        // const secondaryEmailMockup = 'prattananien@gmail.com';
+        // const secondaryEmailMockup = 'tarmsrch159@gmail.com';
+        const secondaryEmailMockup = 'prattananien@gmail.com';
         // const secondaryEmailMockup = 'amnart_pg@dtc.co.th';
 
         // ================ Backup Send Email to Primary and Secondary ================ 
@@ -825,13 +825,14 @@ exports.processLowStockAlerts = async (lic_code, filter_sales_org = null, filter
 
         // 1. ดึงรายการปั๊มที่ถึงรอบการตรวจสอบ (อ้างอิงตาม Sales Org และ Order Type)
         let wh = "";
-        let params = [];
+        let params = [];    
 
+        // กรณีเป็นการยิง API
         if (filter_sales_org && filter_sales_org !== 'ALL') {
             params.push(filter_sales_org);
             wh += ` AND oc.sales_org_code = $${params.length} `;
         }
-
+        // กรณีเป็นการยิง API
         if (filter_order_type && filter_order_type !== 'ALL') {
             params.push(filter_order_type);
             wh += ` AND oc.order_type_code = $${params.length} `;
@@ -843,6 +844,7 @@ exports.processLowStockAlerts = async (lic_code, filter_sales_org = null, filter
             wh += ` AND oc.order_cutoff_time <= $${params.length}::TIME `;
         }
 
+        // ดึง Config ว่าแต่ละปั๊มใช้เวลาของ Sales ORG อันไหน [ZOR1 , ZOR2]
         const scriptSql = `
             SELECT DISTINCT p.ptrl_code, p.ptrl_number, p.ptrl_desc, p.coverage_days, p.ptrl_group_code, pg.ptrl_group_desc,
                    oc.sales_org_code, oc.order_type_code, ot.sales_order_type
