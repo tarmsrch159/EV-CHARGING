@@ -1,11 +1,11 @@
-const prod = false;
+const prod = true;
 
 const connectionStringOnProd = {
   user: "postgres",
-  password: "reP@ssw0rd778900",
-  host: "203.150.210.25",
+  password: "$!Zy2tTP^3",
+  host: "10.100.1.103",
   port: 5432,
-  database: "tms_aos01"
+  database: "tms_aos_qa"
 }
 
 const connectionStringOnSit = {

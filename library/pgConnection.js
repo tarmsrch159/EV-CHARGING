@@ -1,5 +1,13 @@
 const { Pool } = require("pg");
 var pool;
+
+const mapDatabaseName = (dbname) => {
+  if (dbname === 'tms_aos01' || dbname === 'tms_aos02') {
+    return 'tms_aos_qa';
+  }
+  return dbname;
+};
+
 exports.link = async (connectionstring) => {
   let temporary = JSON.parse(JSON.stringify(connectionstring));
   pool = new Pool(temporary);
@@ -8,7 +16,7 @@ exports.link = async (connectionstring) => {
 exports.execute2params = async (dbname, script, params = [], connectionstring) => {
   let temporary = JSON.parse(JSON.stringify(connectionstring));
   if (dbname != null) {
-    temporary.database = dbname;
+    temporary.database = mapDatabaseName(dbname);
   }
   let pool;
   try {
@@ -58,7 +66,7 @@ exports.execute = async (dbname, script, connectionstring) => {
   //debugger;
   let temporary = JSON.parse(JSON.stringify(connectionstring));
   if (dbname != null) {
-    temporary.database = dbname;
+    temporary.database = mapDatabaseName(dbname);
   }
   try {
     var pool = new Pool(temporary);
@@ -115,7 +123,7 @@ exports.get = async (dbname, script, connectionstring) => {
   //get data
   let temporary = JSON.parse(JSON.stringify(connectionstring));
   if (dbname != null) {
-    temporary.database = dbname;
+    temporary.database = mapDatabaseName(dbname);
   }
 
   try {
@@ -163,7 +171,7 @@ exports.getWithParams = async (
   // get data
   let temporary = JSON.parse(JSON.stringify(connectionstring));
   if (dbname != null) {
-    temporary.database = dbname;
+    temporary.database = mapDatabaseName(dbname);
   }
 
   let pool;
@@ -232,7 +240,7 @@ exports.upsert = async (dbname, insert, update, connectionString) => {
 exports.runTransaction = async (dbname, callback, connectionstring) => {
   let temporary = JSON.parse(JSON.stringify(connectionstring));
   if (dbname != null) {
-    temporary.database = dbname;
+    temporary.database = mapDatabaseName(dbname);
   }
   const pool = new Pool(temporary);
   const client = await pool.connect();

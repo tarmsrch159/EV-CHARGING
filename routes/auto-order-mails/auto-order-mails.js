@@ -437,7 +437,7 @@ exports.getAutoOrderMailData = async (req, res) => {
 exports.runAutoOrderMailTask = async (lic_code = 'aos01') => {
     setLicCode(lic_code);
     logInfo('Auto Order Mail', `เริ่ม Background Task สำหรับ ${lic_code}...`);
-    
+
     try {
         // [Auto Order Cleanup] รันการล้างข้อมูลออเดอร์เก่าไปพร้อมกัน (ไม่ว่าจะพบข้อมูลส่งเมลหรือไม่)
         await exports.runAutoOrderCleanupTask(lic_code);
@@ -975,10 +975,10 @@ const getConfirmOrder = async (lic_code, order_id, action) => {
 const runAutoOrderToSapTask = async (lic_code = 'aos01') => {
     currentLicCode = lic_code;
     logInfo('Auto Order SAP Background', `เริ่มตรวจสอบรายการ Auto Order ประจำรอบเวลา ${moment().format('HH:mm:ss')}`);
-    //  console.log(`Auto Order SAP Background [aos01] เริ่มตรวจสอบรายการ Auto Order ประจำรอบเวลา ${moment().format('HH:mm:ss')}`)
+    //  console.log(`Auto Order SAP Background [aosQA] เริ่มตรวจสอบรายการ Auto Order ประจำรอบเวลา ${moment().format('HH:mm:ss')}`)
 
     try {
-        
+
         // โดยเช็คสถานะ order_status = '0' และยังมีสิทธิ์ใช้งานอยู่ (order_flag = '1' และ rm_dt IS NULL)
         const checkAutoOrderScript = `
             SELECT o.id AS order_id, o.order_no, o.ship_to, p.ptrl_desc, o.auto_order AS o_auto, p.auto_order AS p_auto  
@@ -1001,26 +1001,26 @@ const runAutoOrderToSapTask = async (lic_code = 'aos01') => {
 
         if (result.code || !result.data || result.data.length === 0) {
             logInfo('Auto Order SAP Background', 'ไม่พบรายการออเดอร์อัตโนมัติที่ค้างส่งในรอบนี้');
-            // console.log(`Auto Order SAP Background [aos01] ไม่พบรายการออเดอร์อัตโนมัติที่ค้างส่งในรอบนี้`)
+            // console.log(`Auto Order SAP Background [aosQA] ไม่พบรายการออเดอร์อัตโนมัติที่ค้างส่งในรอบนี้`)
             return { success: true };
         }
 
         // logInfo('Auto Order SAP Background', `พบออเดอร์ระบบอัตโนมัติค้างส่งจำนวน ${result.data.length} รายการ`);
-        console.log(`Auto Order SAP Background [aos01] พบออเดอร์ระบบอัตโนมัติจำนวน ${result.data.length} รายการ`)
+        console.log(`Auto Order SAP Background [aosQA] พบออเดอร์ระบบอัตโนมัติจำนวน ${result.data.length} รายการ`)
 
         for (const order of result.data) {
             // logInfo('Auto Order SAP Background', `กำลังส่งออเดอร์ ID: ${order.order_id} ของสถานี: ${order.ptrl_desc}`);
-            console.log(`Auto Order SAP Background [aos01] กำลังส่งออเดอร์ ID: ${order.order_id} ของสถานี: ${order.ptrl_desc}`)
+            console.log(`Auto Order SAP Background [aosQA] กำลังส่งออเดอร์ ID: ${order.order_id} ของสถานี: ${order.ptrl_desc}`)
             const targetOrderId = String(order.order_id);
             const sapResult = await getConfirmOrder('aos01', targetOrderId, 'auto');
 
             // เช็คสถานะการส่งเพื่อเก็บ Log เบื้องต้น
             if (sapResult && sapResult[0] && sapResult[0].status === 'success') {
                 // logInfo('Auto Order SAP Background', `   ✔️ ส่งออเดอร์ ID: ${order.order_id} เข้า SAP สำเร็จ`);
-                console.log(`Auto Order SAP Background [aos01] ส่งออเดอร์ ID: ${order.order_id} ของสถานี: ${order.ptrl_desc} สำเร็จ`)
+                console.log(`Auto Order SAP Background [aosQA] ส่งออเดอร์ ID: ${order.order_id} ของสถานี: ${order.ptrl_desc} สำเร็จ`)
             } else {
                 // logError('Auto Order SAP Background', `   ❌ ส่งออเดอร์ ID: ${order.order_id} ล้มเหลว: ${sapResult[0]?.message || 'Unknown Error'}`);
-                console.log(`Auto Order SAP Background [aos01] ส่งออเดอร์ ID: ${order.order_id} ของสถานี: ${order.ptrl_desc} ล้มเหลว`)
+                console.log(`Auto Order SAP Background [aosQA] ส่งออเดอร์ ID: ${order.order_id} ของสถานี: ${order.ptrl_desc} ล้มเหลว`)
             }
         }
 
@@ -1164,7 +1164,7 @@ exports.updateAutoOrderFlag = async (req, res, next) => {
 //         }
 
 //         // logInfo('Auto Order SAP Background', `พบออเดอร์ระบบอัตโนมัติค้างส่งจำนวน ${result.data.length} รายการ`);
-//         console.log(`Auto Order SAP Background [aos01] พบออเดอร์ระบบอัตโนมัติจำนวน ${result.data.length} รายการ`)
+//         console.log(`Auto Order SAP Background [aosQA] พบออเดอร์ระบบอัตโนมัติจำนวน ${result.data.length} รายการ`)
 
 //         for (const order of result.data) {
 //             // logInfo('Auto Order SAP Background', `กำลังส่งออเดอร์ ID: ${order.order_id} ของสถานี: ${order.ptrl_desc}`);
@@ -1178,7 +1178,7 @@ exports.updateAutoOrderFlag = async (req, res, next) => {
 //                 console.log(`Auto Order SAP Background [${lic_code}] ส่งออเดอร์ ID: ${order.order_id} ของสถานี: ${order.ptrl_desc} สำเร็จ`)
 //             } else {
 //                 // logError('Auto Order SAP Background', `   ❌ ส่งออเดอร์ ID: ${order.order_id} ล้มเหลว: ${sapResult[0]?.message || 'Unknown Error'}`);
-//                 console.log(`Auto Order SAP Background [aos01] ส่งออเดอร์ ID: ${order.order_id} ของสถานี: ${order.ptrl_desc} ล้มเหลว`)
+//                 console.log(`Auto Order SAP Background [aosQA] ส่งออเดอร์ ID: ${order.order_id} ของสถานี: ${order.ptrl_desc} ล้มเหลว`)
 //             }
 //         }
 
