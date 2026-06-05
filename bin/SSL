@@ -10,10 +10,10 @@ var https = require('https');
 const fs = require('fs');
 const options = {
 
-    key: fs.readFileSync('/etc/letsencrypt/live/spd-demo.dtc.co.th/privkey.pem'),
-    cert: fs.readFileSync('/etc/letsencrypt/live/spd-demo.dtc.co.th/fullchain.pem'),
+    key: fs.readFileSync('/aos-bangchak/ssl/bangchak2025.key'),
+    cert: fs.readFileSync('/aos-bangchak/ssl/DigiCertCA.crt'),
     ca: [
-        fs.readFileSync('/etc/letsencrypt/live/spd-demo.dtc.co.th/chain.pem')
+        fs.readFileSync('/aos-bangchak/ssl/DigiCertCA.crt')
     ],
     minVersion: 'TLSv1.2'
 };
@@ -21,7 +21,7 @@ const options = {
  * Get port from environment and store in Express.
  */
 
-var port = normalizePort(process.env.PORT || '9100');
+var port = normalizePort(process.env.PORT || '3000');
 app.set('port', port);
 console.log('API is start on port :', port)
 /**
