@@ -338,6 +338,17 @@ app.use('/api-tms-v2/manual-stock', manualStockRouter);
 //Sales Org Config
 app.use('/api-tms-v2/sales-org-config', salesOrgConfigRouter);
 
+app.get('/api-tms-v2/test-104', (req, res, next) => {
+    console.log("-----------------------------------------")
+    console.log("test 104")
+    console.log("-----------------------------------------")
+    res.status(200).send('Hello World!');
+
+})
+
+
+
+
 
 // ตั้งเวลาทำงานทุก 1 ชั่วโมง
 // cron.schedule('0 * * * *', async () => {
