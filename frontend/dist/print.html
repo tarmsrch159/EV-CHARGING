@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="th">
+  <link href="https://fonts.googleapis.com/css2?family=Bai+Jamjuree:wght@200;300;400;500;600;700&display=swap" rel="stylesheet">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Report</title>
+  <style>
+    @media print {
+       @page {
+            size: A4 landscape;
+        }
+      body {
+        font-family: "Bai Jamjuree", "Sarabun", "TH SarabunPSK", Arial, sans-serif;
+        font-size: 8pt;
+        margin: 20px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      th, td {
+        border: none;
+        padding: 6px;
+        text-align: center;
+      }
+      th {
+        background-color: #f0f0f0;
+      }
+      .page-break {
+        page-break-after: always;
+        position: relative;
+      }
+
+      .footer-overlay {
+        position: absolute;
+        top: 12cm; /* ปรับตำแหน่งจากด้านบน */
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        display: flex;  
+        justify-content: space-between;
+        font-size: 8pt;
+        font-weight: 300 !important; 
+        letter-spacing: 1px; /* ขยายช่องไฟระหว่างตัวอักษร */
+        line-height: 1.6;
+        color: red;
+        background-color: transparent;
+        box-sizing: border-box;
+    }
+
+    .footer-overlay .right-box {
+      float: right;
+      width: 48%;
+      border: 1px solid red;
+    }
+
+    .footer-overlay .left-box {
+      float: left;
+      width: 48%;
+      border: 1px solid red;
+      height:100px;
+      margin-top: 10%;
+    }
+
+    }
+    .header-print {
+      font-weight: bold;
+      font-size: 10pt;
+    }
+    .header2-print {
+      font-weight: bold;
+      font-size: 8pt;
+    }
+
+    th, td {
+      white-space: nowrap;
+    }
+
+  </style>
+</head>
+<body>
+  <div id="printArea"></div>
+
+  <script>
+
+function formatDate(dt) {
+  const d = new Date(dt);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${day}/${month}/${year}`;
+}
+
+
+function formatTime(dt) {
+  const d = new Date(dt);
+  return d.toLocaleTimeString("th-TH", { hour24: false }); 
+}
+function formatMinutesToHHMM(minutes) {
+  const hrs = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  return `${String(hrs).padStart(2, "0")}:${String(mins).padStart(2, "0")}`;
+}
+window.onafterprint = function() {
+    window.close();
+};
+
+    // ใช้ data จริง (แทนการดึงจาก localStorage)
+    const data = JSON.parse(localStorage.getItem("printData")) || []; 
+
+    function formatDateTime(dt) {
+      const d = new Date(dt);
+      return d.toLocaleString("th-TH", { hour24: false });
+    }
+
+    function generateReportHtml(item) {
+      let tableRows = "";
+      // ตัวอย่าง tableData จาก routes ที่มี itm_desc, item_quantity
+      let tableData = item.routes.filter(r => r.itm_desc).map(r => ({
+        taskType: r.location_type_desc,
+        StartDate: formatDate(r.start_dt),
+        Time: formatTime(r.start_dt),
+        HrsMins: formatMinutesToHHMM(r.location_minute),
+        Km: r.location_distance,
+        Min: r.location_minute,
+        Code: r.location_number || "-",
+        Name: r.location_desc || "-",
+        PRO_CD: r.itm_material_number || "-",
+        Product: r.itm_desc || "-",
+        Volume: r.item_quantity
+      }));
+
+      tableData.forEach((row, idx) => {
+        tableRows += `<tr>
+          <td>${idx + 1}</td>
+          <td>${row.taskType}</td>
+          <td>${row.StartDate}</td>
+          <td>${row.Time}</td>
+          <td>${row.HrsMins}</td>
+          <td>${row.Km}</td>
+          <td>${row.Min}</td>
+          <td>${row.Code}</td>
+          <td>${row.Name}</td>
+          <td>${row.PRO_CD}</td>
+          <td>${row.Product}</td>
+          <td>${row.Volume}</td>
+        </tr>`;
+      });
+
+      const html = `
+        <div class="page-break">
+            <div style="display:flex; justify-content: space-between; padding-bottom:10px;">
+              <div><span class="header-print">GSAP_PRV</span></div>
+              <div><span class="header-print">${item.dpo_desc}</span></div>
+              <div><span class="header-print">Plan - ${formatDateTime(item.job_dt)}</span></div>
+            </div>
+            <hr style="border-top:2px solid black; margin-bottom:10px;" />
+            <div style="display:flex; justify-content: space-between; padding-bottom:10px;">
+              <div><span class="header2-print">Vehicle: ${item.veh_number}</span></div>
+              <div><span class="header2-print">Trip Sequence: ${item.trip_sequence}</span></div>
+              <div><span class="header2-print">Shipment: ${item.tms_transport_code}</span></div>
+            </div>
+            <hr style="border-top:2px solid black; margin-bottom:10px;" />
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>TaskType</th>
+                  <th>StartDate</th>
+                  <th>Time</th>
+                  <th>HrsMins</th>
+                  <th>Km</th>
+                  <th>Min</th>
+                  <th>Code</th>
+                  <th>Name</th>
+                  <th>PRO_CD</th>
+                  <th>Product</th>
+                  <th>Volume</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${tableRows}
+              </tbody>
+            </table>
+            <hr style="border-top:2px solid black; margin-top:10px; margin-bottom:10px;" />
+            <div style="display:flex; gap:40px; align-items:flex-start;">
+              <div style="width:31%;">
+                <span class="header2-print">เวลารวมทั้งเที่ยว (นาที)</span><br/>
+                <span class="header2-print">เวลารวมขับรถ (นาที)</span><br/>
+                <span class="header2-print">เวลารวมหยุดพัก (นาที)</span><br/>
+              </div>
+              <div >
+                <span>${formatMinutesToHHMM(item.transit_minute)}</span><br/>
+                <span>${item.drive_minute}</span><br/>
+                <span>${item.rest_minute}</span><br/>
+              </div>
+              <div>
+                <span>${item.distance}</span><br/>
+                <span></span><br/>
+                <span></span><br/>
+              </div>
+              <div>
+                <span>${item.transit_minute}</span><br/>
+                <span></span><br/>
+                <span></span><br/>
+              </div>
+             <div style="margin-left:auto; text-align:right;">
+                <span class="header2-print">${item.item_quantity}</span>
+              </div>
+            </div>
+
+                  <div class="footer-overlay" >
+                    <div class="left-box" style="padding: 5px; justify-content: center; align-items: center; text-align: center;">
+                      <p>ความจุปลอดภัยของถังรับลูกค้า T1 ............................ ลิตร T2 ............................ ลิตร </p>
+                      <p>T3 ............................ ลิตร T4 ............................ ลิตร T5 ............................ ลิตร </p>
+                      <p>T6 ............................ ลิตร T7 ............................ ลิตร T8 ............................ ลิตร</p>
+                    </div>
+                    <div class="right-box" style="padding: 5px;">
+                      <p><input type="checkbox" /> พขร.ได้รับการสื่อสารอันตรายที่อาจเกิดขึ้นได้ในระหว่างเข้ารับน้ำมัน</p>
+                      <p><input type="checkbox" /> พขร.ได้รับการสื่อสารเรื่องเส้นทาง/จุดอันตราย/สถานที่ลูกค้า</p>
+                      <p><input type="checkbox" /> สอบถามและประเมินเรื่องความเหนื่อยล้าก่อนออกเดินทางเรียบร้อยแล้ว</p>
+                      <p><input type="checkbox" /> หัวหน้างานได้แจ้งถึงสถานะอันตรายประจำวันที่ไม่ปกติ เช่น ฝนตก น้ำท่วม ถนนขาด
+                        สร้างทาง ปิดถนน หมอกควัน กลุ่มคนประท้วง ฯลฯ</p>
+                      <p>
+                        <input type="checkbox" /> ไม่มี <br/>
+                        <input type="checkbox" /> มีเรื่อง ...................................................
+                      </p>
+                      <p>ลงชื่อ พขร. .......................................... ลงชื่อหัวหน้างาน ...........................</p>
+                    </div>
+                  </div>
+        </div>
+
+ 
+      `;
+
+      
+      return html;
+    }
+
+    let finalHtml = "";
+    data.forEach(item => {
+      finalHtml += generateReportHtml(item);
+    });
+
+ /*    finalHtml += `
+      <div class="footer-overlay" >
+        <div class="left-box" style="padding: 5px;">
+          <p style="font-weight: bold;">ความจุปลอดภัยของถังรับลูกค้า T1 ............................ ลิตร T2 ............................ ลิตร T3 ............................ ลิตร</p>
+          <p>T4 ............................ ลิตร T5 ............................ ลิตร T6 ............................ ลิตร T7 ............................ ลิตร T8 ............................ ลิตร</p>
+        </div>
+        <div class="right-box" style="padding: 5px;">
+          <p><input type="checkbox" /> พขร.ได้รับการสื่อสารอันตรายที่อาจเกิดขึ้นได้ในระหว่างเข้ารับน้ำมัน</p>
+          <p><input type="checkbox" /> พขร.ได้รับการสื่อสารเรื่องเส้นทาง/จุดอันตราย/สถานที่ลูกค้า</p>
+          <p><input type="checkbox" /> สอบถามและประเมินเรื่องความเหนื่อยล้าก่อนออกเดินทางเรียบร้อยแล้ว</p>
+          <p><input type="checkbox" /> หัวหน้างานได้แจ้งถึงสถานะอันตรายประจำวันที่ไม่ปกติ เช่น ฝนตก น้ำท่วม ถนนขาด
+            สร้างทาง ปิดถนน หมอกควัน กลุ่มคนประท้วง ฯลฯ</p>
+          <p>
+            <input type="checkbox" /> ไม่มี <br/>
+            <input type="checkbox" /> มีเรื่อง ...................................................
+          </p>
+          <p>ลงชื่อ พขร. .......................................... ลงชื่อหัวหน้างาน ...........................</p>
+        </div>
+      </div>
+    `; */
+
+
+
+    document.getElementById("printArea").innerHTML = finalHtml;
+    window.print();
+  </script>
+</body>
+</html>
