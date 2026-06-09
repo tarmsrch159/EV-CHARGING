@@ -59,8 +59,8 @@ exports.getAutoCalculateOrderInformation = async (req, res, next) => {
                     inner join tbl_petrol ptr on eod.shipto_no = ptr.ptrl_sitecode  
                     left join tbl_automatics_orders auto on ptr.ptrl_code = auto.ptrl_code 
                     and auto.ist_dt >= '${xdate} 00:00:00.000' and auto.ist_dt <= '${xdate} 23:59:59.000' 
-                    where date_at >= '${xdate} 00:00:00.000' and date_at <= '${xdate} 23:59:59.000' 
-                    and ptr.auto_order = '1' and auto."result" = 'complete.' and ptr.ptrl_code = '${ptrl_code}' 
+                    where date_at >= '${xdate} 00:00:00.000' and date_at <= '${xdate} 23:59:59.000' and auto."result" = 'complete.' and ptr.ptrl_code = '${ptrl_code}' 
+
                     order by shipto_no asc;`
 
                     tbl_temporary1 = await pgConn.get(
