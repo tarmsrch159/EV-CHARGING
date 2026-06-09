@@ -825,7 +825,7 @@ exports.processLowStockAlerts = async (lic_code, filter_sales_org = null, filter
 
         // 1. ดึงรายการปั๊มที่ถึงรอบการตรวจสอบ (อ้างอิงตาม Sales Org และ Order Type)
         let wh = "";
-        let params = [];    
+        let params = [];
 
         // กรณีเป็นการยิง API
         if (filter_sales_org && filter_sales_org !== 'ALL') {
@@ -854,7 +854,7 @@ exports.processLowStockAlerts = async (lic_code, filter_sales_org = null, filter
             LEFT JOIN tbl_order_type ot ON oc.order_type_code = ot.ord_type_code
             LEFT JOIN tbl_petrol_group pg ON p.ptrl_group_code = pg.ptrl_group_code
             WHERE p.ptrl_flag = '1' AND p.rm_dt IS NULL 
-                  AND oc.sales_org_flag = 1 AND oc.rm_dt IS NULL and p.ptrl_code = 'petr-1778210986206'
+                  AND oc.sales_org_flag = 1 AND oc.rm_dt IS NULL
                 ${wh}
         `;
         // // ดึง Config ว่าแต่ละปั๊มใช้เวลาของ Sales ORG อันไหน [ZOR1 , ZOR2]
