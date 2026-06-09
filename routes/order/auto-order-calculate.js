@@ -16,8 +16,6 @@ exports.getAutoCalculateOrderInformation = async (req, res, next) => {
             ptrl_code,
             action
         } = req.body[0] || {};
-
-        console.log('Log From AOS QA')
         if (ptrl_code == undefined || action == undefined) {
             let response = [
                 {
@@ -33,8 +31,7 @@ exports.getAutoCalculateOrderInformation = async (req, res, next) => {
             return;
         }
         else {
-            var xdate = moment().add(-1, 'days').format('YYYY-MM-DD');
-            // var xdate = moment().add('days', -1).format('YYYY-MM-DD');
+            var xdate = moment().add('days', -1).format('YYYY-MM-DD');
             var xscript = `select distinct shipto_no, ptr.ptrl_code, ptr.ptrl_sitecode, ptr.ptrl_number, ptr.stock_provious_days, 
             case when ptr.waiting_days is null then 2 else waiting_days :: integer + 1 end as waiting_days, ptr.coverage_days, auto.automatic_code 
             from tbl_order_eodtank eod
@@ -54,8 +51,7 @@ exports.getAutoCalculateOrderInformation = async (req, res, next) => {
             if (!tbl_temporary1.code) {
 
                 if (tbl_temporary1.data.length == 0) {
-                    xdate = moment().add(-2, 'days').format('YYYY-MM-DD');
-                    // xdate = moment().add('days', -2).format('YYYY-MM-DD');
+                    xdate = moment().add('days', -2).format('YYYY-MM-DD');
 
                     xscript = `select distinct shipto_no, ptr.ptrl_code, ptr.ptrl_sitecode, ptr.ptrl_number, ptr.stock_provious_days, 
                     case when ptr.waiting_days is null then 2 else waiting_days :: integer + 1 end as waiting_days, ptr.coverage_days, auto.automatic_code 
