@@ -211,7 +211,7 @@ exports.getAutoCalculateOrderInformation = async (req, res, next) => {
                                             itm_code: tbl_temporary2.data[xi].itm_code,
                                             stock: xstock,
                                             daysale: xdaysale,
-                                            target_stock: xtargetorder,
+                                            target_stock: 0,
                                             need_qty: 0,
                                             reason: "Need Qty <= (Tank Capacity - Stock)."
                                         });
@@ -220,6 +220,39 @@ exports.getAutoCalculateOrderInformation = async (req, res, next) => {
                                         //create order
                                         if (xtargetorder > xtnk_target_config) {
                                             xtargetorder = xtnk_target_config;
+                                        }
+
+                                        xscript = `select level, veh_type_code, veh_type_desc, capacity_max, capacity_min
+                                        from 
+                                        ((select 0 as level,tpvt.veh_type_code, tvt.veh_type_desc ,tvt.capacity_max, tvt.capacity_min 
+                                        from tbl_petrol_vehicle_type tpvt 
+                                        left join tbl_vehicle_type tvt on tpvt.veh_type_code = tpvt.veh_type_code 
+                                        where tpvt.ptrl_code = '${ptrl_code}'
+
+                                        union
+
+                                        select 1 as level,tvt.veh_type_code, tvt.veh_type_desc ,tvt.capacity_max, tvt.capacity_min 
+                                        from tbl_vehicle_type tvt where capacity_min < ${xtargetorder}  
+                                        and capacity_max >= ${xtargetorder}
+
+                                        union
+
+                                        select 2 as level,tvt.veh_type_code, tvt.veh_type_desc ,tvt.capacity_max, tvt.capacity_min 
+                                        from tbl_vehicle_type tvt where tvt.veh_type_code in 
+                                        (select veh_type_code from tbl_vehicle_type order by capacity_max desc limit 1))) xtable 
+                                        order by xtable."level" asc`
+
+                                        let tbl_temporary5 = await pgConn.get(
+                                            dbPrefix + lic_code,
+                                            xscript,
+                                            config.connectionString(),
+                                        );
+
+                                        //debugger
+                                        if (!tbl_temporary5.code) {
+                                            if (tbl_temporary5.data.length > 0) {
+                                                xtargetorder = parseFloat(tbl_temporary5.data[0].capacity_max);
+                                            }
                                         }
 
                                         if (xneedqty > 100000) {
