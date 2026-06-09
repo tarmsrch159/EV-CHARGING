@@ -11,7 +11,7 @@ const fs = require('fs');
 const options = {
 
     key: fs.readFileSync('/aos-bangchak/ssl/bangchak2025.key'),
-    cert: fs.readFileSync('/aos-bangchak/ssl/DigiCertCA.crt'),
+    cert: fs.readFileSync('/aos-bangchak/ssl/star_bangchak_co_th.crt'),
     ca: [
         fs.readFileSync('/aos-bangchak/ssl/DigiCertCA.crt')
     ],
