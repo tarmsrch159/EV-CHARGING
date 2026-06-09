@@ -59,8 +59,7 @@ exports.getAutoCalculateOrderInformation = async (req, res, next) => {
                     inner join tbl_petrol ptr on eod.shipto_no = ptr.ptrl_sitecode  
                     left join tbl_automatics_orders auto on ptr.ptrl_code = auto.ptrl_code 
                     and auto.ist_dt >= '${xdate} 00:00:00.000' and auto.ist_dt <= '${xdate} 23:59:59.000' 
-                    where date_at >= '${xdate} 00:00:00.000' and date_at <= '${xdate} 23:59:59.000' 
-                    and ptr.auto_order = '1' and auto."result" = 'complete.' and ptr.ptrl_code = '${ptrl_code}' 
+                    where date_at >= '${xdate} 00:00:00.000' and date_at <= '${xdate} 23:59:59.000' and auto."result" = 'complete.' and ptr.ptrl_code = '${ptrl_code}' 
                     order by shipto_no asc;`
 
                     tbl_temporary1 = await pgConn.get(
@@ -105,8 +104,10 @@ exports.getAutoCalculateOrderInformation = async (req, res, next) => {
                                 var xtnk_safety_factor = 0.85;
                                 var xstock = 0.0;
                                 var xtargetstock = 0.0;
+                                var xtargetorder = 0.0;
                                 var xunpumplevel = parseInt(tbl_temporary2.data[xi].tnk_deadstock);
                                 var xtnk_capacity = parseFloat(tbl_temporary2.data[xi].tnk_capacity);
+                                var xtnk_target_config = parseFloat(tbl_temporary2.data[xi].tnk_target);
                                 var xdaysale = 0.0;
                                 var xneedqty = 0.0;
 
@@ -196,6 +197,7 @@ exports.getAutoCalculateOrderInformation = async (req, res, next) => {
                                         xstock = tbl_temporary2.data[xi].stock;
                                         xtargetstock = (xdaysale * coverage_days) + xunpumplevel;
                                         xneedqty = Math.max(0, xtargetstock - xstock);
+                                        xtargetorder = (xdaysale) + xunpumplevel;
                                     }
                                     catch (ex) {
                                         debugger
@@ -209,13 +211,17 @@ exports.getAutoCalculateOrderInformation = async (req, res, next) => {
                                             itm_code: tbl_temporary2.data[xi].itm_code,
                                             stock: xstock,
                                             daysale: xdaysale,
-                                            target_stock: xtargetstock,
+                                            target_stock: xtargetorder,
                                             need_qty: 0,
                                             reason: "Need Qty <= (Tank Capacity - Stock)."
                                         });
                                     }
                                     else {
                                         //create order
+                                        if (xtargetorder > xtnk_target_config) {
+                                            xtargetorder = xtnk_target_config;
+                                        }
+
                                         if (xneedqty > 100000) {
                                             xresult.push({
                                                 ptrl_code: ptrl_code,
@@ -223,24 +229,19 @@ exports.getAutoCalculateOrderInformation = async (req, res, next) => {
                                                 itm_code: tbl_temporary2.data[xi].itm_code,
                                                 stock: xstock,
                                                 daysale: xdaysale,
-                                                target_stock: xtargetstock,
+                                                target_stock: xtargetorder,
                                                 need_qty: 0,
                                                 reason: "Need Qty is incorrect."
                                             });
                                         }
                                         else {
-
-                                            if (xneedqty > xtnk_capacity) {
-                                                xneedqty = xtnk_capacity;
-                                            }
-
                                             xresult.push({
                                                 ptrl_code: ptrl_code,
                                                 tank_code: tbl_temporary2.data[xi].tank_code,
                                                 itm_code: tbl_temporary2.data[xi].itm_code,
                                                 stock: xstock,
                                                 daysale: xdaysale,
-                                                target_stock: xtargetstock,
+                                                target_stock: xtargetorder,
                                                 need_qty: xneedqty,
                                                 reason: "done."
                                             });
