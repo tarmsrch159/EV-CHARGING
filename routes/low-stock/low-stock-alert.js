@@ -825,7 +825,7 @@ exports.processLowStockAlerts = async (lic_code, filter_sales_org = null, filter
 
         // 1. ดึงรายการปั๊มที่ถึงรอบการตรวจสอบ (อ้างอิงตาม Sales Org และ Order Type)
         let wh = "";
-        let params = [];    
+        let params = [];
 
         // กรณีเป็นการยิง API
         if (filter_sales_org && filter_sales_org !== 'ALL') {
@@ -854,9 +854,22 @@ exports.processLowStockAlerts = async (lic_code, filter_sales_org = null, filter
             LEFT JOIN tbl_order_type ot ON oc.order_type_code = ot.ord_type_code
             LEFT JOIN tbl_petrol_group pg ON p.ptrl_group_code = pg.ptrl_group_code
             WHERE p.ptrl_flag = '1' AND p.rm_dt IS NULL 
-                  AND oc.sales_org_flag = 1 AND oc.rm_dt IS NULL
+                  AND oc.sales_org_flag = 1 AND oc.rm_dt IS NULL 
                 ${wh}
         `;
+        // // ดึง Config ว่าแต่ละปั๊มใช้เวลาของ Sales ORG อันไหน [ZOR1 , ZOR2]
+        // const scriptSql = `
+        //     SELECT DISTINCT p.ptrl_code, p.ptrl_number, p.ptrl_desc, p.coverage_days, p.ptrl_group_code, pg.ptrl_group_desc,
+        //            oc.sales_org_code, oc.order_type_code, ot.sales_order_type
+        //     FROM tbl_petrol p
+        //     INNER JOIN tbl_sales_org_order_config oc ON p.ptrl_sales_group = oc.sales_org_code 
+        //           AND p.ptrl_sales_type = oc.order_type_code
+        //     LEFT JOIN tbl_order_type ot ON oc.order_type_code = ot.ord_type_code
+        //     LEFT JOIN tbl_petrol_group pg ON p.ptrl_group_code = pg.ptrl_group_code
+        //     WHERE p.ptrl_flag = '1' AND p.rm_dt IS NULL 
+        //           AND oc.sales_org_flag = 1 AND oc.rm_dt IS NULL
+        //         ${wh}
+        // `;
         const activeStations = await pgConn.getWithParams(dbName, scriptSql, params, config.connectionString());
         if (!activeStations.data?.length) {
             logInfo('Runout Alert', 'ไม่มีปั๊มที่ต้องตรวจสอบในรอบนี้');
