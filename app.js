@@ -58,6 +58,8 @@ app.get('/api-tms-v2/test-104', (req, res, next) => {
 
 })
 
+console.log('Log From AOS QA')
+
 // gzip/deflate outgoing responses
 var compression = require('compression');
 app.use(compression());
