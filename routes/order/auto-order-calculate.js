@@ -16,6 +16,8 @@ exports.getAutoCalculateOrderInformation = async (req, res, next) => {
             ptrl_code,
             action
         } = req.body[0] || {};
+
+        console.log('Log From AOS QA')
         if (ptrl_code == undefined || action == undefined) {
             let response = [
                 {
