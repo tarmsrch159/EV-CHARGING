@@ -275,7 +275,7 @@ exports.getAutoCalculateOrderInformation = async (req, res, next) => {
                                                 stock: xstock,
                                                 daysale: xdaysale,
                                                 target_stock: xtargetorder,
-                                                need_qty: xneedqty,
+                                                need_qty: xtargetorder,
                                                 reason: "done."
                                             });
                                         }
