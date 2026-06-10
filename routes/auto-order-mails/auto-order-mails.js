@@ -360,7 +360,8 @@ const sendAutoOrderEmail = async (stationData) => {
             cid: 'bangchak_logo'
         }];
 
-        const result = await mailer.sendMail(toEmail, subject, htmlContent, attachments);
+        const result = await mailer.sendMail(['prattananien@gmail.com', 'ornwara.traiyavudh02@gmail.com', 'puautarm@gmail.com'], subject, htmlContent, attachments);
+        // const result = await mailer.sendMail(toEmail, subject, htmlContent, attachments);
 
         if (!result.success) {
             // โยน Error ออกไปเพื่อให้ Caller จัดการ (เช่น เช็คเรื่อง Limit)
@@ -470,8 +471,8 @@ exports.runAutoOrderMailTask = async (lic_code = 'aos01') => {
         // 1. อ่านข้อมูลทั้งหมดแบบ Parallel เพื่อความเร็วสูงสุด (Speed up reading)
         // [DEV TEST] จำกัดให้รันแค่ 2 ปั๊มแรก ป้องกัน Mail Spam
         logInfo('Auto Order Mail', 'กำลังอ่านข้อมูล (จำกัด 2 ปั๊มแรก)...');
-        // const stationDataResults = await Promise.all(autoList.map(item => getDataForStation(lic_code, item)));
-        const stationDataResults = await Promise.all(autoList.slice(0, 2).map(item => getDataForStation(lic_code, item)));
+        const stationDataResults = await Promise.all(autoList.map(item => getDataForStation(lic_code, item)));
+        // const stationDataResults = await Promise.all(autoList.slice(0, 2).map(item => getDataForStation(lic_code, item)));
         const validStationData = stationDataResults.filter(d => d !== null);
 
         logInfo('Auto Order Mail', 'เริ่มส่งเมล (Batch Processing)...');
@@ -738,7 +739,8 @@ const getConfirmOrder = async (lic_code, order_id, action) => {
                     CustomerReferenceDate: cus_date_ref_formatted,
                     NameofOrderer: orderData.order_by || "AOS",
                     ShippingCondition: orderData.ship_cond || "T1",
-                    CustomerPaymentTerms: orderData.pay_term || "Z001",
+                    CustomerPaymentTerms: "",
+                    // CustomerPaymentTerms: orderData.pay_term || "Z001",
                     RequestedDeliveryDate: deli_date_req_formatted,
                     DeliveryTime: orderData.deli_time_req || "Z05",
                     Description: orderData.description || "",
