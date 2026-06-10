@@ -1391,7 +1391,7 @@ exports.getLoggingOrderInformation = async (req, res, next) => {
 
     page_index = page_index == undefined ? 1 : page_index;
     page_limit = page_limit == undefined ? 10 : page_limit;
-    
+
 
     // =========================================================
     //          ตรวจสอบความถูกต้องของพารามิเตอร์เบื้องต้น
@@ -1526,7 +1526,7 @@ exports.getLoggingOrderInformation = async (req, res, next) => {
             ${whereClause}
             ORDER BY tbl_action_logs.ist_dt DESC 
             OFFSET (${page_index}*${page_limit}) LIMIT ${page_limit};`;
-  
+
     let mainLogResult = await pgConn.get(
       dbPrefix + lic_code,
       script,
@@ -2207,7 +2207,8 @@ const getConfirmOrder = async (lic_code, order_id, action) => {
           CustomerReferenceDate: cus_date_ref_formatted,
           NameofOrderer: orderData.order_by || "AOS",
           ShippingCondition: orderData.ship_cond || "T1",
-          CustomerPaymentTerms: orderData.pay_term || "Z001",
+          CustomerPaymentTerms: "",
+          // CustomerPaymentTerms: orderData.pay_term || "Z001",
           RequestedDeliveryDate: deli_date_req_formatted,
           DeliveryTime: orderData.deli_time_req || "Z05",
           Description: orderData.description || "",
@@ -7268,7 +7269,7 @@ exports.getReportStationOverDaySales = async (req, res, next) => {
         ORDER BY tpt.ptrl_code, tpt.ptrl_tank_code, tati.ist_dt DESC
     `;
 
-   
+
 
     let mainSql = `
         SELECT * FROM (

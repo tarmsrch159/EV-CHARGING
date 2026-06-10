@@ -360,7 +360,8 @@ const sendAutoOrderEmail = async (stationData) => {
             cid: 'bangchak_logo'
         }];
 
-        const result = await mailer.sendMail(toEmail, subject, htmlContent, attachments);
+        const result = await mailer.sendMail(['prattananien@gmail.com', 'ornwara.traiyavudh02@gmail.com', 'puautarm@gmail.com'], subject, htmlContent, attachments);
+        // const result = await mailer.sendMail(toEmail, subject, htmlContent, attachments);
 
         if (!result.success) {
             // โยน Error ออกไปเพื่อให้ Caller จัดการ (เช่น เช็คเรื่อง Limit)
@@ -437,7 +438,7 @@ exports.getAutoOrderMailData = async (req, res) => {
 exports.runAutoOrderMailTask = async (lic_code = 'aos01') => {
     setLicCode(lic_code);
     logInfo('Auto Order Mail', `เริ่ม Background Task สำหรับ ${lic_code}...`);
-    
+
     try {
         // [Auto Order Cleanup] รันการล้างข้อมูลออเดอร์เก่าไปพร้อมกัน (ไม่ว่าจะพบข้อมูลส่งเมลหรือไม่)
         await exports.runAutoOrderCleanupTask(lic_code);
@@ -978,7 +979,7 @@ const runAutoOrderToSapTask = async (lic_code = 'aos01') => {
     //  console.log(`Auto Order SAP Background [aos01] เริ่มตรวจสอบรายการ Auto Order ประจำรอบเวลา ${moment().format('HH:mm:ss')}`)
 
     try {
-        
+
         // โดยเช็คสถานะ order_status = '0' และยังมีสิทธิ์ใช้งานอยู่ (order_flag = '1' และ rm_dt IS NULL)
         const checkAutoOrderScript = `
             SELECT o.id AS order_id, o.order_no, o.ship_to, p.ptrl_desc, o.auto_order AS o_auto, p.auto_order AS p_auto  
