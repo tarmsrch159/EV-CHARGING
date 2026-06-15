@@ -1,7 +1,7 @@
 const nodemailer = require('nodemailer');
 
 const ENV = {
-  PROD: false
+  PROD: true
 };
 
 // ======= Config SMTP (Production & SIT) =======
@@ -11,7 +11,7 @@ const MAIL_CONFIGS = {
     port: 25,
     secure: false,
     auth: {
-      user: "TMS-automail@bangchak.co.th",
+      user: "TMS-automail",
       pass: "Tm$@1234"
     },
     from: '"AOS System" <noreply@bangchak.co.th>'
@@ -31,17 +31,20 @@ const MAIL_CONFIGS = {
 // เลือก Config ตาม ENV
 const currentConfig = ENV.PROD ? MAIL_CONFIGS.production : MAIL_CONFIGS.sit;
 
+console.log(currentConfig)
+
 
 
 const transporter = nodemailer.createTransport({
   host: currentConfig.host,
   port: currentConfig.port,
   secure: currentConfig.secure,
-  auth: {
-    user: currentConfig.auth.user,
-    pass: currentConfig.auth.pass
-  }
+  // auth: {
+  //   user: currentConfig.auth.user,
+  //   pass: currentConfig.auth.pass
+  // }
 });
+
 
 /**
  *  ฟังก์ชันส่งอีเมล
