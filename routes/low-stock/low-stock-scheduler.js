@@ -18,7 +18,8 @@ const executeLoop = async () => {
     try {
         logInfo('Runout Alert', 'เริ่มต้นรอบการทำงาน...');
 
-        const licCodes = ['aos01', 'aos02'];
+        const licCodes = ['aos_qa'];
+        // const licCodes = ['aos01', 'aos02'];
         for (const lic_code of licCodes) {
             logInfo('Runout Alert', `[${lic_code}] กำลังตรวจสอบ...`);
             await lowStockAlertController.processLowStockAlerts(lic_code);

@@ -11,7 +11,7 @@ const dbPrefix = config.dbPrefix();
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 const { sapApiClient } = require("../order/sap-api-config");
 
-let currentLicCode = '';
+let currentLicCode = 'aos_qa';
 const setLicCode = (lic) => { currentLicCode = lic; };
 const logInfo = (service, event) => {
     const prefix = currentLicCode ? `[${currentLicCode}] ` : '';
@@ -435,7 +435,7 @@ exports.getAutoOrderMailData = async (req, res) => {
 /**
  * Background Process
  */
-exports.runAutoOrderMailTask = async (lic_code = 'aos01') => {
+exports.runAutoOrderMailTask = async (lic_code = 'aos_qa') => {
     setLicCode(lic_code);
     logInfo('Auto Order Mail', `เริ่ม Background Task สำหรับ ${lic_code}...`);
 
@@ -974,7 +974,7 @@ const getConfirmOrder = async (lic_code, order_id, action) => {
 /**
  * ฟังก์ชันหลักสำหรับ Background Process ดึงออเดอร์ที่เข้าเงื่อนไขส่งเข้า SAP
  */
-const runAutoOrderToSapTask = async (lic_code = 'aos01') => {
+const runAutoOrderToSapTask = async (lic_code = 'aos_qa') => {
     currentLicCode = lic_code;
     logInfo('Auto Order SAP Background', `เริ่มตรวจสอบรายการ Auto Order ประจำรอบเวลา ${moment().format('HH:mm:ss')}`);
     //  console.log(`Auto Order SAP Background [aosQA] เริ่มตรวจสอบรายการ Auto Order ประจำรอบเวลา ${moment().format('HH:mm:ss')}`)
@@ -994,7 +994,7 @@ const runAutoOrderToSapTask = async (lic_code = 'aos01') => {
         `;
 
         const result = await pgConn.get(
-            dbPrefix + 'aos01',
+            dbPrefix + lic_code,
             checkAutoOrderScript,
             config.connectionString()
         );
@@ -1014,7 +1014,7 @@ const runAutoOrderToSapTask = async (lic_code = 'aos01') => {
             // logInfo('Auto Order SAP Background', `กำลังส่งออเดอร์ ID: ${order.order_id} ของสถานี: ${order.ptrl_desc}`);
             console.log(`Auto Order SAP Background [aosQA] กำลังส่งออเดอร์ ID: ${order.order_id} ของสถานี: ${order.ptrl_desc}`)
             const targetOrderId = String(order.order_id);
-            const sapResult = await getConfirmOrder('aos01', targetOrderId, 'auto');
+            const sapResult = await getConfirmOrder(lic_code, targetOrderId, 'auto');
 
             // เช็คสถานะการส่งเพื่อเก็บ Log เบื้องต้น
             if (sapResult && sapResult[0] && sapResult[0].status === 'success') {
@@ -1045,7 +1045,7 @@ exports.runAutoOrderToSapTask = runAutoOrderToSapTask;
 // ======================================================================= Remove Auto Order that over 3 days =====================================================================
 
 // Task สำหรับลบ Auto Order ที่ค้างเกิน 3 วัน (รันพร้อมกับรอบส่งเมล)
-exports.runAutoOrderCleanupTask = async (lic_code = 'aos01') => {
+exports.runAutoOrderCleanupTask = async (lic_code = 'aos_qa') => {
     setLicCode(lic_code);
     try {
         const dbName = dbPrefix + lic_code;
