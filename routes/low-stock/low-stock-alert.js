@@ -321,7 +321,11 @@ async function saveRunoutToDatabase(dbName, station, lowStockProducts, recipient
                 empRoleDesc || null
             ];
 
-            await pgConn.execute2params(dbName, insertScript, params, config.connectionString());
+            const result = await pgConn.execute2params(dbName, insertScript, params, config.connectionString());
+
+            if (result && result.code === true) {
+                logError('Runout Alert', `SQL Insert Error: ${result.message}`);
+            }
         }
         logInfo('Runout Alert', `บันทึกข้อมูลลงฐานข้อมูล ${lowStockProducts.length} รายการ สำหรับ ${station.ptrl_desc} (${recipientType})`);
     } catch (err) {
