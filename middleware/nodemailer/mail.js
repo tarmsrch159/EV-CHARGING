@@ -1,7 +1,7 @@
 const nodemailer = require('nodemailer');
 
 const ENV = {
-  PROD: false
+  PROD: true
 };
 
 // ======= Config SMTP (Production & SIT) =======
@@ -31,6 +31,8 @@ const MAIL_CONFIGS = {
 // เลือก Config ตาม ENV
 const currentConfig = ENV.PROD ? MAIL_CONFIGS.production : MAIL_CONFIGS.sit;
 
+
+
 const transporter = nodemailer.createTransport({
   host: currentConfig.host,
   port: currentConfig.port,
@@ -59,11 +61,11 @@ exports.sendMail = async (to, subject, html, attachments = [], cc = "") => {
       attachments
     });
 
-    // console.log(`   ✅ [MAIL SENT] (Attachments: ${attachments.length})`);
+    console.log(`   ✅ [MAIL SENT] to=${to} | subject=${subject} | msgId=${info.messageId} | Attachments: ${attachments.length}`);
     return { success: true, messageId: info.messageId };
   } catch (error) {
-    // console.error(`   ❌ [MAIL ERROR]:`, error.message);
-    return { success: false, error: error.message };
+    console.error(`   ❌ [MAIL ERROR] host=${currentConfig.host}:${currentConfig.port} | code=${error.code} | cmd=${error.command} | msg=${error.message}`);
+    return { success: false, error: error.message, code: error.code };
   }
 };
 
