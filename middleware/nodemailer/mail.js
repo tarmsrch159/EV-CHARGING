@@ -10,10 +10,6 @@ const MAIL_CONFIGS = {
     host: "smtp.bangchak.co.th",
     port: 25,
     secure: false,
-    auth: {
-      user: "TMS-automail@bangchak.co.th",
-      pass: "Tm$@1234"
-    },
     from: '"AOS System" <noreply@bangchak.co.th>'
   },
   sit: {
