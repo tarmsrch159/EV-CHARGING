@@ -49,7 +49,6 @@ const prod = true;
 const paths = path.join(__dirname, 'files');
 const paths_prod = '/root/tms-fuel/back-end/gateway/files/';
 
-
 app.get('/api-tms-v2/test-104', (req, res, next) => {
     console.log("-----------------------------------------")
     console.log("test 104")
@@ -57,8 +56,6 @@ app.get('/api-tms-v2/test-104', (req, res, next) => {
     res.status(200).send('Hello World!');
 
 })
-
-
 
 // gzip/deflate outgoing responses
 var compression = require('compression');
@@ -348,10 +345,6 @@ app.use('/api-tms-v2/low-stock-alert', lowStockAlertRouter);
 app.use('/api-tms-v2/manual-stock', manualStockRouter);
 //Sales Org Config
 app.use('/api-tms-v2/sales-org-config', salesOrgConfigRouter);
-
-
-
-
 
 
 // ตั้งเวลาทำงานทุก 1 ชั่วโมง

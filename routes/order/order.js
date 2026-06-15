@@ -2375,8 +2375,6 @@ const getConfirmOrder = async (lic_code, order_id, action) => {
         }
       }
 
-
-
       return response;
     } catch (error) {
       let errMsg = error.response ? error.response.data : error.message;
@@ -2425,8 +2423,6 @@ const getConfirmOrder = async (lic_code, order_id, action) => {
 
       return response;
     }
-
-
   })().catch(async (err) => {
     console.log(err);
     let response = [
