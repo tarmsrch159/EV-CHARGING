@@ -859,7 +859,6 @@ exports.processLowStockAlerts = async (lic_code, filter_sales_org = null, filter
             LEFT JOIN tbl_petrol_group pg ON p.ptrl_group_code = pg.ptrl_group_code
             WHERE p.ptrl_flag = '1' AND p.rm_dt IS NULL 
                   AND oc.sales_org_flag = 1 AND oc.rm_dt IS NULL
-                  AND p.ptrl_code = 'petr-1778210986206'
                 ${wh}
         `;
         // // ดึง Config ว่าแต่ละปั๊มใช้เวลาของ Sales ORG อันไหน [ZOR1 , ZOR2]
@@ -932,7 +931,7 @@ exports.processLowStockAlerts = async (lic_code, filter_sales_org = null, filter
                         SELECT *, 
                                ROW_NUMBER() OVER (PARTITION BY tank_code, ptrl_code ORDER BY stock_at DESC) as rn
                         FROM tbl_automatics_tanks_information 
-                        WHERE stock > 0 
+                        WHERE stock >= 0 
                           AND stock_at >= (
                               SELECT MAX(stock_at) - INTERVAL '1 day'
                               FROM tbl_automatics_tanks_information 
