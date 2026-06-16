@@ -64,6 +64,28 @@ exports.getRunoutReportInformation = async (req, res, next) => {
             conditions.push(`p.ptrl_sales_type = $${params.length}`);
         }
 
+        // =========================================================================
+        // กรองข้อมูลตามสิทธิ์การเข้าถึง (Role Authorization)
+        // =========================================================================
+        let act_val = action[0].value.toString().toUpperCase();
+        let act_id = action[0].id;
+
+        if (act_val === "GROUP") {
+            // ======================= สิทธิ์ GROUP (เช่น Planner/CS): มองเห็นเฉพาะ Order ของปั๊มที่อยู่ในความดูแลของตัวเอง =======================
+            conditions.push(
+                `
+        (
+        NOT EXISTS (SELECT 1 FROM tbl_employee_petrol_group WHERE emp_code = '${act_id}' AND emp_pgrp_flag = 1)
+        OR p.ptrl_group_code IN (SELECT ptrl_group_code FROM tbl_employee_petrol_group WHERE emp_code = '${act_id}' AND emp_pgrp_flag = 1)
+        )`,
+            );
+            conditions.push(`p.ptrl_flag = '1'`);
+
+        } else if (act_val !== "ALL") {
+            // ======================= สิทธิ์พนักงานทั่วไป: มองเห็นเฉพาะรายงานของปั๊มตัวเอง =======================
+            conditions.push(`ri.ptrl_code IN (SELECT ptrl_code FROM tbl_petrol WHERE ptrl_code IN (SELECT ptrl_code FROM tbl_employee WHERE emp_code = '${act_id}' AND emp_flag = '1'))`);
+        }
+
         const whereClause = conditions.length > 0 ? "WHERE " + conditions.join(" AND ") : "";
 
         // 2. Query หลัก: ดึงข้อมูลพร้อมเช็คว่า "ยังไม่มีการยืนยันคำสั่งซื้อใน SAP"
@@ -90,6 +112,9 @@ exports.getRunoutReportInformation = async (req, res, next) => {
         `;
         const tbl_temporary = await pgConn.getWithParams(dbName, script, params, config.connectionString());
 
+        console.log(script);
+        console.log(params);
+        console.log(tbl_temporary);
         if (tbl_temporary.code) throw new Error(tbl_temporary.message);
 
         // 3. ปรับแต่งข้อมูล (ดึงค่าที่คำนวณมาแล้วจาก Table)
