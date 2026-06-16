@@ -349,11 +349,6 @@ const sendAutoOrderEmail = async (stationData) => {
 
         const htmlContent = generateFullEmailHtml(stationName, confirmUrl, rowsHtml, hasOrders);
 
-        // Preview File
-        const previewPath = path.join(__dirname, 'preview_html', 'preview_email.html');
-        if (!fs.existsSync(path.dirname(previewPath))) fs.mkdirSync(path.dirname(previewPath), { recursive: true });
-        fs.writeFileSync(previewPath, htmlContent, 'utf8');
-
         const attachments = [{
             filename: 'Logo.png',
             path: path.join(__dirname, '../../public/images/Logo.png'),
