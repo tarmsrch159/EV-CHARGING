@@ -420,7 +420,11 @@ const processAutoOrderMails = async (lic_code) => {
  */
 exports.getAutoOrderMailData = async (req, res) => {
     try {
-        const lic_code = req.header('lic_code');
+        let lic_code = req.header('lic_code');
+        if (lic_code) {
+            lic_code = lic_code.trim();
+            if (lic_code === 'aos_01') lic_code = 'aos01';
+        }
 
         if (!lic_code) return sendResponse(res, 'error', '-1', 'พารามิเตอร์ไม่ถูกต้อง', []);
 
@@ -435,7 +439,11 @@ exports.getAutoOrderMailData = async (req, res) => {
 /**
  * Background Process
  */
-exports.runAutoOrderMailTask = async (lic_code = 'aos_qa') => {
+exports.runAutoOrderMailTask = async (lic_code = '') => {
+    const defaultLicCode = process.env.IS_PROD === 'true' ? 'aos_qa' : 'aos01';
+    lic_code = (lic_code && lic_code.trim()) ? lic_code.trim() : defaultLicCode;
+    if (lic_code === 'aos_01') lic_code = 'aos01';
+
     setLicCode(lic_code);
     logInfo('Auto Order Mail', `เริ่ม Background Task สำหรับ ${lic_code}...`);
 
@@ -974,12 +982,16 @@ const getConfirmOrder = async (lic_code, order_id, action) => {
 /**
  * ฟังก์ชันหลักสำหรับ Background Process ดึงออเดอร์ที่เข้าเงื่อนไขส่งเข้า SAP
  */
-const runAutoOrderToSapTask = async (lic_code = 'aos_qa') => {
+const runAutoOrderToSapTask = async (lic_code = '') => {
+    const defaultLicCode = process.env.IS_PROD === 'true' ? 'aos_qa' : 'aos01';
+    lic_code = (lic_code && lic_code.trim()) ? lic_code.trim() : defaultLicCode;
+    if (lic_code === 'aos_01') lic_code = 'aos01';
+
     currentLicCode = lic_code;
     logInfo('Auto Order SAP Background', `เริ่มตรวจสอบรายการ Auto Order ประจำรอบเวลา ${moment().format('HH:mm:ss')}`);
-    //  console.log(`Auto Order SAP Background [aosQA] เริ่มตรวจสอบรายการ Auto Order ประจำรอบเวลา ${moment().format('HH:mm:ss')}`)
 
     try {
+        console.log(`Auto Order SAP Background [${lic_code}] เริ่มตรวจสอบรายการ Auto Order ประจำรอบเวลา ${moment().format('HH:mm:ss')}`)
 
         // โดยเช็คสถานะ order_status = '0' และยังมีสิทธิ์ใช้งานอยู่ (order_flag = '1' และ rm_dt IS NULL)
         const checkAutoOrderScript = `
@@ -1045,10 +1057,17 @@ exports.runAutoOrderToSapTask = runAutoOrderToSapTask;
 // ======================================================================= Remove Auto Order that over 3 days =====================================================================
 
 // Task สำหรับลบ Auto Order ที่ค้างเกิน 3 วัน (รันพร้อมกับรอบส่งเมล)
-exports.runAutoOrderCleanupTask = async (lic_code = 'aos_qa') => {
+exports.runAutoOrderCleanupTask = async (lic_code = '') => {
+    const defaultLicCode = process.env.IS_PROD === 'true' ? 'aos_qa' : 'aos01';
+    lic_code = (lic_code && lic_code.trim()) ? lic_code.trim() : defaultLicCode;
+    if (lic_code === 'aos_01') lic_code = 'aos01';
+
     setLicCode(lic_code);
     try {
         const dbName = dbPrefix + lic_code;
+
+        console.log(dbName)
+        console.log(lic_code)
 
         // วันที่ย้อนหลัง 3 วัน (นับจากวันนี้)
         const thresholdDate = moment().subtract(3, "days").format("YYYY-MM-DD");
@@ -1082,18 +1101,22 @@ exports.runAutoOrderCleanupTask = async (lic_code = 'aos_qa') => {
 // =========== API สำหรับ Test การอัปเดต Flag Auto Order ===========
 exports.updateAutoOrderFlag = async (req, res, next) => {
     let lic_code = req.header("lic_code");
+    const defaultLicCode = process.env.IS_PROD === 'true' ? 'aos_qa' : 'aos01';
+    lic_code = (lic_code && lic_code.trim()) ? lic_code.trim() : defaultLicCode;
+    if (lic_code === 'aos_01') lic_code = 'aos01';
+
     setLicCode(lic_code);
     let dbName = dbPrefix + lic_code;
 
     try {
         const updateScript = `
-    UPDATE tbl_order 
-    SET order_flag = '0', 
-        rm_dt = CURRENT_TIMESTAMP 
-    WHERE auto_order = '1' 
-      AND order_flag = '1' 
-      AND order_status = '0'
-      AND CURRENT_DATE >= (deli_date_req + INTERVAL '3 days')
+                UPDATE tbl_order 
+                SET order_flag = '0', 
+                    rm_dt = CURRENT_TIMESTAMP 
+                WHERE auto_order = '1' 
+                AND order_flag = '1' 
+                AND order_status = '0'
+                AND CURRENT_DATE >= (deli_date_req + INTERVAL '3 days')
 `;
 
         const result = await pgConn.execute(

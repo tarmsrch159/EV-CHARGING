@@ -1,35 +1,33 @@
 const nodemailer = require('nodemailer');
 
-const ENV = {
-  PROD: true
-};
+const prod = process.env.IS_PROD === 'true';
 
 // ======= Config SMTP (Production & SIT) =======
 const MAIL_CONFIGS = {
   production: {
-    host: "smtp.bangchak.co.th",
-    port: 25,
-    secure: false,
+    host: process.env.MAIL_HOST_PROD || "smtp.bangchak.co.th",
+    port: parseInt(process.env.MAIL_PORT_PROD || "25", 10),
+    secure: process.env.MAIL_SECURE_PROD === 'true',
     auth: {
-      user: "TMS-automail",
-      pass: "Tm$@1234"
+      user: process.env.MAIL_USER_PROD || "TMS-automail",
+      pass: process.env.MAIL_PASS_PROD || "Tm$@1234"
     },
-    from: '"AOS System" <noreply@bangchak.co.th>'
+    from: process.env.MAIL_FROM_PROD || '"AOS System" <noreply@bangchak.co.th>'
   },
   sit: {
-    host: "smtp.gmail.com",
-    port: 587,
-    secure: false,
+    host: process.env.MAIL_HOST_SIT || "smtp.gmail.com",
+    port: parseInt(process.env.MAIL_PORT_SIT || "587", 10),
+    secure: process.env.MAIL_SECURE_SIT === 'true',
     auth: {
-      user: "mrxon2486@gmail.com",
-      pass: "dcrckiikupzsbjny"
+      user: process.env.MAIL_USER_SIT || "mrxon2486@gmail.com",
+      pass: process.env.MAIL_PASS_SIT || "dcrckiikupzsbjny"
     },
-    from: '"AOS System (SIT)" <noreply@bangchak.co.th>'
+    from: process.env.MAIL_FROM_SIT || '"AOS System (SIT)" <noreply@bangchak.co.th>'
   }
 };
 
 // เลือก Config ตาม ENV
-const currentConfig = ENV.PROD ? MAIL_CONFIGS.production : MAIL_CONFIGS.sit;
+const currentConfig = prod ? MAIL_CONFIGS.production : MAIL_CONFIGS.sit;
 
 console.log(currentConfig)
 

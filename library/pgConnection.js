@@ -2,8 +2,17 @@ const { Pool } = require("pg");
 var pool;
 
 const mapDatabaseName = (dbname) => {
-  if (dbname === 'tms_aos01' || dbname === 'tms_aos02') {
-    return 'tms_aos_qa';
+  const isProd = process.env.IS_PROD === 'true';
+  if (!isProd) {
+    // กรณี SIT
+    if (dbname === 'tms_aos_qa') {
+      return process.env.DB_DATABASE_SIT || 'tms_aos01';
+    }
+  } else {
+    // กรณี Prod
+    if (dbname === 'tms_aos01' || dbname === 'tms_aos02') {
+      return process.env.DB_DATABASE_PROD || 'tms_aos_qa';
+    }
   }
   return dbname;
 };

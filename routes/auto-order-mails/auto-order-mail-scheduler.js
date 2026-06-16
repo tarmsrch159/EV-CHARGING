@@ -46,8 +46,9 @@ const executeLoop = async (startTimeStr, endTimeStr, pauseMinutes) => {
             const timeCtx = checkInTimeWindow(startTimeStr, endTimeStr);
             // ======== เริ่มทำงานของรอบวัน ============
             if (timeCtx.isInWindow) {
-                const licCodes = ['aos_qa'];
-                // const licCodes = ['aos01', 'aos02'];
+                const defaultLicCodes = process.env.IS_PROD === 'true' ? ['aos_qa'] : ['aos01'];
+                const licCodes = (process.env.LIC_CODES ? process.env.LIC_CODES.split(',') : defaultLicCodes)
+                    .map(c => c.trim() === 'aos_01' ? 'aos01' : c.trim());
                 for (const lic_code of licCodes) {
                     await autoOrderMailsController.runAutoOrderMailTask(lic_code);
                 }
@@ -111,8 +112,9 @@ exports.startAutoOrderMailLoopTest = async () => {
     console.log(`====================================================================\x1b[0m`);
     while (true) {
         try {
-            const licCodes = ['aos_qa'];
-            // const licCodes = ['aos01', 'aos02'];
+            const defaultLicCodes = process.env.IS_PROD === 'true' ? ['aos_qa'] : ['aos01'];
+            const licCodes = (process.env.LIC_CODES ? process.env.LIC_CODES.split(',') : defaultLicCodes)
+                .map(c => c.trim() === 'aos_01' ? 'aos01' : c.trim());
             for (const lic_code of licCodes) {
                 await autoOrderMailsController.runAutoOrderMailTask(lic_code);
             }

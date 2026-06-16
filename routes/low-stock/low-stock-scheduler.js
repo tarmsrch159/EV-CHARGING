@@ -18,8 +18,9 @@ const executeLoop = async () => {
     try {
         logInfo('Runout Alert', 'เริ่มต้นรอบการทำงาน...');
 
-        const licCodes = ['aos_qa'];
-        // const licCodes = ['aos01', 'aos02'];
+        const defaultLicCodes = process.env.IS_PROD === 'true' ? ['aos_qa'] : ['aos01'];
+        const licCodes = (process.env.LIC_CODES ? process.env.LIC_CODES.split(',') : defaultLicCodes)
+            .map(c => c.trim() === 'aos_01' ? 'aos01' : c.trim());
         for (const lic_code of licCodes) {
             logInfo('Runout Alert', `[${lic_code}] กำลังตรวจสอบ...`);
             await lowStockAlertController.processLowStockAlerts(lic_code);

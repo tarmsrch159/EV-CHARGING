@@ -3,10 +3,12 @@
 /**
  * Module dependencies.
  */
+const path = require('path');
+const dotenv = require('dotenv');
+dotenv.config({ path: path.join(__dirname, '../.env') });
+
 const config = require("../configuration/connection");
 const pgConn = require("../library/pgConnection");
-const dotenv = require('dotenv');
-dotenv.config({ path: __dirname.toString().replace('bin', '') + `/.env` });
 var app = require("../app");
 var debug = require("debug")("demo:server");
 var http = require("http");

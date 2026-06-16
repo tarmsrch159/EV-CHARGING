@@ -1,3 +1,4 @@
+require('dotenv').config();
 var createError = require('http-errors');
 var express = require('express');
 var path = require('path');
@@ -45,9 +46,10 @@ const lowStockAlertScheduler = require('./routes/low-stock/low-stock-scheduler')
 var app = express();
 var cors = require('cors');
 var config = require('./configuration/connection');
-const prod = true;
-const paths = path.join(__dirname, 'files');
-const paths_prod = '/root/tms-fuel/back-end/gateway/files/';
+const prod = process.env.IS_PROD === 'true';
+const paths = process.env.UPLOAD_PATH_DEV || path.join(__dirname, 'files');
+const paths_prod = process.env.UPLOAD_PATH_PROD || '/root/tms-fuel/back-end/gateway/files/';
+const uploadPath = prod ? paths_prod : paths;
 
 app.get('/api-tms-v2/test-104', (req, res, next) => {
     console.log("-----------------------------------------")
@@ -64,14 +66,14 @@ app.use(compression());
 // store session state in browser cookie
 var cookieSession = require('cookie-session');
 app.use(cookieSession({
-    keys: ['secret1', 'secret2']
+    keys: [process.env.SESSION_SECRET_1 || 'secret1', process.env.SESSION_SECRET_2 || 'secret2']
 }));
 
 var session = require('express-session');
 // parse urlencoded request bodies into req.body
 app.set('trust proxy', 1) // trust first proxy
 app.use(session({
-    secret: 'keyboard cat',
+    secret: process.env.SESSION_SECRET_EXPRESS || 'keyboard cat',
     resave: false,
     saveUninitialized: true,
     cookie: { secure: true }
@@ -90,7 +92,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 const storage = multer.diskStorage({
     destination: (req, file, callback) => {
         debugger
-        callback(null, (prod == true) ? paths_prod : paths)
+        callback(null, uploadPath)
     },
     filename: (req, file, callback) => {
         let id = crypto.randomBytes(16).toString("hex");
@@ -167,7 +169,7 @@ exports.xAuthorization = async (req, res) => {
                         res.end(null);
                     } else {
                         //read the image using fs and send the image content back in the response
-                        fs.readFile(((prod == true) ? paths_prod : paths) + pic, function (err, content) {
+                        fs.readFile(uploadPath + pic, function (err, content) {
                             if (err) {
                                 res.writeHead(200, { 'Content-type': 'image/jpg' });
                                 res.end(null);
@@ -186,7 +188,7 @@ exports.xAuthorization = async (req, res) => {
                         res.end(null);
                     } else {
                         //read the image using fs and send the image content back in the response
-                        fs.readFile(((prod == true) ? paths_prod : paths) + video, function (err, content) {
+                        fs.readFile(uploadPath + video, function (err, content) {
                             if (err) {
                                 res.writeHead(200, { 'Content-type': 'video/mp4' });
                                 res.end(null);
@@ -200,7 +202,7 @@ exports.xAuthorization = async (req, res) => {
                 }
 
                 if (video_stream != undefined) {
-                    const videoPath = ((prod == true) ? paths_prod : paths) + video_stream;
+                    const videoPath = uploadPath + video_stream;
                     const stat = fs.statSync(videoPath);
                     const fileSize = stat.size;
                     const range = req.headers.range;
