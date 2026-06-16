@@ -112,9 +112,6 @@ exports.getRunoutReportInformation = async (req, res, next) => {
         `;
         const tbl_temporary = await pgConn.getWithParams(dbName, script, params, config.connectionString());
 
-        console.log(script);
-        console.log(params);
-        console.log(tbl_temporary);
         if (tbl_temporary.code) throw new Error(tbl_temporary.message);
 
         // 3. ปรับแต่งข้อมูล (ดึงค่าที่คำนวณมาแล้วจาก Table)
