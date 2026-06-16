@@ -7287,7 +7287,6 @@ exports.getReportStationOverDaySales = async (req, res, next) => {
         OFFSET (${page_index} * ${page_limit}) LIMIT ${page_limit};
     `;
 
-    console.log(dataScript)
 
     let countScript = `
         SELECT 
@@ -7308,8 +7307,8 @@ exports.getReportStationOverDaySales = async (req, res, next) => {
         tbl_temporary.data = JSON.parse(JSON.stringify(tbl_temporary.data).replace(/\:null/gi, '\:""'));
 
         responseData = tbl_temporary.data.map(row => {
-          let cov = parseFloat(row.days_coverage) || 0;
-          let avg = parseFloat(row.avg_day_sales) || 0;
+          let cov = row.days_coverage || 0;
+          let avg = row.avg_day_sales || 0;
 
           let status = "";
           let suggestion = "";
@@ -7329,7 +7328,7 @@ exports.getReportStationOverDaySales = async (req, res, next) => {
 
           return {
             ...row,
-            days_coverage: cov.toFixed(1),
+            days_coverage: cov,
             status,
             suggestion
           };
