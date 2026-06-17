@@ -4,6 +4,7 @@ const controller = require('./auto-order-mails');
 
 // ============== Auto Order Mails ==============
 router.post('/information', controller.getAutoOrderMailData);
+router.post('/trigger/information', controller.runAutoOrderMailTask);
 router.post('/decrypt-token', controller.decryptToken);
 
 // ============== Auto Order Cleanup ==============

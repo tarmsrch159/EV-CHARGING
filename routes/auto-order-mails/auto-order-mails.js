@@ -446,6 +446,7 @@ exports.runAutoOrderMailTask = async (lic_code = '') => {
         // [Auto Order Cleanup] รันการล้างข้อมูลออเดอร์เก่าไปพร้อมกัน (ไม่ว่าจะพบข้อมูลส่งเมลหรือไม่)
         await exports.runAutoOrderCleanupTask(lic_code);
         await exports.runAutoOrderToSapTask(lic_code);
+        await exports.runAutoStockLogs(lic_code)
 
         const currentTime = moment().format('HH:mm:ss');
         const query = `
