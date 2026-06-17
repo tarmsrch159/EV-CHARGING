@@ -797,6 +797,7 @@ exports.getOrderReportInformation = async (req, res, next) => {
       status_deli,
       ptrl_group_code,
       ptrl_number,
+      ptrl_code,
       search,
       emp_role_code,
       reason,
@@ -817,6 +818,7 @@ exports.getOrderReportInformation = async (req, res, next) => {
     emp_role_code = emp_role_code === undefined ? "ALL" : emp_role_code;
     dpo_code = dpo_code === undefined ? "ALL" : dpo_code;
     reason = reason === undefined ? "ALL" : reason;
+    ptrl_code = ptrl_code === undefined ? "ALL" : ptrl_code
     // ========== เช็คเฉพาะส่วนที่สำคัญ ==========
     if (
       start_date === undefined ||
@@ -897,6 +899,12 @@ exports.getOrderReportInformation = async (req, res, next) => {
       ptrl_group_code.toString().toUpperCase() !== "ALL"
     ) {
       conditions.push(`tbl_petrol.ptrl_group_code = '${ptrl_group_code}'`);
+    }
+
+    if (
+      ptrl_code.toString().toUpperCase() !== "ALL"
+    ) {
+      conditions.push(`tbl_petrol.ptrl_code = '${ptrl_code}'`);
     }
 
     if (search !== "" && search !== undefined && search !== null) {
@@ -7173,7 +7181,7 @@ exports.getChildOrderInformation = async (req, res, next) => {
 };
 
 
-// =========== ดึงข้อมูลรายงานสถานีบริการ ที่สั่งเกินยอดขาย (FR-21) ===========
+// =========== ดึงข้อมูลรายงานสถานีบริการ ที่สั่งเกินยอดขาย ===========
 exports.getReportStationOverDaySales = async (req, res, next) => {
   var xresult = [];
   return (async () => {
