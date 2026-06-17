@@ -90,7 +90,12 @@ exports.getRunoutReportInformation = async (req, res, next) => {
 
         // 2. Query หลัก: ดึงข้อมูลพร้อมเช็คว่า "ยังไม่มีการยืนยันคำสั่งซื้อใน SAP"
         const script = `
-            SELECT DISTINCT ON (p.ptrl_number, ri.tank_numbers, ri.itm_code, DATE(ri.ist_dt))
+            select DISTINCT ON (p.ptrl_number, ri.tank_numbers, ri.itm_code, DATE(ri.ist_dt))
+                o.id,
+                case 
+                	when o.order_status in ('1', '10') then true
+                	else false
+                end as check_order,
                 ri.ist_dt as alert_date,
                 p.ptrl_code,
                 p.ptrl_number,
@@ -103,13 +108,16 @@ exports.getRunoutReportInformation = async (req, res, next) => {
                 ri.stock_minus_sales as stock,
                 p.ptrl_sales_group,
                 ot.sales_order_type
-            FROM tbl_runout_information ri
-            JOIN tbl_petrol p ON ri.ptrl_code = p.ptrl_code
-            LEFT JOIN tbl_order_type ot ON p.ptrl_sales_type = ot.ord_type_code
+            from tbl_runout_information ri
+            join tbl_petrol p ON ri.ptrl_code = p.ptrl_code
+            left join tbl_order_type ot ON p.ptrl_sales_type = ot.ord_type_code
+            left join tbl_order o on p.ptrl_number = o.sold_to
             ${whereClause}
-            ORDER BY p.ptrl_number ASC, ri.tank_numbers ASC, ri.itm_code, DATE(ri.ist_dt), ri.ist_dt DESC
-            OFFSET ${offset} LIMIT ${pageLimitInt};
+            order by p.ptrl_number, ri.tank_numbers, ri.itm_code, DATE(ri.ist_dt), ri.ist_dt DESC
+            offset ${offset} limit ${pageLimitInt};
         `;
+
+        console.log(script)
         const tbl_temporary = await pgConn.getWithParams(dbName, script, params, config.connectionString());
 
         if (tbl_temporary.code) throw new Error(tbl_temporary.message);
