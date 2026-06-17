@@ -1088,11 +1088,11 @@ exports.getOrderReportInformation = async (req, res, next) => {
                 ORDER BY ptrl_code, emp_role_code DESC
             ) tbl_employee ON tbl_petrol.ptrl_code = tbl_employee.ptrl_code
             LEFT JOIN tbl_employee_role empr_st ON tbl_employee.emp_role_code = empr_st.emp_role_code
-            LEFT JOIN tbl_order_item ON tbl_order.id = tbl_order_item.order_no
             LEFT JOIN tbl_order_type ON tbl_order.order_type = tbl_order_type.ord_type_code
             ${whereClause} 
             AND item.rm_dt IS NULL;
         `;
+
     let tbl_top_sum_qty = await pgConn.get(
       dbPrefix + lic_code,
       topSumQtyScript,
@@ -7324,7 +7324,7 @@ exports.getReportStationOverDaySales = async (req, res, next) => {
             suggestion = "คงยอดตามแนะนำ";
           } else {
             status = "Under Threshold";
-            suggestion = "ไม่แนะนำปลด Order";
+            suggestion = "ไม่แนะนำให้ลดออเดอร์";
           }
 
           return {
@@ -7937,7 +7937,7 @@ exports.addOrderInformationWithSAP = async (req, res, next) => {
       }
     }
 
-    // ============ ส่งข้อมูลเข้า SAP ทันที ============
+    // ============ ส่งข้อมูลเข้า SAP ============
     let sapResult = await getConfirmOrder(lic_code, order_id, action);
 
     let response = [];
