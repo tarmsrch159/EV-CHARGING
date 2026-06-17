@@ -1535,7 +1535,6 @@ exports.getLoggingOrderInformation = async (req, res, next) => {
       script,
       config.connectionString(),
     );
-    console.log(mainLogResult.data)
     if (!mainLogResult.code && mainLogResult.data) {
       if (mainLogResult.data.length > 0) {
         // =========================================================
