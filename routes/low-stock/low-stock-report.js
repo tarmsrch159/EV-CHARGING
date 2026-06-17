@@ -91,10 +91,10 @@ exports.getRunoutReportInformation = async (req, res, next) => {
         // 2. Query หลัก: ดึงข้อมูลพร้อมเช็คว่า "ยังไม่มีการยืนยันคำสั่งซื้อใน SAP"
         const script = `
             select DISTINCT ON (p.ptrl_number, ri.tank_numbers, ri.itm_code, DATE(ri.ist_dt))
-                o.id,
+                od.id,
                 case 
-                	when o.order_status in ('1', '10') then 1
-                	else 0
+                        when od.order_status in ('1', '10') then 1
+                        else 0
                 end as check_order,
                 ri.ist_dt as alert_date,
                 p.ptrl_code,
@@ -111,7 +111,9 @@ exports.getRunoutReportInformation = async (req, res, next) => {
             from tbl_runout_information ri
             join tbl_petrol p ON ri.ptrl_code = p.ptrl_code
             left join tbl_order_type ot ON p.ptrl_sales_type = ot.ord_type_code
-            left join tbl_order o on p.ptrl_number = o.sold_to
+            left join (
+            	select o.id, o.order_status, o.sold_to, o.ist_dt from tbl_order o where o.ist_dt >= current_date::date order by o.ist_dt desc
+            ) od on p.ptrl_number = od.sold_to
             ${whereClause}
             order by p.ptrl_number, ri.tank_numbers, ri.itm_code, DATE(ri.ist_dt), ri.ist_dt DESC
             offset ${offset} limit ${pageLimitInt};
