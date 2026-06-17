@@ -1044,6 +1044,72 @@ const runAutoOrderToSapTask = async (lic_code = '') => {
 exports.runAutoOrderToSapTask = runAutoOrderToSapTask;
 
 
+// Function สำหรับอ่านข้อมูลว่ามีน้ำมันที่คำนวณมาหรือไม่ ถ้าไม่มีให้เก็บ Logs ไปแสดงในหน้า Audit trail logging
+exports.runAutoStockLogs = async (lic_code = '') => {
+    const defaultLicCode = process.env.IS_PROD === 'true' ? 'aos_qa' : 'aos01';
+    lic_code = (lic_code && lic_code.trim) ? lic_code.trim() : defaultLicCode;
+    if (lic_code === 'aos_01') lic_code = 'aos01';
+
+    setLicCode(lic_code);
+    logInfo('Auto Stock Logs', `เริ่ม Background Task ตรวจสอบ Stock สำหรับ ${lic_code}...`);
+
+    try {
+        const petrolScript = `SELECT ptrl_code, ptrl_desc, ptrl_number FROM tbl_petrol WHERE ptrl_flag = '1' AND rm_dt IS NULL`;
+        const petrolResult = await pgConn.get(dbPrefix + lic_code, petrolScript, config.connectionString());
+
+        if (petrolResult.code || !petrolResult.data || petrolResult.data.length === 0) {
+            logInfo('Auto Stock Logs', 'ไม่พบข้อมูลสถานีบริการ');
+            return { success: false, message: 'ไม่พบข้อมูลสถานีบริการ' };
+        }
+
+        let missingStockCount = 0;
+
+        for (const petrol of petrolResult.data) {
+            const stockScript = `
+                select * from tbl_automatics_tanks_information tati
+                left join tbl_petrol p on tati.ptrl_code = p.ptrl_code
+                where tati.stock_at >= current_date - 1 and tati.ptrl_code = $1 order by tati.stock_at desc
+            `;
+            const stockResult = await pgConn.getWithParams(dbPrefix + lic_code, stockScript, [petrol.ptrl_code], config.connectionString());
+
+            if (stockResult.code || !stockResult.data || stockResult.data.length === 0) {
+                missingStockCount++;
+                let logPayload = {
+                    order_no: "-",
+                    aos_order_no: "-",
+                    ship_to: petrol.ptrl_number,
+                    station_name: petrol.ptrl_desc,
+                    station_group: "Auto Calculator",
+                    event_type: "Auto Calculator",
+                    action_by: "Auto Calculator",
+                    action_date: moment().format("YYYY-MM-DD HH:mm:ss"),
+                    remark: "ไม่มีข้อมูล Stock เข้ามา",
+                    field: "",
+                    before: "",
+                    after: "",
+                    changes: []
+                };
+
+                await xglobal.action_logs(
+                    lic_code,
+                    "Auto Calculator",
+                    "override",
+                    JSON.stringify(logPayload),
+                    "success",
+                    "Auto Calculator"
+                );
+            }
+        }
+
+        logInfo('Auto Stock Logs', `รันเสร็จสิ้น: พบสถานีที่ไม่มีข้อมูล Stock จำนวน ${missingStockCount} แห่ง`);
+        return { success: true, missingStockCount };
+
+    } catch (err) {
+        logError('Auto Stock Logs', 'runAutoStockLogs Error', err);
+        return { success: false, error: err.message };
+    }
+};
+
 
 
 

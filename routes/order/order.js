@@ -1509,7 +1509,10 @@ exports.getLoggingOrderInformation = async (req, res, next) => {
     //             ดึงข้อมูล Audit Logs หลัก (Main Query)
     // =========================================================
     script = `SELECT 
-            tbl_employee.emp_name || ' / ' || tbl_employee_role.emp_role_desc as action_by,
+            case 
+              when tbl_action_logs.action_code = 'Auto Calculator' then 'Auto Calculator'
+              else tbl_employee.emp_name || ' / ' || tbl_employee_role.emp_role_desc
+            end as action_by,
             tbl_action_logs.action_desc as event_type,
             tbl_action_logs.action_body,
             tbl_action_logs.ist_dt as action_date,
@@ -1532,7 +1535,7 @@ exports.getLoggingOrderInformation = async (req, res, next) => {
       script,
       config.connectionString(),
     );
-
+    console.log(mainLogResult.data)
     if (!mainLogResult.code && mainLogResult.data) {
       if (mainLogResult.data.length > 0) {
         // =========================================================

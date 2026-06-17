@@ -13,4 +13,8 @@ router.patch('/auto-order/cleanup/test', controller.updateAutoOrderFlag);
 router.post('/run/auto-order-to-sap', controller.runAutoOrderToSapTask);
 
 
+// ============== Auto Order Send To SAP ==============
+router.post('/run/auto-stock-logs', controller.runAutoStockLogs);
+
+
 module.exports = router;
