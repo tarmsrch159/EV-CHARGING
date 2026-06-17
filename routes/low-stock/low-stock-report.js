@@ -93,8 +93,8 @@ exports.getRunoutReportInformation = async (req, res, next) => {
             select DISTINCT ON (p.ptrl_number, ri.tank_numbers, ri.itm_code, DATE(ri.ist_dt))
                 o.id,
                 case 
-                	when o.order_status in ('1', '10') then true
-                	else false
+                	when o.order_status in ('1', '10') then 1
+                	else 0
                 end as check_order,
                 ri.ist_dt as alert_date,
                 p.ptrl_code,
