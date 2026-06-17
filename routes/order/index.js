@@ -16,6 +16,7 @@ router.post('/auto-email/information', order.getOrderReport);
 router.post('/order-logs/information', order.getLoggingOrderInformation);
 router.post('/re-order/information', order.reCreateOrderInformation);
 router.put('/information', order.addOrderInformation);
+router.put('/information-with-sap', order.addOrderInformationWithSAP);
 router.put('/linked-order/information', order.addLinkedOrderInformation);
 router.patch('/set-linked-order/information', order.setLinkedOrderInformation);
 router.delete('/unlinked-order/information', order.unlinkOrderInformation);
