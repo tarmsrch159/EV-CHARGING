@@ -111,6 +111,7 @@ exports.getRunoutReportInformation = async (req, res, next) => {
             from tbl_runout_information ri
             join tbl_petrol p ON ri.ptrl_code = p.ptrl_code
             left join tbl_order_type ot ON p.ptrl_sales_type = ot.ord_type_code
+            left join tbl_order ord on p.ptrl_number = ord.sold_to
             left join (
             	select o.id, o.order_status, o.sold_to, o.ist_dt from tbl_order o where o.ist_dt >= current_date::date order by o.ist_dt desc
             ) od on p.ptrl_number = od.sold_to
