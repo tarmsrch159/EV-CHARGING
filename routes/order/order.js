@@ -1033,7 +1033,6 @@ exports.getOrderReportInformation = async (req, res, next) => {
             WHERE tbl_order_item.rm_dt IS NULL
             AND ${whereClause.replace("WHERE", "")}
             ORDER BY tbl_order.ist_dt DESC 
-            OFFSET (${page_index} * ${page_limit}) LIMIT ${page_limit}
         )
         SELECT 
             (SELECT COUNT(DISTINCT id) FROM paginated_items WHERE auto_order = '0') AS total_manual_order,

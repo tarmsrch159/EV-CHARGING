@@ -436,7 +436,7 @@ exports.getAutoOrderMailData = async (req, res) => {
  */
 exports.runAutoOrderMailTask = async (lic_code = '') => {
     const defaultLicCode = process.env.IS_PROD === 'true' ? 'aos_qa' : 'aos01';
-    lic_code = (lic_code && lic_code.trim()) ? lic_code.trim() : defaultLicCode;
+    lic_code = (lic_code && lic_code.trim) ? lic_code.trim : defaultLicCode;
     if (lic_code === 'aos_01') lic_code = 'aos01';
 
     setLicCode(lic_code);
