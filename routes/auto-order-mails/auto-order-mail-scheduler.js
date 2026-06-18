@@ -48,7 +48,7 @@ const executeLoop = async (startTimeStr, endTimeStr, pauseMinutes) => {
             if (timeCtx.isInWindow) {
                 const defaultLicCodes = process.env.IS_PROD === 'true' ? ['aos_qa'] : ['aos01'];
                 const licCodes = (process.env.LIC_CODES ? process.env.LIC_CODES.split(',') : defaultLicCodes)
-                    .map(c => c.trim() === 'aos_01' ? 'aos01' : c.trim());
+                    .map(c => c.trim === 'aos_01' ? 'aos01' : c.trim);
                 for (const lic_code of licCodes) {
                     await autoOrderMailsController.runAutoOrderMailTask(lic_code);
                 }

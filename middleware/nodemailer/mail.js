@@ -37,10 +37,10 @@ const transporter = nodemailer.createTransport({
   host: currentConfig.host,
   port: currentConfig.port,
   secure: currentConfig.secure,
-  // auth: {
-  //   user: currentConfig.auth.user,
-  //   pass: currentConfig.auth.pass
-  // }
+  auth: {
+    user: currentConfig.auth.user,
+    pass: currentConfig.auth.pass
+  }
 });
 
 
