@@ -314,8 +314,8 @@ const sendAutoOrderEmail = async (stationData) => {
     try {
         const toEmail = stationData.manager_email || 'test@example.com';
         const stationName = `${stationData.ptrl_desc} (${stationData.ptrl_number})`;
-        const reportBaseUrlProd = 'https://spd-demo.dtc.co.th:9101/main/order/order-report';
-        const reportBaseUrlTest = 'http://localhost:5173/main/order/order-report';
+        const reportBaseUrlProd = process.env.IS_PROD == 'true' ? 'https://aos-qa.bangchak.co.th/main/order/order-report' : 'https://spd-demo.dtc.co.th:9101/main/order/order-report';
+
         const reportBaseUrl = reportBaseUrlProd;
 
         const hasOrders = stationData.orders && stationData.orders.length > 0;
