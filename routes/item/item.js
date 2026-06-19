@@ -417,7 +417,7 @@ exports.setItemInformation = async (req, res, next) => {
             itm_icon = '${itm_icon}',
             itm_image = '${itm_image}',
             itm_material_number = '${itm_material_number}',
-            itm_weight_litr_per_kg = ${itm_weight_litr_per_kg},
+            itm_weight_litr_per_kg = ${itm_weight_litr_per_kg ? `'${itm_weight_litr_per_kg}'` : 'NULL'},
             itm_sales_org = '${itm_sales_org}',
             itm_order_type = '${itm_order_type}',
             mdf_dt = '${moment().format('YYYY-MM-DD HH:mm:ss')}' 
@@ -547,7 +547,7 @@ exports.addItemInformation = async (req, res, next) => {
             itm_material_number, itm_weight_litr_per_kg, itm_flag, ist_dt, itm_sales_org, itm_order_type) 
             values 
             ('${itm_code}', '${itm_desc}', '${itm_short_desc}', '${itm_type_code}', '${itm_unit_code}', '${itm_icon}', 
-            '${itm_image}', '${itm_material_number}', ${itm_weight_litr_per_kg}, '1', '${moment().format('YYYY-MM-DD HH:mm:ss')}', '${itm_sales_org}', '${itm_order_type}');`
+            '${itm_image}', '${itm_material_number}', ${itm_weight_litr_per_kg ? `'${itm_weight_litr_per_kg}'` : 'NULL'}, '1', '${moment().format('YYYY-MM-DD HH:mm:ss')}', '${itm_sales_org}', '${itm_order_type}');`
 
             script = script.replace(/'NULL'/gi, "NULL")
             let tbl_temporary = await pgConn.execute(dbPrefix + lic_code, script, config.connectionString());
