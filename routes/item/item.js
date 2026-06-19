@@ -12,7 +12,7 @@ exports.getItemInformation = async (req, res, next) => {
 
     return (async () => {
         let lic_code = req.header('lic_code');
-        let { itm_code, itm_material_number, search, page_index, page_limit, action, itm_sales_org, itm_order_type } = req.body[0];
+        let { itm_code, itm_material_number, search, itm_type_code, page_index, page_limit, action, itm_sales_org, itm_order_type } = req.body[0];
         page_index == undefined ? page_index = 1 : page_index;
         page_limit == undefined ? page_limit = 10 : page_limit;
 
@@ -93,6 +93,10 @@ exports.getItemInformation = async (req, res, next) => {
                 script += ` and tbl_item.itm_material_number = '${itm_material_number}'`
             }
 
+            if (itm_type_code.toString().toUpperCase() != 'ALL') {
+                script += ` and tbl_item.itm_type_code = '${itm_type_code}'`
+            }
+
             if (search != '') {
                 script += ` and (tbl_item.itm_material_number like '%${search}%' 
                 or tbl_item.itm_desc ILIKE '%${search}%' 
@@ -115,6 +119,7 @@ exports.getItemInformation = async (req, res, next) => {
                     OR tbl_item.itm_order_type IN (SELECT ord_type_code FROM tbl_order_type WHERE sales_order_type IN (${otypes}))
                 ) `;
             }
+
 
             // ดัก undefined ให้ Action
             let act_val = action?.[0]?.value?.toString().toUpperCase() || "ALL";
