@@ -123,10 +123,18 @@ exports.getPetrolGroupInformation = async (req, res, next) => {
         // SQL Query หลัก
         // =========================================================================
         let script = `
-            SELECT ptrl_group_code, ptrl_group_desc, ptrl_group_short_desc, ptrl_group_flag, 
-            tbl_petrol_group.ist_dt, tbl_petrol_group.mdf_dt, tbl_petrol_group.rm_dt, 
-            tbl_petrol_group.off_code, tbl_office.off_desc,
-            tbl_order_type.sales_order_type, tbl_petrol_group.ptrl_group_sales_org,
+            SELECT 
+            ptrl_group_code, 
+            ptrl_group_desc, 
+            ptrl_group_short_desc, 
+            ptrl_group_flag, 
+            tbl_petrol_group.ist_dt, 
+            tbl_petrol_group.mdf_dt, 
+            tbl_petrol_group.rm_dt, 
+            tbl_petrol_group.off_code, 
+            tbl_office.off_desc,
+            tbl_order_type.ord_type_desc as sales_order_type, 
+            tbl_petrol_group.ptrl_group_sales_org,
             tbl_petrol_group.ptrl_group_order_type,
             (SELECT COUNT(*) FROM tbl_petrol WHERE tbl_petrol.ptrl_group_code = tbl_petrol_group.ptrl_group_code AND tbl_petrol.ptrl_flag = '1') as ptrl_count
             FROM tbl_petrol_group 

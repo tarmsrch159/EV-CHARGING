@@ -107,7 +107,7 @@ exports.getRunoutReportInformation = async (req, res, next) => {
                 ri.unpump,
                 ri.stock_minus_sales as stock,
                 p.ptrl_sales_group,
-                ot.sales_order_type
+                ot.ord_type_desc as sales_order_type
             from tbl_runout_information ri
             join tbl_petrol p ON ri.ptrl_code = p.ptrl_code
             left join tbl_order_type ot ON p.ptrl_sales_type = ot.ord_type_code
