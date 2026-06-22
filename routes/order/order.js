@@ -7,6 +7,138 @@ const xglobal = require("../../middleware/global");
 const dbPrefix = config.dbPrefix();
 const sendResponse = xglobal.sendResponse;
 
+function allocateFuelDownOnly(compartments, products) {
+  const productNames = products.map((item) => item.product);
+
+  const productMap = products.reduce((acc, item) => {
+    acc[item.product] = item.liter;
+    return acc;
+  }, {});
+
+  const productMetaMap = products.reduce((acc, item) => {
+    acc[item.product] = {
+      ref1: item.ref1 ?? null,
+      ref2: item.ref2 ?? null,
+    };
+    return acc;
+  }, {});
+
+  const best = {
+    score: Infinity,
+    allocation: null,
+    adjustedProducts: null,
+  };
+
+  function calcScore(adjusted) {
+    let score = 0;
+    for (const name of productNames) {
+      const requested = productMap[name];
+      const actual = adjusted[name] || 0;
+      score += requested - actual; // down_only => actual ต้องไม่เกิน requested
+    }
+    return score;
+  }
+
+  function backtrack(index, currentAllocation, adjusted) {
+    if (index === compartments.length) {
+      const score = calcScore(adjusted);
+
+      if (score < best.score) {
+        best.score = score;
+        best.allocation = JSON.parse(JSON.stringify(currentAllocation));
+        best.adjustedProducts = { ...adjusted };
+      }
+      return;
+    }
+
+    const compartment = compartments[index];
+
+    // ไม่ใช้ช่องนี้
+    currentAllocation.push({
+      compartment_no: compartment.compartment_no,
+      product: null,
+      liter: 0,
+    });
+    backtrack(index + 1, currentAllocation, adjusted);
+    currentAllocation.pop();
+
+    // ใช้ช่องนี้กับ product
+    for (const productName of productNames) {
+      for (const qty of compartment.options) {
+        const nextTotal = (adjusted[productName] || 0) + qty;
+
+        // down_only => ห้ามเกิน target
+        if (nextTotal > productMap[productName]) continue;
+
+        currentAllocation.push({
+          compartment_no: compartment.compartment_no,
+          product: productName,
+          liter: qty,
+        });
+
+        adjusted[productName] = nextTotal;
+
+        backtrack(index + 1, currentAllocation, adjusted);
+
+        adjusted[productName] -= qty;
+        currentAllocation.pop();
+      }
+    }
+  }
+
+  const initAdjusted = {};
+  for (const name of productNames) {
+    initAdjusted[name] = 0;
+  }
+
+  backtrack(0, [], initAdjusted);
+
+  if (!best.allocation) {
+    return {
+      success: false,
+      score: null,
+      result: [],
+      unused_compartments: [],
+    };
+  }
+
+  const result = products.map((item) => {
+    const productName = item.product;
+    const requestedLiter = item.liter;
+    const adjustedLiter = best.adjustedProducts[productName] || 0;
+    const meta = productMetaMap[productName] || {};
+
+    return {
+      product: productName,
+      ref1: meta.ref1,
+      ref2: meta.ref2,
+      requested_liter: requestedLiter,
+      adjusted_liter: adjustedLiter,
+      diff_liter: adjustedLiter - requestedLiter,
+      compartments: best.allocation
+        .filter((x) => x.product === productName)
+        .map((x) => ({
+          compartment_no: x.compartment_no,
+          liter: x.liter,
+        })),
+    };
+  });
+
+  const unusedCompartments = best.allocation
+    .filter((x) => x.product === null)
+    .map((x) => ({
+      compartment_no: x.compartment_no,
+      liter: 0,
+    }));
+
+  return {
+    success: true,
+    score: best.score,
+    unused_compartments: unusedCompartments,
+    result,
+  };
+}
+
 // =========== ดึงข้อมูลรายการสั่งซื้อ ===========
 exports.getOrderInformation = async (req, res, next) => {
   var xresult = [];
