@@ -8482,3 +8482,1264 @@ exports.addOrderInformationWithSAP = async (req, res, next) => {
     res.status(200).send(response);
   });
 };
+
+// ============= เพิ่มและแก้ไขออเดอร์ ในส่วนของตรวจสอบช่องน้ำมันของรถ V2 ===================
+
+exports.addOrderInformationV2 = async (req, res, next) => {
+  return (async () => {
+    let lic_code = req.header("lic_code");
+    let {
+      order_type,
+      order_group,
+      chanel,
+      division,
+      sold_to,
+      ship_to,
+      cus_ref,
+      cus_date_ref,
+      po_name,
+      order_by,
+      ship_cond,
+      pay_term,
+      deli_date_req,
+      deli_time_req,
+      description,
+      sh_cus_ref,
+      sh_cus_date_ref,
+      order_item,
+      action,
+    } = req.body[0];
+
+    // ====================== เช็คเฉพาะส่วนที่สำคัญ ======================
+    if (
+      order_type == undefined ||
+      order_group == undefined ||
+      sold_to == undefined ||
+      ship_to == undefined ||
+      deli_date_req == undefined ||
+      deli_time_req == undefined ||
+      order_item == undefined ||
+      action == undefined
+    ) {
+      let response = [
+        {
+          status: "error",
+          invalid_code: "-1",
+          message:
+            "ไม่สามารถบันทึกข้อมูล, เนื่องจากข้อมูลพารามิเตอร์ไม่ถูกต้อง",
+          data: [],
+          response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+        },
+      ];
+
+      res.status(200).send(response);
+      return;
+    }
+
+    // Petrol Query
+    let scriptPetrol = `select ptrl_code from tbl_petrol where ptrl_number = $1 and ptrl_flag = '1'`;
+    let resultPetrol = await pgConn.getWithParams(
+      dbPrefix + lic_code,
+      scriptPetrol,
+      [ship_to],
+      config.connectionString(),
+    );
+
+    if (resultPetrol.code) {
+      let response = [
+        {
+          status: "error",
+          invalid_code: "-1",
+          message:
+            "ไม่สามารถบันทึกข้อมูล, เนื่องจากข้อมูลพารามิเตอร์ไม่ถูกต้อง",
+          data: [],
+          response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+        },
+      ];
+      res.status(200).send(response);
+      return;
+    }
+
+    if (resultPetrol.data.length === 0) {
+      let response = [
+        {
+          status: "error",
+          invalid_code: "-1",
+          message:
+            "ไม่สามารถบันทึกข้อมูล, เนื่องจากข้อมูลพารามิเตอร์ไม่ถูกต้อง",
+          data: [],
+          response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+        },
+      ];
+      res.status(200).send(response);
+      return;
+    }
+
+    // ============== Set Default Value ==============
+    chanel = chanel === undefined || chanel === "" ? "01" : chanel;
+    division = division === undefined || division === "" ? "04" : division;
+    deli_date_req =
+      deli_date_req === undefined || deli_date_req === ""
+        ? null
+        : deli_date_req;
+
+    let script = ``;
+    // =========== Order-No Mockup ===========
+    let order_no = "ord-" + moment().format("x");
+
+    // ====================== เช็คก่อนว่า มีรหัสน้ำมันในระบบรึเปล่า ======================
+    let hasValidItem = false;
+    if (order_item && Array.isArray(order_item) && order_item.length > 0) {
+      for (let i = 0; i < order_item.length; i++) {
+        let pre_itm_material_number = order_item[i].itm_material_number;
+        if (pre_itm_material_number) {
+          let check_item_script = `SELECT 1 FROM tbl_item WHERE itm_material_number = '${pre_itm_material_number}' LIMIT 1`;
+          let checkItemResult = await pgConn.get(
+            dbPrefix + lic_code,
+            check_item_script,
+            config.connectionString(),
+          );
+          if (!checkItemResult.code && checkItemResult.data.length > 0) {
+            hasValidItem = true;
+            break;
+          }
+        }
+      }
+    }
+
+    if (!hasValidItem) {
+      let response = [
+        {
+          status: "error",
+          invalid_code: "-1",
+          message:
+            "ไม่สามารถบันทึกข้อมูล Order ได้ เนื่องจากไม่พบรหัสสินค้าน้ำมัน (material_code) ที่ถูกต้องในระบบ",
+          data: [],
+          response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+        },
+      ];
+      res.status(200).send(response);
+      let logPayload = { order_no: "-", ...req.body[0] };
+      await xglobal.action_logs(
+        lic_code,
+        action[0].id,
+        "เพิ่ม Order",
+        JSON.stringify(logPayload),
+        "ไม่สามารถบันทึกข้อมูล Order เนื่องจากไม่มี รหัสน้ำมันอยู่ในระบบ",
+        action[0].value,
+      );
+      return;
+    }
+    // ====================== จบการเช็ค ======================
+
+    // ====================== เช็ค Validate item_quantity & Compartment Capacity (แยกรายน้ำมัน) ======================
+    if (order_item && Array.isArray(order_item) && order_item.length > 0) {
+      // ดึงข้อมูล Capacity ที่อนุญาตจากแป้นน้ำมันมาก่อน
+      let script_check_capacity = `select tvcl.veh_compartment_level from tbl_vehicle_compartment_level tvcl where tvcl.veh_compartment_level_flag = '1'`;
+      let checkCapacityResult = await pgConn.get(
+        dbPrefix + lic_code,
+        script_check_capacity,
+        config.connectionString(),
+      );
+
+      // ============ แป้นน้ำมันที่มีค่ามากกว่า 0 ==============
+      let allowedLevels = [];
+      if (!checkCapacityResult.code && checkCapacityResult.data.length > 0) {
+        allowedLevels = checkCapacityResult.data
+          .map((item) => parseFloat(item.veh_compartment_level))
+          .filter((l) => l > 0);
+      }
+
+      // จัดกลุ่มน้ำมัน ถ้าเป็นน้ำมันเดียวกันให้รวมน้ำมันแล้วเช็คแป้นน้ำมัน ถ้าคนละตัวให้เช็ครายน้ำมัน
+      let totalOrderQty = 0;
+      let validationItems = [];
+      order_item.forEach((item) => {
+        let qty = parseFloat(item.item_quantity) || 0;
+        totalOrderQty += qty;
+        let existing = validationItems.find(
+          (g) => g.itm_material_number === item.itm_material_number,
+        );
+        if (existing) {
+          existing.item_quantity = parseFloat(existing.item_quantity) + qty;
+        } else {
+          validationItems.push({
+            itm_material_number: item.itm_material_number,
+            item_quantity: qty,
+          });
+        }
+      });
+
+      // Loop ตรวจสอบทีละ Material (ที่รวมจำนวนแล้ว)
+      let SumCurrentQty = 0.0;
+      for (let i = 0; i < validationItems.length; i++) {
+        var item_quantity_check = validationItems[i].item_quantity;
+        var itm_material_number = validationItems[i].itm_material_number;
+
+        let scriptCheckItem = `SELECT itm_desc from tbl_item where itm_material_number = '${itm_material_number}' and itm_flag = '1'`;
+        console.log("scriptCheckItem", scriptCheckItem);
+        let checkItemResult = await pgConn.get(
+          dbPrefix + lic_code,
+          scriptCheckItem,
+          config.connectionString(),
+        );
+        let item_desc =
+          checkItemResult.data && checkItemResult.data.length > 0
+            ? checkItemResult.data[0].itm_desc
+            : "";
+
+        // ตรวจสอบว่าเป็นตัวเลขหรือไม่
+        if (isNaN(item_quantity_check)) {
+          let response = [
+            {
+              status: "error",
+              invalid_code: "-1",
+              message: `รายการน้ำมัน (${itm_material_number}) ${item_desc}: จำนวนต้องเป็นตัวเลขเท่านั้น`,
+              data: [],
+              response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+            },
+          ];
+          res.status(200).send(response);
+          return;
+        }
+
+        let currentQty = parseFloat(item_quantity_check);
+        SumCurrentQty += currentQty;
+
+        if (i == validationItems.length - 1) {
+          debugger;
+          var veh_type_code = "";
+          //get vehicle type
+          xscript = `select level, veh_type_code, veh_type_desc, capacity_max, capacity_min
+              from 
+              ((select 0 as level,tpvt.veh_type_code, tvt.veh_type_desc ,tvt.capacity_max, tvt.capacity_min 
+              from tbl_petrol_vehicle_type tpvt 
+              left join tbl_vehicle_type tvt on tpvt.veh_type_code = tpvt.veh_type_code 
+              where tpvt.ptrl_code = '${resultPetrol.data[0].ptrl_code}'
+
+              union
+
+              select 1 as level,tvt.veh_type_code, tvt.veh_type_desc ,tvt.capacity_max, tvt.capacity_min 
+              from tbl_vehicle_type tvt where capacity_min < ${SumCurrentQty}  
+              and capacity_max >= ${SumCurrentQty}
+
+              union
+
+              select 2 as level,tvt.veh_type_code, tvt.veh_type_desc ,tvt.capacity_max, tvt.capacity_min 
+              from tbl_vehicle_type tvt where tvt.veh_type_code in 
+              (select veh_type_code from tbl_vehicle_type order by capacity_max desc limit 1))) xtable 
+              order by xtable."level" asc`;
+
+          let db_createorder2 = await pgConn.get(
+            dbPrefix + lic_code,
+            xscript,
+            config.connectionString(),
+          );
+          if (!db_createorder2.code) {
+            if (db_createorder2.data.length > 0) {
+              veh_type_code = db_createorder2.data[0].veh_type_code;
+            }
+          }
+
+          if (veh_type_code != "") {
+            xscript = `select tvt.veh_type_code, tvt.veh_type_desc, tvt.veh_qty, tvt.capacity_min, tvt.capacity_max,
+                compartment_no, compartment_total, vect_compartment_level_id, veh_compartment_type_level_number, veh_compartment_type_level,
+                '' as automatic_code ,'' as ptrl_code, '' as tank_code, '' as itm_code 
+                from tbl_vehicle_type tvt
+                left join tbl_vehicle_type_compartment tvtim on tvt.veh_type_code = tvtim.veh_type_code 
+                left join tbl_vehicle_type_compartment_level tvtlev on tvtim.id = tvtlev.compartment_item_id  
+                where tvt.veh_type_code = '${veh_type_code}' and tvtlev.veh_compartment_type_level_flag = '1'
+                order by tvtim.compartment_no asc, tvtlev.veh_compartment_type_level_number asc`;
+
+            let db_createorder3 = await pgConn.get(
+              dbPrefix + lic_code,
+              xscript,
+              config.connectionString(),
+            );
+
+            if (!db_createorder3.code) {
+              if (db_createorder3.data.length > 0) {
+                var compartments = [];
+                var xcompartment_no = "";
+                var xlevel = [];
+                for (
+                  var xcomp = 0;
+                  xcomp <= db_createorder3.data.length - 1;
+                  xcomp++
+                ) {
+                  if (
+                    xcompartment_no !=
+                    db_createorder3.data[xcomp].compartment_no
+                  ) {
+                    if (xcompartment_no == "") {
+                      xlevel = [];
+                      xcompartment_no =
+                        db_createorder3.data[xcomp].compartment_no;
+                      xlevel.push(
+                        db_createorder3.data[xcomp].veh_compartment_type_level,
+                      );
+                    } else {
+                      compartments.push({
+                        compartment_no: xcompartment_no,
+                        options: xlevel,
+                      });
+
+                      xlevel = [];
+                      xcompartment_no =
+                        db_createorder3.data[xcomp].compartment_no;
+                      xlevel.push(
+                        db_createorder3.data[xcomp].veh_compartment_type_level,
+                      );
+
+                      if (xcomp == db_createorder3.data.length - 1) {
+                        compartments.push({
+                          compartment_no: xcompartment_no,
+                          options: xlevel,
+                        });
+
+                        xlevel = [];
+                      }
+                    }
+                  } else {
+                    xlevel.push(
+                      db_createorder3.data[xcomp].veh_compartment_type_level,
+                    );
+
+                    if (xcomp == db_createorder3.data.length - 1) {
+                      compartments.push({
+                        compartment_no: xcompartment_no,
+                        options: xlevel,
+                      });
+
+                      xlevel = [];
+                    }
+                  }
+                }
+
+                console.log(JSON.stringify(compartments));
+                //debugger
+                var products = [];
+                debugger;
+                order_item.forEach((item) => {
+                  products.push({
+                    product: item.ptrl_tank_code,
+                    liter: parseFloat(item.item_quantity) || 0,
+                    ref1: item.item_no,
+                    ref2: resultPetrol.data[0].ptrl_code,
+                  });
+                });
+
+                //debugger
+                var xresult = await allocateFuelDownOnly(
+                  compartments,
+                  products,
+                );
+                console.log(xresult);
+
+                if (xresult.success) {
+                  if (xresult.result.length == 0) {
+                    let response = [
+                      {
+                        status: "error",
+                        invalid_code: "-1",
+                        message: `รายการน้ำมัน (${itm_material_number}) ${item_desc} : จำนวนรวม ${currentQty} ไม่ตรงกับขนาดช่องบรรจุใดๆ ในระบบ`,
+                        data: [],
+                        response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+                      },
+                    ];
+                    res.status(200).send(response);
+                    return;
+                  }
+                } else {
+                  let response = [
+                    {
+                      status: "error",
+                      invalid_code: "-1",
+                      message: `รายการน้ำมัน (${itm_material_number}) ${item_desc} : จำนวนรวม ${currentQty} ไม่ตรงกับขนาดช่องบรรจุใดๆ ในระบบ`,
+                      data: [],
+                      response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+                    },
+                  ];
+                  res.status(200).send(response);
+                  return;
+                }
+              }
+            }
+          } else {
+            let response = [
+              {
+                status: "error",
+                invalid_code: "-1",
+                message: `รายการน้ำมัน (${itm_material_number}) ${item_desc} : จำนวนรวม ${currentQty} ไม่ตรงกับขนาดช่องบรรจุใดๆ ในระบบ`,
+                data: [],
+                response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+              },
+            ];
+            res.status(200).send(response);
+            return;
+          }
+        }
+      }
+    }
+
+    cus_date_ref = deli_date_req;
+    sh_cus_date_ref = deli_date_req;
+
+    let req_date_str = moment(deli_date_req).format("YYYYMMDD");
+
+    // ====================== หาค่า sh_cus_ref ล่าสุด ======================
+    let scriptCheckShCusRef = `
+            SELECT MAX(CAST(SUBSTRING(sh_cus_ref FROM 12) AS INTEGER)) as last_running 
+            FROM public.tbl_order 
+            WHERE sh_cus_ref LIKE 'AOS${req_date_str}%' AND sh_cus_ref ~ '^AOS[0-9]{8}[0-9]+$'
+            `;
+    let checkShCusRefResult = await pgConn.get(
+      dbPrefix + lic_code,
+      scriptCheckShCusRef,
+      config.connectionString(),
+    );
+
+    let running_number = 1;
+    if (
+      !checkShCusRefResult.code &&
+      checkShCusRefResult.data.length > 0 &&
+      checkShCusRefResult.data[0].last_running !== null
+    ) {
+      running_number = parseInt(checkShCusRefResult.data[0].last_running) + 1;
+    }
+
+    sh_cus_ref = "AOS" + req_date_str + String(running_number).padStart(4, "0");
+
+    // Lookup internal code for order_type (SAP code -> Internal code)
+    let checkOrderType = await pgConn.get(
+      dbPrefix + lic_code,
+      `SELECT ord_type_code FROM tbl_order_type WHERE sales_order_type = '${order_type}' OR ord_type_code = '${order_type}' LIMIT 1`,
+      config.connectionString(),
+    );
+    if (!checkOrderType.code && checkOrderType.data.length > 0) {
+      order_type = checkOrderType.data[0].ord_type_code;
+    }
+
+    // ====================== เพิ่มข้อมูลลงใน tbl_order ======================
+    script = `INSERT INTO public.tbl_order
+            (order_no, order_type, order_group, chanel, division, sold_to, ship_to,
+                cus_ref, cus_date_ref, po_name, order_by, ship_cond, pay_term,
+                deli_date_req, deli_time_req, description, sh_cus_ref, sh_cus_date_ref,
+                status_deli, ist_dt, order_flag, auto_order, order_status, created_by_tms)
+        VALUES
+            (NULL, '${order_type}', '${order_group}', '${chanel}', '${division}',
+                '${sold_to}', '${ship_to}', '${(cus_ref || "").replace(/'/g, "''")}', ${cus_date_ref ? "'" + moment(cus_date_ref).format("YYYY-MM-DD HH:mm:ss") + "'" : "NULL"},
+                '${(po_name || "AOS").replace(/'/g, "''")}', '${(order_by || "AOS").replace(/'/g, "''")}', '${ship_cond || "T1"}', '${pay_term || "Z001"}',
+                ${deli_date_req ? "'" + moment(deli_date_req).format("YYYY-MM-DD HH:mm:ss") + "'" : "NULL"}, '${deli_time_req || ""}',
+                '${(description || "").replace(/'/g, "''")}', '${sh_cus_ref || ""}', ${sh_cus_date_ref ? "'" + moment(sh_cus_date_ref).format("YYYY-MM-DD HH:mm:ss") + "'" : "NULL"},
+                'A', '${moment().format("YYYY-MM-DD HH:mm:ss")}', '1', 0, 0, '${action[0].id}') RETURNING id`;
+
+    script = script.replace(/'NULL'/gi, "NULL");
+    let tbl_temporary = await pgConn.get(
+      dbPrefix + lic_code,
+      script,
+      config.connectionString(),
+    );
+    if (tbl_temporary.code || tbl_temporary.data.length === 0) {
+      let response = [
+        {
+          status: "error",
+          invalid_code: "-3",
+          message: `ไม่สามารถบันทึกข้อมูล Order, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ`,
+          data: [],
+          response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+        },
+      ];
+      res.status(200).send(response);
+      let logPayload = { order_no: "-", ...req.body[0] };
+      await xglobal.action_logs(
+        lic_code,
+        action[0].id,
+        "เพิ่ม Order",
+        JSON.stringify(logPayload),
+        "ไม่สามารถบันทึกข้อมูล Order",
+        action[0].value,
+      );
+      return;
+    }
+
+    let order_id = tbl_temporary.data[0].id;
+
+    let invalid_material_item = [];
+
+    // ====================== เพิ่มข้อมูลลงใน tbl_order_item จาก order_item array ======================
+    if (order_item && Array.isArray(order_item) && order_item.length > 0) {
+      console.log(
+        `Database Name: ${dbPrefix + lic_code}, Order ID: ${order_id}, Item Count: ${order_item.length}`,
+      );
+
+      for (let i = 0; i < order_item.length; i++) {
+        let sales_order_item = String((i + 1) * 10);
+        var itm_code = order_item[i].itm_code;
+        var item_quantity = parseFloat(order_item[i].item_quantity) || 0;
+        var itm_material_number = (
+          order_item[i].itm_material_number || ""
+        ).trim();
+        var deli_plant = order_item[i].deli_plant;
+        var remark = order_item[i].remark;
+        var ptrl_tank_code = order_item[i].ptrl_tank_code;
+
+        console.log(
+          `ตรวจสอบ Item [${i}]: Material=${itm_material_number}, Code=${itm_code}`,
+        );
+
+        // ===== เช็ค itm_material_number ว่ามีอยู่ใน tbl_item หรือไม่ (ถ้าไม่มี itm_code มาให้) =====
+        if (itm_material_number && !itm_code) {
+          let check_item_script = `SELECT itm_code FROM tbl_item WHERE itm_material_number = '${itm_material_number}' LIMIT 1`;
+          let checkItemResult = await pgConn.get(
+            dbPrefix + lic_code,
+            check_item_script,
+            config.connectionString(),
+          );
+
+          if (!checkItemResult.code && checkItemResult.data.length > 0) {
+            itm_code = checkItemResult.data[0].itm_code;
+          }
+        }
+
+        if (itm_code) {
+          // ===== เพิ่มข้อมูลลงใน tbl_order_item =====
+          if (
+            order_item[i].item_text &&
+            Array.isArray(order_item[i].item_text) &&
+            order_item[i].item_text.length > 0
+          ) {
+            // กรณีที่มี item_text
+            for (var k = 0; k < order_item[i].item_text.length; k++) {
+              var item_text = order_item[i].item_text[k];
+              let script_item = `INSERT INTO public.tbl_order_item
+                        (order_no, item_no, item_qty, long_text_id, long_text, ist_dt, order_item_flag, auto_order, deli_plant, sales_order_item, remark, ptrl_tank_code)
+                        VALUES(${order_id}, '${itm_code}', ${item_quantity}, '${(item_text.long_text_id || "ZT01").replace(/'/g, "''")}', '${(item_text.long_text || "Compartment").replace(/'/g, "''")}',
+                        '${moment().format("YYYY-MM-DD HH:mm:ss")}', '1', 0, '${deli_plant || ""}', '${sales_order_item}', '${remark || ""}', '${ptrl_tank_code || ""}')`;
+
+              console.log(
+                `กำลัง Insert Item [${itm_code}] (with text) สำหรับ Order ${order_id}`,
+              );
+              let res_item = await pgConn.execute(
+                dbPrefix + lic_code,
+                script_item,
+                config.connectionString(),
+              );
+              if (res_item.code) {
+                console.error(
+                  `Error Insert Item [${itm_code}]: ${res_item.message}`,
+                );
+              }
+            }
+          } else {
+            // กรณีที่ไม่มี item_text
+            let script_item = `INSERT INTO public.tbl_order_item
+                            (order_no, item_no, item_qty, long_text_id, long_text, ist_dt, order_item_flag, auto_order, deli_plant, sales_order_item, remark, ptrl_tank_code)
+                        VALUES(${order_id}, '${itm_code}', ${item_quantity}, '', '',
+                            '${moment().format("YYYY-MM-DD HH:mm:ss")}', '1', 0, '${deli_plant || ""}', '${sales_order_item}', '${remark || ""}', '${ptrl_tank_code || ""}')`;
+
+            console.log(
+              `กำลัง Insert Item [${itm_code}] (no text) สำหรับ Order ${order_id}`,
+            );
+            let res_item = await pgConn.execute(
+              dbPrefix + lic_code,
+              script_item,
+              config.connectionString(),
+            );
+            if (res_item.code) {
+              console.error(
+                `Error Insert Item [${itm_code}]: ${res_item.message}`,
+              );
+            }
+          }
+        } else {
+          console.log(
+            `ข้ามรายการน้ำมัน [${i}]: ไม่พบ itm_code สำหรับ material number ${itm_material_number}`,
+          );
+          invalid_material_item.push(itm_material_number || itm_code);
+        }
+      }
+    }
+
+    // ============ Success response ============
+    let response = [
+      {
+        status: "success",
+        invalid_code: "0",
+        message: "ยืนยันคำสั่ง Order สำเร็จ รอคำสั่ง SAP",
+        data: [
+          {
+            sh_cus_ref: sh_cus_ref,
+            order_id: order_id,
+          },
+        ],
+        invalid_material_item: invalid_material_item,
+        response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+      },
+    ];
+
+    res.status(200).send(response);
+    let event_type = req.body[0].event_type || "manual";
+
+    // ========== Audit Log: สร้าง changes array และบันทึกทีละ order_item ==========
+    if (order_item && Array.isArray(order_item) && order_item.length > 0) {
+      for (let item of order_item) {
+        let itemDesc = item.itm_material_number || item.itm_code || "N/A";
+        let logPayloadItem = {
+          order_no: "-",
+          order_id: order_id,
+          ship_to: ship_to || "",
+          reason:
+            item.remark ||
+            req.body[0].remark ||
+            req.body[0].reason ||
+            req.body[0].description ||
+            "",
+          field: `Order Qty (${itemDesc})`,
+          before: "0",
+          after: String(item.item_quantity || 0),
+        };
+        await xglobal.action_logs(
+          lic_code,
+          action[0].id,
+          event_type,
+          JSON.stringify(logPayloadItem),
+          "success",
+          action[0].value,
+        );
+      }
+    } else {
+      let logPayload = {
+        order_no: "-",
+        order_id: order_id,
+        ship_to: ship_to || "",
+        reason:
+          req.body[0].remark ||
+          req.body[0].reason ||
+          req.body[0].description ||
+          "",
+        field: "",
+        before: "",
+        after: "",
+      };
+      await xglobal.action_logs(
+        lic_code,
+        action[0].id,
+        event_type,
+        JSON.stringify(logPayload),
+        "success",
+        action[0].value,
+      );
+    }
+    return;
+  })().catch(async (err) => {
+    console.log(err);
+    let response = [
+      {
+        status: "error",
+        invalid_code: "-4",
+        message: `ไม่สามารถบันทึกข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ`,
+        data: [],
+        response_time: moment().format("YYYY-MM-DD HH:mm:ss").toString(),
+      },
+    ];
+    res.status(200).send(response);
+  });
+};
+
+exports.editOrderItemV2 = async (req, res, next) => {
+  return (async () => {
+    let lic_code = req.header("lic_code");
+    let { order_id } = req.query;
+    let { description, order_item, deli_date_req, deli_time_req, action } =
+      req.body[0];
+
+    // เช็คเฉพาะส่วนที่สำคัญ
+    if (action == undefined || order_item == undefined) {
+      let response = [
+        {
+          status: "error",
+          invalid_code: "-1",
+          message:
+            "ไม่สามารถบันทึกข้อมูล, เนื่องจากข้อมูลพารามิเตอร์ไม่ถูกต้อง",
+          data: [],
+          response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+        },
+      ];
+
+      res.status(200).send(response);
+      return;
+    }
+
+    let order_no = order_id || req.body[0].order_id || req.body[0].order_no;
+
+    if (order_no == undefined || order_no == "") {
+      let response = [
+        {
+          status: "error",
+          invalid_code: "-1",
+          message: "ไม่สามารถบันทึกข้อมูล, เนื่องจากไม่พบ order_id",
+          data: [],
+          response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+        },
+      ];
+      res.status(200).send(response);
+      return;
+    }
+
+    deli_date_req =
+      deli_date_req != undefined
+        ? moment(deli_date_req).format("YYYY-MM-DD")
+        : moment().format("YYYY-MM-DD");
+    deli_time_req = deli_time_req != undefined ? deli_time_req : "Z00";
+
+    let scriptCheckOrderNo = `SELECT id, order_no, sh_cus_ref, ship_to, status_deli, order_status FROM tbl_order WHERE id = $1`;
+    let checkOrderNo = await pgConn.getWithParams(
+      dbPrefix + lic_code,
+      scriptCheckOrderNo,
+      [order_no],
+      config.connectionString(),
+    );
+
+    if (
+      checkOrderNo.code ||
+      checkOrderNo.data.length === 0 ||
+      checkOrderNo.data[0].status_deli != "A"
+    ) {
+      let response = [
+        {
+          status: "error",
+          invalid_code: "-1",
+          message:
+            "ไม่พบข้อมูลออเดอร์ที่สามารถแก้ไขได้ในระบบ Not Found Status Delivery หรือ Status Delivery ไม่ใช่ A",
+          data: [],
+          response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+        },
+      ];
+      res.status(200).send(response);
+      let logPayloadObj = { order_no: "-", ...req.body[0] };
+      let event_type = req.body[0].event_type || "override";
+      await xglobal.action_logs(
+        lic_code,
+        action[0].id,
+        event_type,
+        JSON.stringify(logPayloadObj),
+        "ไม่พบข้อมูลออเดอร์ที่สามารถแก้ไขได้ในระบบ Not Found Status Delivery หรือ Status Delivery ไม่ใช่ A",
+        action[0].value,
+      );
+      return;
+    } else {
+      let oldOrder = checkOrderNo.data[0];
+      let event_type = req.body[0].event_type || "override";
+
+      // ====================== เช็ค Validate item_quantity & Compartment Capacity (แยกรายน้ำมัน) ======================
+      if (order_item && Array.isArray(order_item) && order_item.length > 0) {
+        let totalOrderQty = 0;
+
+        // --- ดึงข้อมูลปั๊มน้ำมัน ---
+        let scriptPetrol = `select * from tbl_petrol where ptrl_number = $1 limit 1`;
+        let resultPetrol = await pgConn.getWithParams(
+          dbPrefix + lic_code,
+          scriptPetrol,
+          [oldOrder.ship_to],
+          config.connectionString(),
+        );
+
+        if (!resultPetrol.code && resultPetrol.data.length > 0) {
+          // ดึงข้อมูล itm_material_number สำหรับรายการที่ส่งมา
+          let materialMap = {};
+          let itemCodesForMaterial = order_item
+            .map((i) => `'${i.item_no}'`)
+            .join(",");
+          if (itemCodesForMaterial) {
+            let materialRes = await pgConn.get(
+              dbPrefix + lic_code,
+              `SELECT itm_code, itm_material_number FROM tbl_item WHERE itm_code IN (${itemCodesForMaterial})`,
+              config.connectionString(),
+            );
+            if (!materialRes.code) {
+              materialRes.data.forEach((m) => {
+                materialMap[m.itm_code] = m.itm_material_number;
+              });
+            }
+          }
+
+          // จัดกลุ่มน้ำมัน ถ้าเป็นน้ำมันเดียวกันให้รวมน้ำมันแล้วเช็คแป้นน้ำมัน ถ้าคนละตัวให้เช็ครายน้ำมัน
+          let validationItems = [];
+          order_item.forEach((item) => {
+            let qty = parseFloat(item.item_quantity) || 0;
+            totalOrderQty += qty;
+            let matNum = materialMap[item.item_no] || "Unknown";
+            let existing = validationItems.find(
+              (g) => g.itm_material_number === matNum,
+            );
+            if (existing) {
+              existing.item_quantity = parseFloat(existing.item_quantity) + qty;
+            } else {
+              validationItems.push({
+                itm_material_number: matNum,
+                item_quantity: qty,
+              });
+            }
+          });
+
+          let SumCurrentQty = 0.0;
+          for (let i = 0; i < validationItems.length; i++) {
+            let item_quantity_check = validationItems[i].item_quantity;
+            let itm_material_number = validationItems[i].itm_material_number;
+
+            let scriptCheckItem = `SELECT itm_desc from tbl_item where itm_material_number = '${itm_material_number}' and itm_flag = '1'`;
+            console.log("scriptCheckItem", scriptCheckItem);
+            let checkItemResult = await pgConn.get(
+              dbPrefix + lic_code,
+              scriptCheckItem,
+              config.connectionString(),
+            );
+            let item_desc =
+              checkItemResult.data && checkItemResult.data.length > 0
+                ? checkItemResult.data[0].itm_desc
+                : "";
+
+            // ตรวจสอบว่าเป็นตัวเลขหรือไม่
+            if (isNaN(item_quantity_check)) {
+              let response = [
+                {
+                  status: "error",
+                  invalid_code: "-1",
+                  message: `รายการน้ำมัน (${itm_material_number}) ${item_desc}: จำนวนต้องเป็นตัวเลขเท่านั้น`,
+                  data: [],
+                  response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+                },
+              ];
+              res.status(200).send(response);
+              return;
+            }
+
+            let currentQty = parseFloat(item_quantity_check);
+            SumCurrentQty += currentQty;
+
+            if (i == validationItems.length - 1) {
+              debugger;
+              var veh_type_code = "";
+              //get vehicle type
+              xscript = `select level, veh_type_code, veh_type_desc, capacity_max, capacity_min
+              from 
+              ((select 0 as level,tpvt.veh_type_code, tvt.veh_type_desc ,tvt.capacity_max, tvt.capacity_min 
+              from tbl_petrol_vehicle_type tpvt 
+              left join tbl_vehicle_type tvt on tpvt.veh_type_code = tpvt.veh_type_code 
+              where tpvt.ptrl_code = '${resultPetrol.data[0].ptrl_code}'
+
+              union
+
+              select 1 as level,tvt.veh_type_code, tvt.veh_type_desc ,tvt.capacity_max, tvt.capacity_min 
+              from tbl_vehicle_type tvt where capacity_min < ${SumCurrentQty}  
+              and capacity_max >= ${SumCurrentQty}
+
+              union
+
+              select 2 as level,tvt.veh_type_code, tvt.veh_type_desc ,tvt.capacity_max, tvt.capacity_min 
+              from tbl_vehicle_type tvt where tvt.veh_type_code in 
+              (select veh_type_code from tbl_vehicle_type order by capacity_max desc limit 1))) xtable 
+              order by xtable."level" asc`;
+
+              let db_createorder2 = await pgConn.get(
+                dbPrefix + lic_code,
+                xscript,
+                config.connectionString(),
+              );
+              if (!db_createorder2.code) {
+                if (db_createorder2.data.length > 0) {
+                  veh_type_code = db_createorder2.data[0].veh_type_code;
+                }
+              }
+
+              if (veh_type_code != "") {
+                xscript = `select tvt.veh_type_code, tvt.veh_type_desc, tvt.veh_qty, tvt.capacity_min, tvt.capacity_max,
+                compartment_no, compartment_total, vect_compartment_level_id, veh_compartment_type_level_number, veh_compartment_type_level,
+                '' as automatic_code ,'' as ptrl_code, '' as tank_code, '' as itm_code 
+                from tbl_vehicle_type tvt
+                left join tbl_vehicle_type_compartment tvtim on tvt.veh_type_code = tvtim.veh_type_code 
+                left join tbl_vehicle_type_compartment_level tvtlev on tvtim.id = tvtlev.compartment_item_id  
+                where tvt.veh_type_code = '${veh_type_code}' and tvtlev.veh_compartment_type_level_flag = '1'
+                order by tvtim.compartment_no asc, tvtlev.veh_compartment_type_level_number asc`;
+
+                let db_createorder3 = await pgConn.get(
+                  dbPrefix + lic_code,
+                  xscript,
+                  config.connectionString(),
+                );
+
+                if (!db_createorder3.code) {
+                  if (db_createorder3.data.length > 0) {
+                    var compartments = [];
+                    var xcompartment_no = "";
+                    var xlevel = [];
+                    for (
+                      var xcomp = 0;
+                      xcomp <= db_createorder3.data.length - 1;
+                      xcomp++
+                    ) {
+                      if (
+                        xcompartment_no !=
+                        db_createorder3.data[xcomp].compartment_no
+                      ) {
+                        if (xcompartment_no == "") {
+                          xlevel = [];
+                          xcompartment_no =
+                            db_createorder3.data[xcomp].compartment_no;
+                          xlevel.push(
+                            db_createorder3.data[xcomp]
+                              .veh_compartment_type_level,
+                          );
+                        } else {
+                          compartments.push({
+                            compartment_no: xcompartment_no,
+                            options: xlevel,
+                          });
+
+                          xlevel = [];
+                          xcompartment_no =
+                            db_createorder3.data[xcomp].compartment_no;
+                          xlevel.push(
+                            db_createorder3.data[xcomp]
+                              .veh_compartment_type_level,
+                          );
+
+                          if (xcomp == db_createorder3.data.length - 1) {
+                            compartments.push({
+                              compartment_no: xcompartment_no,
+                              options: xlevel,
+                            });
+
+                            xlevel = [];
+                          }
+                        }
+                      } else {
+                        xlevel.push(
+                          db_createorder3.data[xcomp]
+                            .veh_compartment_type_level,
+                        );
+
+                        if (xcomp == db_createorder3.data.length - 1) {
+                          compartments.push({
+                            compartment_no: xcompartment_no,
+                            options: xlevel,
+                          });
+
+                          xlevel = [];
+                        }
+                      }
+                    }
+
+                    console.log(JSON.stringify(compartments));
+                    //debugger
+                    var products = [];
+                    debugger;
+                    order_item.forEach((item) => {
+                      products.push({
+                        product: item.ptrl_tank_code,
+                        liter: parseFloat(item.item_quantity) || 0,
+                        ref1: item.item_no,
+                        ref2: resultPetrol.data[0].ptrl_code,
+                      });
+                    });
+
+                    //debugger
+                    var xresult = await allocateFuelDownOnly(
+                      compartments,
+                      products,
+                    );
+                    console.log(xresult);
+
+                    if (xresult.success) {
+                      if (xresult.result.length == 0) {
+                        let response = [
+                          {
+                            status: "error",
+                            invalid_code: "-1",
+                            message: `รายการน้ำมัน (${itm_material_number}) ${item_desc} : จำนวนรวม ${currentQty} ไม่ตรงกับขนาดช่องบรรจุใดๆ ในระบบ`,
+                            data: [],
+                            response_time: moment().format(
+                              "YYYY-MM-DD HH:mm:ss",
+                            ),
+                          },
+                        ];
+                        res.status(200).send(response);
+                        return;
+                      }
+                    } else {
+                      let response = [
+                        {
+                          status: "error",
+                          invalid_code: "-1",
+                          message: `รายการน้ำมัน (${itm_material_number}) ${item_desc} : จำนวนรวม ${currentQty} ไม่ตรงกับขนาดช่องบรรจุใดๆ ในระบบ`,
+                          data: [],
+                          response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+                        },
+                      ];
+                      res.status(200).send(response);
+                      return;
+                    }
+                  }
+                }
+              } else {
+                let response = [
+                  {
+                    status: "error",
+                    invalid_code: "-1",
+                    message: `รายการน้ำมัน (${itm_material_number}) ${item_desc} : จำนวนรวม ${currentQty} ไม่ตรงกับขนาดช่องบรรจุใดๆ ในระบบ`,
+                    data: [],
+                    response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+                  },
+                ];
+                res.status(200).send(response);
+                return;
+              }
+            }
+          }
+        }
+      }
+
+      // ========== Audit Log: ดึงรายการสินค้าเดิมมาเก็บไว้เทียบ ==========
+      let getOldItemsScript = `
+        SELECT oi.item_no, oi.item_qty, oi.remark, itm.itm_desc 
+        FROM tbl_order_item oi
+        LEFT JOIN tbl_item itm ON oi.item_no = itm.itm_code
+        WHERE oi.order_no = $1 AND oi.rm_dt IS NULL
+      `;
+      let oldItemsRes = await pgConn.getWithParams(
+        dbPrefix + lic_code,
+        getOldItemsScript,
+        [order_no],
+        config.connectionString(),
+      );
+      let oldItemsMap = {};
+      if (!oldItemsRes.code) {
+        oldItemsRes.data.forEach((item) => {
+          oldItemsMap[item.item_no] = item;
+        });
+      }
+
+      // --- ดึงข้อมูลพื้นฐาน (เช่น คลัง) จากรายการเดิมเก็บไว้ก่อน ---
+      let getDeliPlantScript = `SELECT deli_plant FROM tbl_order_item WHERE order_no = $1 AND rm_dt IS NULL LIMIT 1`;
+      let deliPlantRes = await pgConn.getWithParams(
+        dbPrefix + lic_code,
+        getDeliPlantScript,
+        [order_no],
+        config.connectionString(),
+      );
+      let default_deli_plant =
+        !deliPlantRes.code && deliPlantRes.data.length > 0
+          ? deliPlantRes.data[0].deli_plant
+          : "";
+
+      // --- ลบรายการเดิมทั้งหมด (Hard Delete) ---
+      let deleteOldItemsScript = `DELETE FROM tbl_order_item WHERE order_no = $1`;
+      await pgConn.execute2params(
+        dbPrefix + lic_code,
+        deleteOldItemsScript,
+        [order_no],
+        config.connectionString(),
+      );
+
+      // --- เพิ่มรายการใหม่เข้าไปทั้งหมด ---
+      // ดึงชื่อสินค้าทั้งหมดที่ส่งมาเตรียมไว้สำหรับ Log
+      let itemCodesInReq = order_item.map((i) => `'${i.item_no}'`).join(",");
+      let itemNameMap = {};
+      if (itemCodesInReq) {
+        let itemNamesRes = await pgConn.get(
+          dbPrefix + lic_code,
+          `SELECT itm_code, itm_desc FROM tbl_item WHERE itm_code IN (${itemCodesInReq})`,
+          config.connectionString(),
+        );
+        if (!itemNamesRes.code) {
+          itemNamesRes.data.forEach(
+            (it) => (itemNameMap[it.itm_code] = it.itm_desc),
+          );
+        }
+      }
+
+      // -- 1. Log การเปลี่ยนแปลงของ Description --
+      if ((oldOrder.description || "") !== (description || "")) {
+        let auditChanges = [
+          {
+            field: "Description",
+            before: oldOrder.description || "-",
+            after: description || "-",
+          },
+        ];
+        let logPayload = {
+          order_no: oldOrder.order_no || "-",
+          order_id: order_no,
+          ship_to: oldOrder.ship_to || "",
+          reason: req.body[0].remark || req.body[0].reason || description || "",
+          changes: auditChanges,
+        };
+        await xglobal.action_logs(
+          lic_code,
+          action[0].id,
+          event_type,
+          JSON.stringify(logPayload),
+          "success",
+          action[0].value,
+        );
+      }
+
+      for (let i = 0; i < order_item.length; i++) {
+        let item = order_item[i];
+        let item_quantity = parseFloat(item.item_quantity) || 0;
+        let item_no = item.item_no;
+        let remark = item.remark || "";
+        let ptrl_tank_code = item.ptrl_tank_code;
+
+        if (item_quantity > 0) {
+          let sales_order_item = String((i + 1) * 10);
+          let insertScript = `
+              INSERT INTO tbl_order_item (
+                  order_no, item_no, item_qty, remark, ptrl_tank_code, 
+                  ist_dt, auto_order, deli_plant, order_item_flag, sales_order_item
+              ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          `;
+          let insertParams = [
+            order_no,
+            item_no,
+            item_quantity,
+            remark,
+            ptrl_tank_code,
+            moment().format("YYYY-MM-DD HH:mm:ss"),
+            0,
+            default_deli_plant,
+            "1",
+            sales_order_item,
+          ];
+          await pgConn.execute2params(
+            dbPrefix + lic_code,
+            insertScript,
+            insertParams,
+            config.connectionString(),
+          );
+
+          // -- 2. Log การเปลี่ยนแปลงของ Item (แยกทีละรายการ) --
+          let oldItem = oldItemsMap[item_no];
+          let itemLabel =
+            itemNameMap[item_no] ||
+            (oldItem ? oldItem.itm_desc : "") ||
+            item_no;
+          let oldQty = oldItem ? parseFloat(oldItem.item_qty) || 0 : 0;
+          let oldRemark = oldItem ? oldItem.remark || "" : "";
+          let itemAuditChanges = [];
+
+          if (oldQty !== item_quantity) {
+            itemAuditChanges.push({
+              field: `Order Qty (${itemLabel})`,
+              before: String(oldQty),
+              after: String(item_quantity),
+            });
+          }
+          if (oldRemark !== remark) {
+            itemAuditChanges.push({
+              field: `Remark (${itemLabel})`,
+              before: oldRemark || "-",
+              after: remark || "-",
+            });
+          }
+
+          if (itemAuditChanges.length > 0) {
+            let logPayload = {
+              order_no: oldOrder.order_no || "-",
+              order_id: order_no,
+              ship_to: oldOrder.ship_to || "",
+              reason:
+                req.body[0].remark || req.body[0].reason || description || "",
+              changes: itemAuditChanges,
+            };
+            await xglobal.action_logs(
+              lic_code,
+              action[0].id,
+              event_type,
+              JSON.stringify(logPayload),
+              "success",
+              action[0].value,
+            );
+          }
+
+          // ลบออกจาก map เพื่อเช็คว่ามีตัวไหนถูกลบออกไปบ้าง (หายไปจากออเดอร์)
+          delete oldItemsMap[item_no];
+        }
+      }
+
+      // -- 3. Log รายการที่ถูกลบออก --
+      for (let item_no in oldItemsMap) {
+        let oldItem = oldItemsMap[item_no];
+        let itemAuditChanges = [
+          {
+            field: `Removed Item (${oldItem.itm_desc || item_no})`,
+            before: String(oldItem.item_qty),
+            after: "0 (Removed)",
+          },
+        ];
+        let logPayload = {
+          order_no: oldOrder.order_no || "-",
+          order_id: order_no,
+          ship_to: oldOrder.ship_to || "",
+          reason: req.body[0].remark || req.body[0].reason || description || "",
+          changes: itemAuditChanges,
+        };
+        await xglobal.action_logs(
+          lic_code,
+          action[0].id,
+          event_type,
+          JSON.stringify(logPayload),
+          "success",
+          action[0].value,
+        );
+      }
+
+      // ========== อัปเดตข้อมูลหลักของออเดอร์ (อัปเดต Description และเวลาแก้ไข) ==========
+      let updateOrder = `
+                UPDATE tbl_order 
+                SET description = $1, 
+                    auto_order = $2,
+                    mdf_dt = $3,
+                    created_by_tms = $4
+                WHERE id = $5
+            `;
+      let paramsOrder = [
+        description || "",
+        0,
+        moment().format("YYYY-MM-DD HH:mm:ss"),
+        action[0].id,
+        order_no,
+      ];
+      await pgConn.execute2params(
+        dbPrefix + lic_code,
+        updateOrder,
+        paramsOrder,
+        config.connectionString(),
+      );
+
+      // ============= Success response =============
+      let response = [
+        {
+          status: "success",
+          invalid_code: "0",
+          message: "",
+          data: [],
+          response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+        },
+      ];
+      res.status(200).send(response);
+    }
+  })().catch(async (err) => {
+    console.log(err);
+    let response = [
+      {
+        status: "error",
+        invalid_code: "-4",
+        message: `ไม่สามารถบันทึกข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ`,
+        data: [],
+        response_time: moment().format("YYYY-MM-DD HH:mm:ss").toString(),
+      },
+    ];
+    res.status(200).send(response);
+  });
+};
