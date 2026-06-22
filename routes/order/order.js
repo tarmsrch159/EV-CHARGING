@@ -9648,10 +9648,17 @@ exports.addOrderInformationV2 = async (req, res, next) => {
                         products,
                       );
                       console.log(xresult);
-
                       if (xresult.success) {
                         if (xresult.result.length > 0) {
-                          xpassed = true;
+
+                          let xSumCurrentQty = 0;
+                          for (var xcmm = 0; xcmm <= xresult.result.length - 1; xcmm++) {
+                            xSumCurrentQty += xresult.result[xcmm].adjusted_liter;
+                          }
+
+                          if (SumCurrentQty == xSumCurrentQty) {
+                            xpassed = true;
+                          }
                         }
                       }
                     }
@@ -10246,7 +10253,15 @@ exports.editOrderItemV2 = async (req, res, next) => {
 
                           if (xresult.success) {
                             if (xresult.result.length > 0) {
-                              xpassed = true;
+
+                              let xSumCurrentQty = 0;
+                              for (var xcmm = 0; xcmm <= xresult.result.length - 1; xcmm++) {
+                                xSumCurrentQty += xresult.result[xcmm].adjusted_liter;
+                              }
+
+                              if (SumCurrentQty == xSumCurrentQty) {
+                                xpassed = true;
+                              }
                             }
                           }
                         }
