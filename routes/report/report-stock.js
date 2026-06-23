@@ -1,40 +1,42 @@
-const config = require('../../configuration/connection');
-const pgConn = require('../../library/pgConnection');
-const moment = require('moment');
-const xglobal = new require('../../middleware/global');
+const config = require("../../configuration/connection");
+const pgConn = require("../../library/pgConnection");
+const moment = require("moment");
+const xglobal = new require("../../middleware/global");
 
 const dbPrefix = config.dbPrefix();
 
 const formatIfValid = (date) => {
-    return moment(date, moment.ISO_8601, true).isValid()
-        ? moment(date).format('YYYY-MM-DD')
-        : null;
+  return moment(date, moment.ISO_8601, true).isValid()
+    ? moment(date).format("YYYY-MM-DD")
+    : null;
 };
 
 exports.syncSalesInfo = async (date_at, ptrl_number, lic_code) => {
-    date_at = date_at ? moment(date_at).format('YYYY-MM-DD') : moment().format('YYYY-MM-DD');
-    date_at = moment(date_at).subtract(1, 'days').format('YYYY-MM-DD');
-    ptrl_number = ptrl_number ? ptrl_number : 'ALL';
+  date_at = date_at
+    ? moment(date_at).format("YYYY-MM-DD")
+    : moment().format("YYYY-MM-DD");
+  date_at = moment(date_at).subtract(1, "days").format("YYYY-MM-DD");
+  ptrl_number = ptrl_number ? ptrl_number : "ALL";
 
-    if (!lic_code) {
-        return;
+  if (!lic_code) {
+    return;
+  }
+
+  try {
+    let wh = "";
+    let param = [];
+    param.push(date_at);
+
+    if (ptrl_number && ptrl_number !== "ALL" && ptrl_number !== "") {
+      param.push(ptrl_number);
+      wh += ` AND tpr.ptrl_number = $${param.length} `;
     }
 
-    try {
-        let wh = '';
-        let param = [];
-        param.push(date_at);
+    const dayIndex = moment(date_at).day();
+    const coverageDays = 3;
+    const threshold = 2000; // ถ้าน้อยกว่า 2000 ลิตร ไม่ต้องสั่ง
 
-        if (ptrl_number && ptrl_number !== 'ALL' && ptrl_number !== '') {
-            param.push(ptrl_number);
-            wh += ` AND tpr.ptrl_number = $${param.length} `;
-        }
-
-        const dayIndex = moment(date_at).day();
-        const coverageDays = 3;
-        const threshold = 2000; // ถ้าน้อยกว่า 2000 ลิตร ไม่ต้องสั่ง
-
-        let scriptSql = `
+    let scriptSql = `
             WITH daily_stats AS (
                 SELECT 
                     tpr.ptrl_sitecode,
@@ -136,47 +138,69 @@ exports.syncSalesInfo = async (date_at, ptrl_number, lic_code) => {
                 mdf_dt = NOW();
         `;
 
-        await pgConn.getWithParams(dbPrefix + lic_code, scriptSql, param, config.connectionString());
-        await xglobal.action_logs(lic_code, 'SYSTEM', 'Sync Sales', JSON.stringify({ date_at, ptrl_number }), 'success', 'SYSTEM');
-        return;
-    } catch (error) {
-        console.log(error);
-        await xglobal.action_logs(lic_code, 'SYSTEM', 'Sync Sales', JSON.stringify({ date_at, ptrl_number }), 'error', 'SYSTEM');
-        return;
-    }
-}
+    await pgConn.getWithParams(
+      dbPrefix + lic_code,
+      scriptSql,
+      param,
+      config.connectionString(),
+    );
+    await xglobal.action_logs(
+      lic_code,
+      "SYSTEM",
+      "Sync Sales",
+      JSON.stringify({ date_at, ptrl_number }),
+      "success",
+      "SYSTEM",
+    );
+    return;
+  } catch (error) {
+    console.log(error);
+    await xglobal.action_logs(
+      lic_code,
+      "SYSTEM",
+      "Sync Sales",
+      JSON.stringify({ date_at, ptrl_number }),
+      "error",
+      "SYSTEM",
+    );
+    return;
+  }
+};
 
 exports.getReportStock = async (req, res, next) => {
-    var xresult = [];
-    let { date_at, ptrl_number, ptrl_sitecode, action } = req.body[0];
-    let lic_code = req.header('lic_code');
-    let roleId = action[0].id;
-    let roleValue = action[0].value !== 'ALL' ? action[0].value : 'ALL';
+  debugger;
+  var xresult = [];
+  let { date_at, ptrl_number, ptrl_sitecode, action } = req.body[0];
+  let lic_code = req.header("lic_code");
+  let roleId = action[0].id;
+  let roleValue = action[0].value !== "ALL" ? action[0].value : "ALL";
 
-    if (!lic_code || !ptrl_sitecode) {
-        let response = [{
-            status: 'error',
-            invalid_code: '-1',
-            message: 'ไม่สามารถดึงข้อมูลได้, เนื่องจากข้อมูลพารามิเตอร์ไม่ถูกต้อง',
-            data: xresult,
-            response_time: moment().format('YYYY-MM-DD HH:mm:ss')
-        }]
+  if (!lic_code || !ptrl_sitecode) {
+    let response = [
+      {
+        status: "error",
+        invalid_code: "-1",
+        message: "ไม่สามารถดึงข้อมูลได้, เนื่องจากข้อมูลพารามิเตอร์ไม่ถูกต้อง",
+        data: xresult,
+        response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+      },
+    ];
 
-        res.status(200).send(response);
-        return
-    }
+    res.status(200).send(response);
+    return;
+  }
 
-    try {
-        date_at = date_at ? moment(date_at).format('YYYY-MM-DD') : moment().format('YYYY-MM-DD');
-        // date_at = moment(date_at).subtract(1, 'days').format('YYYY-MM-DD');
+  try {
+    date_at = date_at
+      ? moment(date_at).format("YYYY-MM-DD")
+      : moment().format("YYYY-MM-DD");
+    // date_at = moment(date_at).subtract(1, 'days').format('YYYY-MM-DD');
 
+    let param = [];
+    param.push(date_at); // $1
+    param.push(ptrl_sitecode); // $2
 
-
-        let param = [];
-        param.push(date_at); // $1
-        param.push(ptrl_sitecode); // $2
-
-        let scriptSql = `
+    let scriptSql = `
             SELECT
                 tpr.ptrl_sitecode AS shipto,
                 $1::date AS date_at,
@@ -209,9 +233,14 @@ exports.getReportStock = async (req, res, next) => {
                 SELECT ptrl_code, ptrl_sitecode FROM tbl_petrol WHERE ptrl_flag = '1'
             ) tpr ON tpt.ptrl_code = tpr.ptrl_code
             LEFT JOIN tbl_item tit ON tpt.itm_code = tit.itm_code
-            LEFT JOIN tbl_order_eodtank eod ON tpr.ptrl_sitecode = eod.shipto_no 
+            LEFT JOIN (
+                SELECT DISTINCT ON (shipto_no, tank_no, date_at)
+                    shipto_no, tank_no, date_at, product_no
+                FROM tbl_order_eodtank
+                WHERE date_at = $1::date
+                ORDER BY shipto_no, tank_no, date_at, tank_end DESC
+            ) eod ON tpr.ptrl_sitecode = eod.shipto_no 
                 AND tpt.tnk_number::text = eod.tank_no 
-                AND eod.date_at = $1::date
             LEFT JOIN (
                 SELECT 
                     ptrl_code, 
@@ -237,26 +266,34 @@ exports.getReportStock = async (req, res, next) => {
             ORDER BY tpr.ptrl_sitecode ASC;
         `;
 
+    let result = await pgConn.getWithParams(
+      dbPrefix + lic_code,
+      scriptSql,
+      param,
+      config.connectionString(),
+    );
 
-        let result = await pgConn.getWithParams(dbPrefix + lic_code, scriptSql, param, config.connectionString());
+    console.log(scriptSql);
+    console.log(param);
 
-        if (result.code) {
-            res.status(200).json(result);
-        } else {
-            res.status(200).json(result);
-        }
-
-    } catch (error) {
-        let response = [{
-            status: 'error',
-            invalid_code: '-1',
-            message: 'ไม่สามารถดึงข้อมูลได้, ระบบเกิดข้อผิดพลาด',
-            data: error.message,
-            response_time: moment().format('YYYY-MM-DD HH:mm:ss')
-        }];
-        res.status(500).json(response);
+    if (result.code) {
+      res.status(200).json(result);
+    } else {
+      res.status(200).json(result);
     }
-}
+  } catch (error) {
+    let response = [
+      {
+        status: "error",
+        invalid_code: "-1",
+        message: "ไม่สามารถดึงข้อมูลได้, ระบบเกิดข้อผิดพลาด",
+        data: error.message,
+        response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+      },
+    ];
+    res.status(500).json(response);
+  }
+};
 
 // ================== Backup Function ==================
 // exports.getReportStock = async (req, res, next) => {
@@ -317,17 +354,17 @@ exports.getReportStock = async (req, res, next) => {
 //                     )
 //                     ORDER BY tpt.tnk_number ASC
 //                 ) AS data
-//             FROM tbl_petrol_tank tpt 
+//             FROM tbl_petrol_tank tpt
 //             INNER JOIN (
 //                 SELECT ptrl_code, ptrl_sitecode FROM tbl_petrol WHERE ptrl_flag = '1'
 //             ) tpr ON tpt.ptrl_code = tpr.ptrl_code
 //             LEFT JOIN tbl_item tit ON tpt.itm_code = tit.itm_code
-//             LEFT JOIN tbl_order_eodtank eod ON tpr.ptrl_sitecode = eod.shipto_no 
-//                 AND tpt.tnk_number::text = eod.tank_no 
+//             LEFT JOIN tbl_order_eodtank eod ON tpr.ptrl_sitecode = eod.shipto_no
+//                 AND tpt.tnk_number::text = eod.tank_no
 //                 AND eod.date_at = $1::date
 //             LEFT JOIN (
-//                 SELECT 
-//                     ptrl_code, 
+//                 SELECT
+//                     ptrl_code,
 //                     tank_code,
 //                     MAX(tnk_capacity) as tnk_capacity,
 //                     MAX(tnk_deadstock) as tnk_deadstock,
@@ -337,9 +374,9 @@ exports.getReportStock = async (req, res, next) => {
 //                 GROUP BY ptrl_code, tank_code
 //             ) auto_tank ON tpr.ptrl_code = auto_tank.ptrl_code AND tpt.ptrl_tank_code = auto_tank.tank_code
 //             LEFT JOIN (
-//                 SELECT 
-//                     ptrl_code, 
-//                     tank_code, 
+//                 SELECT
+//                     ptrl_code,
+//                     tank_code,
 //                     MAX(sale_previous) as total_sales
 //                 FROM tbl_automatics_sales_previous_information
 //                 WHERE sale_at_previous::date = $1::date
