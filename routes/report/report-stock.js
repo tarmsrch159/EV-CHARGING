@@ -201,7 +201,9 @@ exports.getReportStock = async (req, res, next) => {
     param.push(ptrl_sitecode); // $2
 
     let scriptSql = `
-            SELECT
+            
+
+SELECT
                 tpr.ptrl_sitecode AS shipto,
                 $1::date AS date_at,
                 JSONB_AGG(
@@ -217,8 +219,9 @@ exports.getReportStock = async (req, res, next) => {
                         'target_stock', tpt.tnk_target,
                         'tank_start', COALESCE(auto_tank.tank_start, 0),
                         'tank_end', COALESCE(auto_tank.tank_end, 0),
-                        'total_sales', COALESCE(auto_sales.total_sales, 0),
-                        'min_stock', COALESCE(auto_sales.total_sales, 0) + COALESCE(auto_tank.tnk_deadstock, tpt.tnk_deadstock, 0),
+                        'total_sales_minus_1', COALESCE(auto_sales.sales_yesterday, 0),
+                        'total_sales', COALESCE(auto_sales.sales_today, 0),
+                        'min_stock', COALESCE(auto_sales.sales_today, 0) + COALESCE(auto_tank.tnk_deadstock, tpt.tnk_deadstock, 0),
                         'itm_flag', COALESCE(tit.itm_flag, '1'),
                         'ptrl_tank_flag', COALESCE(tpt.ptrl_tank_flag, '1'),
                         'is_disabled', CASE WHEN COALESCE(tit.itm_flag, '1') = '0' OR COALESCE(tpt.ptrl_tank_flag, '1') = '0' THEN true ELSE false END,
@@ -253,17 +256,18 @@ exports.getReportStock = async (req, res, next) => {
                 GROUP BY ptrl_code, tank_code
             ) auto_tank ON tpr.ptrl_code = auto_tank.ptrl_code AND tpt.ptrl_tank_code = auto_tank.tank_code
             LEFT JOIN (
-                SELECT 
-                    ptrl_code, 
-                    tank_code, 
-                    MAX(sale_previous) as total_sales
-                FROM tbl_automatics_sales_previous_information
-                WHERE sale_at_previous::date = $1::date
-                GROUP BY ptrl_code, tank_code
-            ) auto_sales ON tpr.ptrl_code = auto_sales.ptrl_code AND tpt.ptrl_tank_code = auto_sales.tank_code
+    SELECT 
+        ptrl_code, 
+        tank_code,
+        MAX(CASE WHEN sale_at_previous::date = ($1::date - INTERVAL '1 day') THEN sale_previous END) as sales_yesterday,
+        MAX(CASE WHEN sale_at_previous::date = $1::date THEN sale_previous END) as sales_today
+    FROM tbl_automatics_sales_previous_information
+    WHERE sale_at_previous::date IN ($1::date, $1::date - INTERVAL '1 day')
+    GROUP BY ptrl_code, tank_code
+) auto_sales ON tpr.ptrl_code = auto_sales.ptrl_code AND tpt.ptrl_tank_code = auto_sales.tank_code
             WHERE tpr.ptrl_sitecode = $2 AND tpt.ptrl_tank_flag = '1'
             GROUP BY tpr.ptrl_sitecode, tpr.ptrl_code
-            ORDER BY tpr.ptrl_sitecode ASC;
+            ORDER BY tpr.ptrl_sitecode asc
         `;
 
     let result = await pgConn.getWithParams(
