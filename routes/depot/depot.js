@@ -357,6 +357,16 @@ exports.setDepotInformation = async (req, res, next) => {
             }]
             return res.status(200).send(response);
         } else {
+            dpo_loading_minute = (dpo_loading_minute === "" || dpo_loading_minute === undefined || dpo_loading_minute === null) ? "NULL" : dpo_loading_minute;
+            dpo_expenses_per_km = (dpo_expenses_per_km === "" || dpo_expenses_per_km === undefined || dpo_expenses_per_km === null) ? 0 : dpo_expenses_per_km;
+            dpo_area = (dpo_area === "" || dpo_area === undefined || dpo_area === null) ? 0 : dpo_area;
+            dpo_sales_org = (dpo_sales_org === "" || dpo_sales_org === undefined || dpo_sales_org === null) ? "NULL" : dpo_sales_org;
+            dpo_order_type = (dpo_order_type === "" || dpo_order_type === undefined || dpo_order_type === null) ? "NULL" : dpo_order_type;
+            dpo_short_desc = dpo_short_desc || "";
+            dpo_address = dpo_address || "";
+            dpo_zip_code = dpo_zip_code || "";
+            dpo_city = dpo_city || "";
+            dpo_country_code = dpo_country_code || "";
 
             let script = ``;
             script = `update tbl_depot set
@@ -478,6 +488,16 @@ exports.addDepotInformation = async (req, res, next) => {
             }]
             return res.status(200).send(response);
         } else {
+            dpo_loading_minute = (dpo_loading_minute === "" || dpo_loading_minute === undefined || dpo_loading_minute === null) ? "NULL" : dpo_loading_minute;
+            dpo_expenses_per_km = (dpo_expenses_per_km === "" || dpo_expenses_per_km === undefined || dpo_expenses_per_km === null) ? 0 : dpo_expenses_per_km;
+            dpo_area = (dpo_area === "" || dpo_area === undefined || dpo_area === null) ? 0 : dpo_area;
+            dpo_sales_org = (dpo_sales_org === "" || dpo_sales_org === undefined || dpo_sales_org === null) ? "NULL" : dpo_sales_org;
+            dpo_order_type = (dpo_order_type === "" || dpo_order_type === undefined || dpo_order_type === null) ? "NULL" : dpo_order_type;
+            dpo_short_desc = dpo_short_desc || "";
+            dpo_address = dpo_address || "";
+            dpo_zip_code = dpo_zip_code || "";
+            dpo_city = dpo_city || "";
+            dpo_country_code = dpo_country_code || "";
 
             let script = ``;
             script = `select dpo_code from tbl_depot where (dpo_desc = '${dpo_desc}' or dpo_short_desc = '${dpo_short_desc}' or dpo_number = '${dpo_number}') and dpo_flag = '1';`

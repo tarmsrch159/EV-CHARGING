@@ -211,7 +211,7 @@ exports.getReportStock = async (req, res, next) => {
                         'itm_code', tit.itm_code,
                         'itm_material_number', tit.itm_material_number,
                         'product_no', eod.product_no,
-                        'itm_desc', tit.itm_desc,
+                        'itm_desc', tit.itm_desc,   
                         'un_pump', COALESCE(tpt.tnk_deadstock, auto_tank.tnk_deadstock),
                         'max_stock', COALESCE(auto_tank.tnk_capacity, tpt.tnk_capacity),
                         'target_stock', tpt.tnk_target,
