@@ -767,26 +767,6 @@ exports.getAutoCalculateOrderInformation = async (req, res, next) => {
                         }
                     }
 
-                    //check fill order (auto, manual)
-                    if (xrunfillmanualorder) {
-                        for (var xfillorder = 0; xfillorder <= db_temporary.data.length - 1; xfillorder++) {
-                            var shipto_no = db_temporary.data[xfillorder].shipto_no;
-                            console.log("calculate fill order:", shipto_no, xfillorder, '/', db_temporary.data.length - 1, moment().format('YYYY-MM-DD HH:mm:ss'));
-
-                            xscript = `select automatic_code, ptrl_code, tank_code, itm_code, stock, stock_at, ist_dt, mdf_dt, fill_volume, fill_volume_after, tnk_capacity, tnk_target, tnk_deadstock 
-                            from tbl_automatics_tanks_information where ptrl_code in (select ptrl_code from tbl_petrol where ptrl_sitecode  = '${shipto_no}')  
-                            and stock_at >= '${xdate} 00:00:00.000' and stock_at <= '${xdate} 23:59:59.000';`;
-                            let db_fillorder1 = await pgConn.get(xdatabase, xscript, config.connectionString());
-
-                            if (!db_fillorder1.code) {
-                                for (var xfill = 0; xfill <= db_fillorder1.data.length - 1; xfill++) {
-                                    xscript = ``
-                                }
-                            }
-
-                        }
-                    }
-
                     //find auto order. (need Qty)
                     if (xrunautoorder) {
                         for (var xautoorder = 0; xautoorder <= db_temporary.data.length - 1; xautoorder++) {
@@ -933,7 +913,7 @@ exports.getAutoCalculateOrderInformation = async (req, res, next) => {
                         xscript = `select tati.ptrl_code, sum(tati.fill_volume_after) as fill_volume_after, tati.result 
                         from tbl_automatics_tanks_information tati  
                         where stock_at >= '${xdate} 00:00:00.000' 
-                        and stock_at <= '${xdate} 23:59:59.000' 
+                        and stock_at <= '${xdate} 23:59:59.000' and tati.ptrl_code = '${ptrl_code}' 
                         and tati.result = 'correct' group by tati.ptrl_code, result 
                         order by tati.ptrl_code asc`
 
@@ -943,191 +923,204 @@ exports.getAutoCalculateOrderInformation = async (req, res, next) => {
                                 for (var xcorder = 0; xcorder <= db_createorder1.data.length - 1; xcorder++) {
                                     var veh_type_code = '';
                                     //get vehicle type
-                                    xscript = `select level, veh_type_code, veh_type_desc, capacity_max, capacity_min
-                                    from 
-                                    ((select 0 as level,tpvt.veh_type_code, tvt.veh_type_desc ,tvt.capacity_max, tvt.capacity_min 
+                                    xscript = `select 0 as level,tpvt.veh_type_code, tvt.veh_type_desc ,tvt.capacity_max, tvt.capacity_min, tpvt.ptrl_vehicle_type_flag
                                     from tbl_petrol_vehicle_type tpvt 
-                                    left join tbl_vehicle_type tvt on tpvt.veh_type_code = tpvt.veh_type_code 
-                                    where tpvt.ptrl_code = '${db_createorder1.data[xcorder].ptrl_code}'
+                                    inner join tbl_vehicle_type tvt on tpvt.veh_type_code = tvt.veh_type_code 
+                                    where tpvt.ptrl_code = '${db_createorder1.data[xcorder].ptrl_code}' and tpvt.ptrl_vehicle_type_flag = '1' and tvt.veh_type_flag = '1'`;
 
-                                    union
-
-                                    select 1 as level,tvt.veh_type_code, tvt.veh_type_desc ,tvt.capacity_max, tvt.capacity_min 
-                                    from tbl_vehicle_type tvt where capacity_min < ${db_createorder1.data[xcorder].fill_volume_after}  
-                                    and capacity_max >= ${db_createorder1.data[xcorder].fill_volume_after}
-
-                                    union
-
-                                    select 2 as level,tvt.veh_type_code, tvt.veh_type_desc ,tvt.capacity_max, tvt.capacity_min 
-                                    from tbl_vehicle_type tvt where tvt.veh_type_code in 
-                                    (select veh_type_code from tbl_vehicle_type order by capacity_max desc limit 1))) xtable 
-                                    order by xtable."level" asc`
-
+                                    let xpassed = false;
                                     let db_createorder2 = await pgConn.get(xdatabase, xscript, config.connectionString());
                                     if (!db_createorder2.code) {
-                                        if (db_createorder2.data.length > 0) {
-                                            veh_type_code = db_createorder2.data[0].veh_type_code;
+
+                                        if (db_createorder2.data.length == 0) {
+                                            xscript = `select level, veh_type_code, veh_type_desc, capacity_max, capacity_min
+                                            from 
+                                            ((select 0 as level,tpvt.veh_type_code, tvt.veh_type_desc ,tvt.capacity_max, tvt.capacity_min 
+                                            from tbl_petrol_vehicle_type tpvt 
+                                            left join tbl_vehicle_type tvt on tpvt.veh_type_code = tpvt.veh_type_code 
+                                            where tpvt.ptrl_code = '${db_createorder1.data[xcorder].ptrl_code}'
+
+                                            union
+
+                                            select 1 as level,tvt.veh_type_code, tvt.veh_type_desc ,tvt.capacity_max, tvt.capacity_min 
+                                            from tbl_vehicle_type tvt where capacity_min < ${db_createorder1.data[xcorder].fill_volume_after}  
+                                            and capacity_max >= ${db_createorder1.data[xcorder].fill_volume_after}
+
+                                            union
+
+                                            select 2 as level,tvt.veh_type_code, tvt.veh_type_desc ,tvt.capacity_max, tvt.capacity_min 
+                                            from tbl_vehicle_type tvt where tvt.veh_type_code in 
+                                            (select veh_type_code from tbl_vehicle_type order by capacity_max desc limit 1))) xtable 
+                                            order by xtable."level" asc`
+
+                                            db_createorder2 = await pgConn.get(xdatabase, xscript, config.connectionString());
                                         }
-                                    }
 
-                                    if (veh_type_code != '') {
-                                        xscript = `select tvt.veh_type_code, tvt.veh_type_desc, tvt.veh_qty, tvt.capacity_min, tvt.capacity_max,
-                                        compartment_no, compartment_total, vect_compartment_level_id, veh_compartment_type_level_number, veh_compartment_type_level,
-                                        '' as automatic_code ,'' as ptrl_code, '' as tank_code, '' as itm_code 
-                                        from tbl_vehicle_type tvt
-                                        left join tbl_vehicle_type_compartment tvtim on tvt.veh_type_code = tvtim.veh_type_code 
-                                        left join tbl_vehicle_type_compartment_level tvtlev on tvtim.id = tvtlev.compartment_item_id  
-                                        where tvt.veh_type_code = '${veh_type_code}' and tvtlev.veh_compartment_type_level_flag = '1'
-                                        order by tvtim.compartment_no asc, tvtlev.veh_compartment_type_level_number asc`
+                                        if (db_createorder2.data.length > 0) {
+                                            for (var xpass = 0; xpass <= db_createorder2.data.length - 1; xpass++) {
+                                                var veh_type_code = db_createorder2.data[xpass].veh_type_code;
 
-                                        let db_createorder3 = await pgConn.get(xdatabase, xscript, config.connectionString());
+                                                if (xpassed == false) {
+                                                    xscript = `select tvt.veh_type_code, tvt.veh_type_desc, tvt.veh_qty, tvt.capacity_min, tvt.capacity_max,
+                                                    compartment_no, compartment_total, vect_compartment_level_id, veh_compartment_type_level_number, veh_compartment_type_level,
+                                                    '' as automatic_code ,'' as ptrl_code, '' as tank_code, '' as itm_code 
+                                                    from tbl_vehicle_type tvt
+                                                    left join tbl_vehicle_type_compartment tvtim on tvt.veh_type_code = tvtim.veh_type_code 
+                                                    left join tbl_vehicle_type_compartment_level tvtlev on tvtim.id = tvtlev.compartment_item_id  
+                                                    where tvt.veh_type_code = '${veh_type_code}' and tvtlev.veh_compartment_type_level_flag = '1'
+                                                    order by tvtim.compartment_no asc, tvtlev.veh_compartment_type_level_number asc`
 
-                                        if (!db_createorder3.code) {
-                                            if (db_createorder3.data.length > 0) {
-                                                //get information for create order.
-                                                xscript = `select tati.automatic_code ,tati.ptrl_code, tati.tank_code, tati.itm_code, tati.fill_volume_after, tati.result 
-                                                from tbl_automatics_tanks_information tati  
-                                                where stock_at >= '${xdate} 00:00:00.000' 
-                                                and stock_at <= '${xdate} 23:59:59.000' 
-                                                and tati.result = 'correct' and tati.ptrl_code = '${db_createorder1.data[xcorder].ptrl_code}'
-                                                group by tati.automatic_code, tati.ptrl_code, tati.tank_code, tati.itm_code, tati.fill_volume_after, tati.result 
-                                                order by tati.ptrl_code asc`
+                                                    let db_createorder3 = await pgConn.get(xdatabase, xscript, config.connectionString());
 
-                                                let db_createorder4 = await pgConn.get(xdatabase, xscript, config.connectionString());
+                                                    if (!db_createorder3.code) {
+                                                        if (db_createorder3.data.length > 0) {
+                                                            //get information for create order.
+                                                            xscript = `select tati.automatic_code ,tati.ptrl_code, tati.tank_code, tati.itm_code, tati.fill_volume_after, tati.result 
+                                                            from tbl_automatics_tanks_information tati  
+                                                            where stock_at >= '${xdate} 00:00:00.000' 
+                                                            and stock_at <= '${xdate} 23:59:59.000' 
+                                                            and tati.result = 'correct' and tati.ptrl_code = '${db_createorder1.data[xcorder].ptrl_code}'
+                                                            group by tati.automatic_code, tati.ptrl_code, tati.tank_code, tati.itm_code, tati.fill_volume_after, tati.result 
+                                                            order by tati.ptrl_code asc`
 
-                                                if (!db_createorder4.code) {
-                                                    if (db_createorder4.data.length > 0) {
+                                                            let db_createorder4 = await pgConn.get(xdatabase, xscript, config.connectionString());
 
-                                                        var compartments = [];
-                                                        var xcompartment_no = '';
-                                                        var xlevel = [];
-                                                        for (var xcomp = 0; xcomp <= db_createorder3.data.length - 1; xcomp++) {
-                                                            if (xcompartment_no != db_createorder3.data[xcomp].compartment_no) {
-                                                                if (xcompartment_no == '') {
-                                                                    xlevel = [];
-                                                                    xcompartment_no = db_createorder3.data[xcomp].compartment_no;
-                                                                    xlevel.push(db_createorder3.data[xcomp].veh_compartment_type_level);
-                                                                }
-                                                                else {
-                                                                    compartments.push({
-                                                                        compartment_no: xcompartment_no,
-                                                                        options: xlevel
-                                                                    })
+                                                            if (!db_createorder4.code) {
+                                                                if (db_createorder4.data.length > 0) {
 
-                                                                    xlevel = [];
-                                                                    xcompartment_no = db_createorder3.data[xcomp].compartment_no;
-                                                                    xlevel.push(db_createorder3.data[xcomp].veh_compartment_type_level);
+                                                                    var compartments = [];
+                                                                    var xcompartment_no = '';
+                                                                    var xlevel = [];
+                                                                    for (var xcomp = 0; xcomp <= db_createorder3.data.length - 1; xcomp++) {
+                                                                        if (xcompartment_no != db_createorder3.data[xcomp].compartment_no) {
+                                                                            if (xcompartment_no == '') {
+                                                                                xlevel = [];
+                                                                                xcompartment_no = db_createorder3.data[xcomp].compartment_no;
+                                                                                xlevel.push(db_createorder3.data[xcomp].veh_compartment_type_level);
+                                                                            }
+                                                                            else {
+                                                                                compartments.push({
+                                                                                    compartment_no: xcompartment_no,
+                                                                                    options: xlevel
+                                                                                })
 
-                                                                    if (xcomp == db_createorder3.data.length - 1) {
-                                                                        compartments.push({
-                                                                            compartment_no: xcompartment_no,
-                                                                            options: xlevel
-                                                                        });
+                                                                                xlevel = [];
+                                                                                xcompartment_no = db_createorder3.data[xcomp].compartment_no;
+                                                                                xlevel.push(db_createorder3.data[xcomp].veh_compartment_type_level);
 
-                                                                        xlevel = [];
-                                                                    }
-                                                                }
-                                                            }
-                                                            else {
-                                                                xlevel.push(db_createorder3.data[xcomp].veh_compartment_type_level);
+                                                                                if (xcomp == db_createorder3.data.length - 1) {
+                                                                                    compartments.push({
+                                                                                        compartment_no: xcompartment_no,
+                                                                                        options: xlevel
+                                                                                    });
 
-                                                                if (xcomp == db_createorder3.data.length - 1) {
-                                                                    compartments.push({
-                                                                        compartment_no: xcompartment_no,
-                                                                        options: xlevel
-                                                                    });
-
-                                                                    xlevel = [];
-                                                                }
-                                                            }
-                                                        }
-
-                                                        console.log(JSON.stringify(compartments));
-                                                        //debugger
-                                                        var products = [];
-                                                        for (var xprod = 0; xprod <= db_createorder4.data.length - 1; xprod++) {
-                                                            products.push(
-                                                                {
-                                                                    product: db_createorder4.data[xprod].tank_code,
-                                                                    liter: db_createorder4.data[xprod].fill_volume_after,
-                                                                    ref1: db_createorder4.data[xprod].automatic_code,
-                                                                    ref2: db_createorder4.data[xprod].ptrl_code
-                                                                })
-                                                        }
-
-                                                        //debugger
-                                                        var xresult = await allocateFuelDownOnly(compartments, products);
-                                                        console.log(xresult);
-
-                                                        if (xresult.success) {
-                                                            if (xresult.result.length > 0) {
-                                                                for (var xss = 0; xss <= xresult.result.length - 1; xss++) {
-                                                                    //update fill_volume_actual
-                                                                    if (xresult.result[xss].compartments.length > 0) {
-                                                                        xscript = `update tbl_automatics_tanks_information 
-                                                                        set fill_volume_actual = ${xresult.result[xss].adjusted_liter},
-                                                                        veh_type_code = '${veh_type_code}',
-                                                                        result = 'wait create order.' 
-                                                                        where automatic_code = '${xresult.result[xss].ref1}' 
-                                                                        and ptrl_code = '${xresult.result[xss].ref2}' 
-                                                                        and tank_code = '${xresult.result[xss].product}';`
-
-                                                                        console.log('update fill_volume_actual, veh_type_code,', xresult.result[xss].ref1, ',', xresult.result[xss].ref2);
-                                                                        var db_createorder5 = await pgConn.execute(xdatabase, xscript, config.connectionString());
-
-                                                                        if (!db_createorder5.code) {
-                                                                            if (xresult.result[xss].compartments.length > 0) {
-                                                                                for (var xcc = 0; xcc <= xresult.result[xss].compartments.length - 1; xcc++) {
-                                                                                    xscript = `insert into tbl_automatics_compartment_information 
-                                                                                    (automatic_code, compartment_no, tank_code, fill_volume_actual, ist_dt) 
-                                                                                    values 
-                                                                                    ('${xresult.result[xss].ref1}', '${xresult.result[xss].compartments[xcc].compartment_no}', 
-                                                                                    '${xresult.result[xss].product}', ${xresult.result[xss].compartments[xcc].liter}, '${moment().format('YYYY-MM-DD HH:mm:ss')}');`
-
-                                                                                    var db_createorder6 = await pgConn.execute(xdatabase, xscript, config.connectionString());
-                                                                                    console.log('insert compartment,', xresult.result[xss].ref1, ',', xresult.result[xss].ref2, ',', xresult.result[xss].compartments[xcc].compartment_no);
+                                                                                    xlevel = [];
                                                                                 }
                                                                             }
                                                                         }
+                                                                        else {
+                                                                            xlevel.push(db_createorder3.data[xcomp].veh_compartment_type_level);
+
+                                                                            if (xcomp == db_createorder3.data.length - 1) {
+                                                                                compartments.push({
+                                                                                    compartment_no: xcompartment_no,
+                                                                                    options: xlevel
+                                                                                });
+
+                                                                                xlevel = [];
+                                                                            }
+                                                                        }
                                                                     }
-                                                                    else {
-                                                                        //debugger
-                                                                        if (xresult.result[xss].adjusted_liter <= 0 && xresult.result[xss].requested_liter > 0) {
-                                                                            console.log('wait next time for get new veh_type_code,', xresult.result[xss].ref1, ',', xresult.result[xss].ref2);
+
+                                                                    console.log(JSON.stringify(compartments));
+                                                                    //debugger
+                                                                    var products = [];
+                                                                    for (var xprod = 0; xprod <= db_createorder4.data.length - 1; xprod++) {
+                                                                        products.push(
+                                                                            {
+                                                                                product: db_createorder4.data[xprod].tank_code,
+                                                                                liter: db_createorder4.data[xprod].fill_volume_after,
+                                                                                ref1: db_createorder4.data[xprod].automatic_code,
+                                                                                ref2: db_createorder4.data[xprod].ptrl_code
+                                                                            })
+                                                                    }
+
+                                                                    //debugger
+                                                                    var xresult = await allocateFuelDownOnly(compartments, products);
+                                                                    console.log(xresult);
+
+                                                                    if (xresult.success) {
+                                                                        if (xresult.result.length > 0) {
+                                                                            for (var xss = 0; xss <= xresult.result.length - 1; xss++) {
+                                                                                //update fill_volume_actual
+                                                                                if (xresult.result[xss].compartments.length > 0) {
+                                                                                    xscript = `update tbl_automatics_tanks_information 
+                                                                                    set fill_volume_actual = ${xresult.result[xss].adjusted_liter},
+                                                                                    veh_type_code = '${veh_type_code}',
+                                                                                    result = 'wait create order.' 
+                                                                                    where automatic_code = '${xresult.result[xss].ref1}' 
+                                                                                    and ptrl_code = '${xresult.result[xss].ref2}' 
+                                                                                    and tank_code = '${xresult.result[xss].product}';`
+
+                                                                                    console.log('update fill_volume_actual, veh_type_code,', xresult.result[xss].ref1, ',', xresult.result[xss].ref2);
+                                                                                    var db_createorder5 = await pgConn.execute(xdatabase, xscript, config.connectionString());
+
+                                                                                    if (!db_createorder5.code) {
+                                                                                        if (xresult.result[xss].compartments.length > 0) {
+                                                                                            for (var xcc = 0; xcc <= xresult.result[xss].compartments.length - 1; xcc++) {
+                                                                                                xscript = `insert into tbl_automatics_compartment_information 
+                                                                                                (automatic_code, compartment_no, tank_code, fill_volume_actual, ist_dt) 
+                                                                                                values 
+                                                                                                ('${xresult.result[xss].ref1}', '${xresult.result[xss].compartments[xcc].compartment_no}', 
+                                                                                                '${xresult.result[xss].product}', ${xresult.result[xss].compartments[xcc].liter}, '${moment().format('YYYY-MM-DD HH:mm:ss')}');`
+
+                                                                                                var db_createorder6 = await pgConn.execute(xdatabase, xscript, config.connectionString());
+                                                                                                console.log('insert compartment,', xresult.result[xss].ref1, ',', xresult.result[xss].ref2, ',', xresult.result[xss].compartments[xcc].compartment_no);
+                                                                                            }
+                                                                                        }
+                                                                                    }
+                                                                                }
+                                                                                else {
+                                                                                    //debugger
+                                                                                    if (xresult.result[xss].adjusted_liter <= 0 && xresult.result[xss].requested_liter > 0) {
+                                                                                        console.log('wait next time for get new veh_type_code,', xresult.result[xss].ref1, ',', xresult.result[xss].ref2);
+                                                                                    }
+                                                                                    else {
+                                                                                        xscript = `update tbl_automatics_tanks_information 
+                                                                                        set result = 'Need Qty = 0' 
+                                                                                        where automatic_code = '${xresult.result[xss].ref1}' 
+                                                                                        and ptrl_code = '${xresult.result[xss].ref2}' 
+                                                                                        and tank_code = '${xresult.result[xss].product}';`
+
+                                                                                        console.log('Need Qty = 0,', xresult.result[xss].ref1, ',', xresult.result[xss].ref2);
+                                                                                        var db_createorder7 = await pgConn.execute(xdatabase, xscript, config.connectionString());
+                                                                                    }
+
+                                                                                }
+                                                                            }
                                                                         }
                                                                         else {
-                                                                            xscript = `update tbl_automatics_tanks_information 
-                                                                            set result = 'Need Qty = 0' 
-                                                                            where automatic_code = '${xresult.result[xss].ref1}' 
-                                                                            and ptrl_code = '${xresult.result[xss].ref2}' 
-                                                                            and tank_code = '${xresult.result[xss].product}';`
-
-                                                                            console.log('Need Qty = 0,', xresult.result[xss].ref1, ',', xresult.result[xss].ref2);
-                                                                            var db_createorder7 = await pgConn.execute(xdatabase, xscript, config.connectionString());
+                                                                            //update not success
+                                                                            debugger
                                                                         }
-
-
+                                                                    }
+                                                                    else {
+                                                                        debugger
                                                                     }
                                                                 }
                                                             }
                                                             else {
-                                                                //update not success
                                                                 debugger
                                                             }
                                                         }
-                                                        else {
-                                                            debugger
-                                                        }
                                                     }
                                                 }
-                                                else {
-                                                    debugger
-                                                }
+                                            }
+
+                                            if (xpassed == false) {
+                                                debugger
                                             }
                                         }
-                                    }
-                                    else {
-                                        debugger
                                     }
                                 }
                             }
@@ -1139,7 +1132,7 @@ exports.getAutoCalculateOrderInformation = async (req, res, next) => {
                         from tbl_automatics_tanks_information tati  
                         where stock_at >= '${xdate} 00:00:00.000' 
                         and stock_at <= '${xdate} 23:59:59.000' 
-                        and tati.result = 'wait create order.' 
+                        and tati.result = 'wait create order.' and tati.ptrl_code = '${ptrl_code}' 
                         group by tati.ptrl_code, result order by tati.ptrl_code asc`
 
                         let db_createorderxx1 = await pgConn.get(xdatabase, xscript, config.connectionString());
@@ -1274,6 +1267,112 @@ exports.getAutoCalculateOrderInformation = async (req, res, next) => {
                                         //update no config depo.
                                     }
 
+                                }
+                            }
+                            else {
+                                if (xruncreateorder) {
+                                    xscript = `select distinct tati.ptrl_code, tati.result 
+                        from tbl_automatics_tanks_information tati  
+                        where stock_at >= '${xdate} 00:00:00.000' 
+                        and stock_at <= '${xdate} 23:59:59.000' 
+                        and tati.result = 'create order complete.' and tati.ptrl_code = '${ptrl_code}'
+                        group by tati.ptrl_code, result order by tati.ptrl_code asc`
+
+                                    let db_createorderxx1 = await pgConn.get(xdatabase, xscript, config.connectionString());
+                                    if (!db_createorderxx1.code) {
+                                        if (db_createorderxx1.data.length > 0) {
+                                            xscript = `select tati.automatic_code ,tati.ptrl_code ,tati.ptrl_code, tati.tank_code, tati.itm_code, tati.fill_volume_actual,  tati.result 
+                                from tbl_automatics_tanks_information tati  
+                                where stock_at >= '${xdate} 00:00:00.000' 
+                                and stock_at <= '${xdate} 23:59:59.000' 
+                                and tati.result = 'create order complete.' and tati.ptrl_code = '${ptrl_code}'`
+                                            var db_createorderxx5 = await pgConn.get(xdatabase, xscript, config.connectionString());
+
+                                            if (!db_createorderxx5.code) {
+                                                var xresult = [];
+                                                for (var xrds = 0; xrds <= db_createorderxx5.data.length - 1; xrds++) {
+                                                    xresult.push({
+                                                        ptrl_code: ptrl_code,
+                                                        tank_code: db_createorderxx5.data[xrds].tank_code,
+                                                        itm_code: db_createorderxx5.data[xrds].itm_code,
+                                                        stock: db_createorderxx5.data[xrds].fill_volume_actual,
+                                                        daysale: db_createorderxx5.data[xrds].fill_volume_actual,
+                                                        target_stock: db_createorderxx5.data[xrds].fill_volume_actual,
+                                                        need_qty: db_createorderxx5.data[xrds].fill_volume_actual,
+                                                        reason: ""
+                                                    });
+
+                                                    if (xrds == db_createorderxx5.data.length - 1) {
+                                                        let response = [
+                                                            {
+                                                                status: "success",
+                                                                invalid_code: "0",
+                                                                message: "",
+                                                                data: xresult,
+                                                                response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+                                                            },
+                                                        ];
+                                                        res.status(200).send(response);
+                                                        return;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        else {
+                                            xscript = `select tbl_petrol.ptrl_code ,tbl_petrol_tank.ptrl_tank_code, tbl_petrol_tank.itm_code ,coverage_days, tnk_capacity, tnk_target, tnk_deadstock, tnk_safety_factor 
+                                from tbl_petrol left join tbl_petrol_tank on tbl_petrol.ptrl_code = tbl_petrol_tank.ptrl_code 
+                                where tbl_petrol.ptrl_code = '${ptrl_code}';`
+
+                                            let tbl_temporary5 = await pgConn.get(
+                                                dbPrefix + lic_code,
+                                                xscript,
+                                                config.connectionString(),
+                                            );
+
+                                            if (!tbl_temporary5.code) {
+                                                xresult = [];
+                                                for (let xi2 = 0; xi2 <= tbl_temporary5.data.length - 1; xi2++) {
+                                                    xresult.push({
+                                                        ptrl_code: ptrl_code,
+                                                        tank_code: tbl_temporary5.data[xi2].ptrl_tank_code,
+                                                        itm_code: tbl_temporary5.data[xi2].itm_code,
+                                                        stock: 0,
+                                                        daysale: 0,
+                                                        target_stock: 0,
+                                                        need_qty: 0,
+                                                        reason: "Stock is incorrect."
+                                                    });
+
+                                                    if (xi2 == tbl_temporary5.data.length - 1) {
+                                                        let response = [
+                                                            {
+                                                                status: "success",
+                                                                invalid_code: "0",
+                                                                message: "",
+                                                                data: xresult,
+                                                                response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+                                                            },
+                                                        ];
+                                                        res.status(200).send(response);
+                                                        return;
+                                                    }
+                                                }
+                                            }
+                                            else {
+                                                let response = [
+                                                    {
+                                                        status: "error",
+                                                        invalid_code: "-4",
+                                                        message: `ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ`,
+                                                        data: xresult,
+                                                        response_time: moment().format("YYYY-MM-DD HH:mm:ss").toString(),
+                                                    },
+                                                ];
+                                                res.status(200).send(response);
+                                                return
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
