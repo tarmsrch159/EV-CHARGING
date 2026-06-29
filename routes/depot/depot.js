@@ -59,14 +59,15 @@ exports.getDepotInformation = async (req, res, next) => {
       );
 
       // const codeIn = JSON.parse(managerData.data?.[0]?.ptrl_code);
-      const codeIn =
-        managerData.data?.[0]?.ptrl_code?.replace(/[\[\]']/g, "").split(",") ||
-        [];
+      const codeIn = managerData.data?.[0]?.ptrl_code
+        ?.replace(/[\[\]'"\s]/g, "")
+        .split(",")
+        .filter(Boolean);
 
       let managerCodeIn = `(${codeIn.map((item) => `'${item}'`).join(", ")})`;
 
       if (dpo_code.toString().toUpperCase() != "ALL") {
-        script = `select dpo_code, dpo_number, dpo_desc, dpo_short_desc, dpo_address, dpo_zip_code, dpo_country_code,
+        script = `select tbl_depot.dpo_code, dpo_number, dpo_desc, dpo_short_desc, dpo_address, dpo_zip_code, dpo_country_code,
                 dpo_loading_minute, dpo_expenses_per_km, dpo_area, dpo_lat, dpo_lon,
                 tbl_depot.off_code, off_desc, tbl_depot.dpo_group_code, dpo_group_desc, tbl_depot.ist_dt, tbl_depot.mdf_dt, tbl_depot.rm_dt, tbl_depot.prov_code, 
                 tbl_depot.amph_code, tbl_depot.tamb_code, tbl_province.prov_desc, tbl_amphure.amph_desc, tbl_tambon.tamb_desc, dpo_flag,
@@ -78,9 +79,10 @@ exports.getDepotInformation = async (req, res, next) => {
                 left join tbl_province on tbl_depot.prov_code = tbl_province.prov_code 
                 left join tbl_amphure on tbl_depot.amph_code = tbl_amphure.amph_code 
                 left join tbl_tambon on tbl_depot.tamb_code = tbl_tambon.tamb_code 
+                left join tbl_petrol_depot dp on tbl_depot.dpo_code = dp.dpo_code
                 where dpo_flag = '1' and tbl_depot.dpo_code = '${dpo_code}'`;
       } else {
-        script = `select dpo_code, dpo_number, dpo_desc, dpo_short_desc, dpo_address, dpo_zip_code, dpo_country_code,
+        script = `select tbl_depot.dpo_code, dpo_number, dpo_desc, dpo_short_desc, dpo_address, dpo_zip_code, dpo_country_code,
                 dpo_loading_minute, dpo_expenses_per_km, dpo_area, dpo_lat, dpo_lon,
                 tbl_depot.off_code, off_desc, tbl_depot.dpo_group_code, dpo_group_desc, tbl_depot.ist_dt, tbl_depot.mdf_dt, tbl_depot.rm_dt, tbl_depot.prov_code, 
                 tbl_depot.amph_code, tbl_depot.tamb_code, tbl_province.prov_desc, tbl_amphure.amph_desc, tbl_tambon.tamb_desc, dpo_flag,
@@ -92,6 +94,7 @@ exports.getDepotInformation = async (req, res, next) => {
                 left join tbl_province on tbl_depot.prov_code = tbl_province.prov_code 
                 left join tbl_amphure on tbl_depot.amph_code = tbl_amphure.amph_code 
                 left join tbl_tambon on tbl_depot.tamb_code = tbl_tambon.tamb_code 
+                left join tbl_petrol_depot dp on tbl_depot.dpo_code = dp.dpo_code
                 where dpo_flag = '1'`;
       }
 
@@ -136,7 +139,7 @@ exports.getDepotInformation = async (req, res, next) => {
                 OR tbl_depot.dpo_sales_org IN (SELECT sales_org_code FROM tbl_employee_sales_org WHERE emp_code = '${act_id}' AND emp_sorg_flag = 1)
             )`;
         } else {
-          script += ` and tbl_petrol_depot.ptrl_code in (${managerCodeIn})`;
+          script += ` and dp.ptrl_code in ${managerCodeIn}`;
         }
       }
 
@@ -158,16 +161,26 @@ exports.getDepotInformation = async (req, res, next) => {
           let rows_total = 0;
           script = ``;
           if (dpo_code.toString().toUpperCase() != "ALL") {
-            script = `select ceil((ceil(count(dpo_code)) / ${page_limit})) as page_total, (count(dpo_code)) as rows_total 
+            script = `select ceil((ceil(count(tbl_depot.dpo_code)) / ${page_limit})) as page_total, (count(tbl_depot.dpo_code)) as rows_total 
                         from tbl_depot 
+                        left join tbl_order_type on tbl_depot.dpo_order_type = tbl_order_type.ord_type_code
                         left join tbl_office on tbl_depot.off_code = tbl_office.off_code 
                         left join tbl_depot_group on tbl_depot.dpo_group_code = tbl_depot_group.dpo_group_code 
-                        where dpo_flag = '1' and tbl_depot.dpo_code = '${dpo_code}'`;
+                        left join tbl_province on tbl_depot.prov_code = tbl_province.prov_code 
+                        left join tbl_amphure on tbl_depot.amph_code = tbl_amphure.amph_code 
+                        left join tbl_tambon on tbl_depot.tamb_code = tbl_tambon.tamb_code 
+                left join tbl_petrol_depot dp on tbl_depot.dpo_code = dp.dpo_code
+                        where dpo_flag = '1' and tbl_depot.dpo_code = '${dpo_code}' `;
           } else {
-            script = `select ceil((ceil(count(dpo_code)) / ${page_limit})) as page_total, (count(dpo_code)) as rows_total 
+            script = `select ceil((ceil(count(tbl_depot.dpo_code)) / ${page_limit})) as page_total, (count(tbl_depot.dpo_code)) as rows_total 
                         from tbl_depot 
                         left join tbl_office on tbl_depot.off_code = tbl_office.off_code 
                         left join tbl_depot_group on tbl_depot.dpo_group_code = tbl_depot_group.dpo_group_code 
+                        left join tbl_order_type on tbl_depot.dpo_order_type = tbl_order_type.ord_type_code
+                        left join tbl_province on tbl_depot.prov_code = tbl_province.prov_code 
+                        left join tbl_amphure on tbl_depot.amph_code = tbl_amphure.amph_code 
+                        left join tbl_tambon on tbl_depot.tamb_code = tbl_tambon.tamb_code 
+                        left join tbl_petrol_depot dp on tbl_depot.dpo_code = dp.dpo_code
                         where dpo_flag = '1' `;
           }
 
@@ -193,6 +206,30 @@ exports.getDepotInformation = async (req, res, next) => {
                         or dpo_address like '%${search}%' 
                         or dpo_city like '%${search}%' 
                         or dpo_zip_code like '%${search}%')`;
+          }
+
+          let act_val = action[0]?.value?.toString().toUpperCase() || "ALL";
+          let act_id = action[0]?.id || "";
+          if (act_val !== "ADMIN") {
+            if (act_val === "GROUP") {
+              // กรองตาม Order Type (ZOR1, ZOR2)
+              script += ` and (
+                NOT EXISTS (SELECT 1 FROM tbl_employee_order_type WHERE emp_code = '${act_id}' AND emp_otyp_flag = 1)
+                OR tbl_depot.dpo_order_type IN (
+                    SELECT t2.ord_type_code 
+                    FROM tbl_employee_order_type t1 
+                    JOIN tbl_order_type t2 ON t1.ord_type_code = t2.ord_type_code 
+                    WHERE t1.emp_code = '${act_id}' AND t1.emp_otyp_flag = 1
+                )
+            )`;
+
+              // กรองตาม Sales Org (1000, 1900)
+              script += ` and (NOT EXISTS (SELECT 1 FROM tbl_employee_sales_org WHERE emp_code = '${act_id}' AND emp_sorg_flag = 1)
+                OR tbl_depot.dpo_sales_org IN (SELECT sales_org_code FROM tbl_employee_sales_org WHERE emp_code = '${act_id}' AND emp_sorg_flag = 1)
+            )`;
+            } else {
+              script += ` and dp.ptrl_code in ${managerCodeIn}`;
+            }
           }
 
           let tbl_temporary0 = await pgConn.get(

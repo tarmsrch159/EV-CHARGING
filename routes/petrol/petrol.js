@@ -424,6 +424,21 @@ exports.getPetrolInformationFilter = async (req, res, next) => {
       page_index -= 1;
     }
 
+    const managerScript = `select ptrl_code from tbl_employee where emp_code = '${action[0].id}'`;
+    let managerData = await pgConn.get(
+      dbPrefix + lic_code,
+      managerScript,
+      config.connectionString(),
+    );
+
+    // const codeIn = JSON.parse(managerData.data?.[0]?.ptrl_code);
+    const codeIn = managerData.data?.[0]?.ptrl_code
+      ?.replace(/[\[\]'"\s]/g, "")
+      .split(",")
+      .filter(Boolean);
+
+    let managerCodeIn = `(${codeIn.map((item) => `'${item}'`).join(", ")})`;
+
     // ======== สร้างเงื่อนไข WHERE (Dynamic Conditions) ========
     let conditions = ["tbl_petrol.ptrl_flag = '1'"];
 
@@ -498,9 +513,7 @@ exports.getPetrolInformationFilter = async (req, res, next) => {
           OR tbl_petrol.ptrl_sales_group IN (SELECT sales_org_code FROM tbl_employee_sales_org WHERE emp_code = '${act_id}' AND emp_sorg_flag = 1)
         )`);
       } else {
-        conditions.push(
-          `tbl_petrol.ptrl_code IN (SELECT ptrl_code FROM tbl_employee WHERE emp_code = '${act_id}' AND emp_flag = '1')`,
-        );
+        conditions.push(`tbl_petrol.ptrl_code IN ${managerCodeIn}`);
       }
     }
 
