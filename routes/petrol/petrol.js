@@ -10,7 +10,7 @@ exports.getPetrolInformation = async (req, res, next) => {
   var xresult = [];
   let lic_code = req.header("lic_code");
   let payload = req.body?.[0] || {};
-
+  // debugger;
   try {
     let {
       ptrl_code,
@@ -25,10 +25,10 @@ exports.getPetrolInformation = async (req, res, next) => {
       ptrl_sales_type,
     } = payload;
 
-
     // ======== กำหนดค่าเริ่มต้น ========
     page_index = page_index === undefined ? 1 : page_index;
-    page_limit = page_limit === undefined || page_limit === "" ? 10 : page_limit;
+    page_limit =
+      page_limit === undefined || page_limit === "" ? 10 : page_limit;
     off_code = off_code === undefined || off_code === "" ? "ALL" : off_code;
     auto_order =
       auto_order === undefined || auto_order === "" ? "ALL" : auto_order;
@@ -64,6 +64,22 @@ exports.getPetrolInformation = async (req, res, next) => {
       page_index -= 1;
     }
 
+    const managerScript = `select ptrl_code from tbl_employee where emp_code = '${action[0].id}'`;
+    let managerData = await pgConn.get(
+      dbPrefix + lic_code,
+      managerScript,
+      config.connectionString(),
+    );
+
+    // const codeIn = JSON.parse(managerData.data?.[0]?.ptrl_code);
+    const codeIn = managerData.data?.[0]?.ptrl_code
+      ?.replace(/[\[\]'"\s]/g, "")
+      .split(",")
+      .filter(Boolean);
+
+    let managerCodeIn = `(${codeIn.map((item) => `'${item}'`).join(", ")})`;
+
+    console.log(managerCodeIn);
     // ======== สร้างเงื่อนไข WHERE (Dynamic Conditions) ========
     let conditions = ["tbl_petrol.ptrl_flag = '1'"];
 
@@ -84,21 +100,31 @@ exports.getPetrolInformation = async (req, res, next) => {
     // }
 
     // กรองเพิ่มเติมตาม array sales_org
-    if (ptrl_sales_group && Array.isArray(ptrl_sales_group) && ptrl_sales_group.length > 0) {
-      const salesOrg = ptrl_sales_group.map(val => `'${String(val).replace(/'/g, "''")}'`).join(", ");
+    if (
+      ptrl_sales_group &&
+      Array.isArray(ptrl_sales_group) &&
+      ptrl_sales_group.length > 0
+    ) {
+      const salesOrg = ptrl_sales_group
+        .map((val) => `'${String(val).replace(/'/g, "''")}'`)
+        .join(", ");
       conditions.push(`tbl_petrol.ptrl_sales_group IN (${salesOrg})`);
     }
 
     // กรองเพิ่มเติมตาม array order_type (รองรับทั้ง ord_type_code และ sales_order_type)
-    if (ptrl_sales_type && Array.isArray(ptrl_sales_type) && ptrl_sales_type.length > 0) {
-      const orderTypes = ptrl_sales_type.map(val => `'${String(val).replace(/'/g, "''")}'`).join(", ");
+    if (
+      ptrl_sales_type &&
+      Array.isArray(ptrl_sales_type) &&
+      ptrl_sales_type.length > 0
+    ) {
+      const orderTypes = ptrl_sales_type
+        .map((val) => `'${String(val).replace(/'/g, "''")}'`)
+        .join(", ");
       conditions.push(`(
         tbl_petrol.ptrl_sales_type IN (${orderTypes})
         OR tbl_petrol.ptrl_sales_type IN (SELECT ord_type_code FROM tbl_order_type WHERE sales_order_type IN (${orderTypes}))
       )`);
     }
-
-
 
     // ดัก undefined ให้ Action
     let act_val = action?.[0]?.value?.toString().toUpperCase() || "ALL";
@@ -130,9 +156,10 @@ exports.getPetrolInformation = async (req, res, next) => {
           OR tbl_petrol.ptrl_sales_group IN (SELECT sales_org_code FROM tbl_employee_sales_org WHERE emp_code = '${act_id}' AND emp_sorg_flag = 1)
         )`);
       } else {
-        conditions.push(
-          `tbl_petrol.ptrl_code IN (SELECT ptrl_code FROM tbl_employee WHERE emp_code = '${act_id}' AND emp_flag = '1')`,
-        );
+        conditions.push(`tbl_petrol.ptrl_code IN ${managerCodeIn}`);
+        // conditions.push(
+        //   `tbl_petrol.ptrl_code IN (SELECT ptrl_code FROM tbl_employee WHERE emp_code = '${act_id}' AND emp_flag = '1')`,
+        // );
       }
     }
 
@@ -206,7 +233,6 @@ exports.getPetrolInformation = async (req, res, next) => {
             ORDER BY tbl_petrol.ist_dt DESC 
             ${paginationClause};
         `;
-
 
     let tbl_temporary = await pgConn.get(
       dbPrefix + lic_code,
@@ -417,14 +443,26 @@ exports.getPetrolInformationFilter = async (req, res, next) => {
     }
 
     // กรองเพิ่มเติมตาม array sales_org
-    if (ptrl_sales_group && Array.isArray(ptrl_sales_group) && ptrl_sales_group.length > 0) {
-      const salesOrg = ptrl_sales_group.map(val => `'${String(val).replace(/'/g, "''")}'`).join(", ");
+    if (
+      ptrl_sales_group &&
+      Array.isArray(ptrl_sales_group) &&
+      ptrl_sales_group.length > 0
+    ) {
+      const salesOrg = ptrl_sales_group
+        .map((val) => `'${String(val).replace(/'/g, "''")}'`)
+        .join(", ");
       conditions.push(`tbl_petrol.ptrl_sales_group IN (${salesOrg})`);
     }
 
     // กรองเพิ่มเติมตาม array order_type (รองรับทั้ง ord_type_code และ sales_order_type)
-    if (ptrl_sales_type && Array.isArray(ptrl_sales_type) && ptrl_sales_type.length > 0) {
-      const orderTypes = ptrl_sales_type.map(val => `'${String(val).replace(/'/g, "''")}'`).join(", ");
+    if (
+      ptrl_sales_type &&
+      Array.isArray(ptrl_sales_type) &&
+      ptrl_sales_type.length > 0
+    ) {
+      const orderTypes = ptrl_sales_type
+        .map((val) => `'${String(val).replace(/'/g, "''")}'`)
+        .join(", ");
       conditions.push(`(
         tbl_petrol.ptrl_sales_type IN (${orderTypes})
         OR tbl_petrol.ptrl_sales_type IN (SELECT ord_type_code FROM tbl_order_type WHERE sales_order_type IN (${orderTypes}))
@@ -527,7 +565,10 @@ exports.getPetrolInformationFilter = async (req, res, next) => {
         let rows_total = 0;
 
         // ======== นับจำนวนแถวทั้งหมด ========
-        let pageLimitForCount = page_limit.toString().trim().toUpperCase() === "ALL" ? "COUNT(tbl_petrol.ptrl_code)" : parseInt(page_limit);
+        let pageLimitForCount =
+          page_limit.toString().trim().toUpperCase() === "ALL"
+            ? "COUNT(tbl_petrol.ptrl_code)"
+            : parseInt(page_limit);
         let countScript = `
                     SELECT 
                         CEIL(COUNT(DISTINCT tbl_petrol.ptrl_code)::float / ${pageLimitForCount}) as page_total, 
@@ -765,7 +806,7 @@ exports.setPetrolInformation = async (req, res, next) => {
       tamb_code,
       coverage_days,
       waiting_days,
-      stock_provious_days
+      stock_provious_days,
     } = payload;
 
     //เช็คเฉพาะส่วนที่สำคัญ
@@ -804,7 +845,11 @@ exports.setPetrolInformation = async (req, res, next) => {
       }
 
       // Lookup internal code for order_type (SAP code -> Internal code)
-      let checkOrderType = await pgConn.get(dbPrefix + lic_code, `SELECT ord_type_code FROM tbl_order_type WHERE sales_order_type = '${ptrl_sales_type}' OR ord_type_code = '${ptrl_sales_type}' LIMIT 1`, config.connectionString());
+      let checkOrderType = await pgConn.get(
+        dbPrefix + lic_code,
+        `SELECT ord_type_code FROM tbl_order_type WHERE sales_order_type = '${ptrl_sales_type}' OR ord_type_code = '${ptrl_sales_type}' LIMIT 1`,
+        config.connectionString(),
+      );
       if (!checkOrderType.code && checkOrderType.data.length > 0) {
         ptrl_sales_type = checkOrderType.data[0].ord_type_code;
       }
@@ -863,7 +908,7 @@ exports.setPetrolInformation = async (req, res, next) => {
         await pgConn.execute(
           dbPrefix + lic_code,
           updatePendingOrdersScript,
-          config.connectionString()
+          config.connectionString(),
         );
 
         //debugger
@@ -968,7 +1013,7 @@ exports.addPetrolInformation = async (req, res, next) => {
       tamb_code,
       waiting_days,
       coverage_days,
-      stock_provious_days
+      stock_provious_days,
     } = payload;
 
     //เช็คเฉพาะส่วนที่สำคัญ
