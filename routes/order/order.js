@@ -199,6 +199,21 @@ exports.getOrderInformation = async (req, res, next) => {
       return;
     }
 
+    const managerScript = `select ptrl_code from tbl_employee where emp_code = '${action[0].id}'`;
+    let managerData = await pgConn.get(
+      dbPrefix + lic_code,
+      managerScript,
+      config.connectionString(),
+    );
+
+    // const codeIn = JSON.parse(managerData.data?.[0]?.ptrl_code);
+    const codeIn = managerData.data?.[0]?.ptrl_code
+      ?.replace(/[\[\]'"\s]/g, "")
+      .split(",")
+      .filter(Boolean);
+
+    let managerCodeIn = `(${codeIn.map((item) => `'${item}'`).join(", ")})`;
+
     // =========================================================================
     // จัดการ Data Type และ Format สำหรับ Pagination และ Date
     // =========================================================================
@@ -298,7 +313,7 @@ exports.getOrderInformation = async (req, res, next) => {
     } else if (act_val !== "ALL") {
       // ======================= สิทธิ์พนักงานทั่วไป: มองเห็นเฉพาะ Order ที่ตัวเองเป็นคนสร้าง =======================
       conditions.push(
-        `tbl_order.ship_to IN (SELECT ptrl_number FROM tbl_petrol WHERE ptrl_code IN (SELECT ptrl_code FROM tbl_employee WHERE emp_code = '${act_id}' AND emp_flag = '1'))`,
+        `tbl_order.ship_to IN (SELECT ptrl_number FROM tbl_petrol WHERE ptrl_code IN ${managerCodeIn})`,
       );
     }
 
@@ -1015,6 +1030,20 @@ exports.getOrderReportInformation = async (req, res, next) => {
       res.status(200).send(response);
       return;
     }
+    const managerScript = `select ptrl_code from tbl_employee where emp_code = '${action[0].id}'`;
+    let managerData = await pgConn.get(
+      dbPrefix + lic_code,
+      managerScript,
+      config.connectionString(),
+    );
+
+    // const codeIn = JSON.parse(managerData.data?.[0]?.ptrl_code);
+    const codeIn = managerData.data?.[0]?.ptrl_code
+      ?.replace(/[\[\]'"\s]/g, "")
+      .split(",")
+      .filter(Boolean);
+
+    let managerCodeIn = `(${codeIn.map((item) => `'${item}'`).join(", ")})`;
 
     // ========== เตรียมข้อมูลสำหรับ Query และ Format Dates ==========
     if (page_index > 0) page_index -= 1;
@@ -1149,7 +1178,7 @@ exports.getOrderReportInformation = async (req, res, next) => {
     } else if (act_val !== "ALL") {
       // สิทธิ์พนักงานทั่วไป: มองเห็นเฉพาะ Order ที่ตัวเองเป็นคนสร้าง
       conditions.push(
-        `tbl_order.ship_to IN (SELECT ptrl_number FROM tbl_petrol WHERE ptrl_code IN (SELECT ptrl_code FROM tbl_employee WHERE emp_code = '${act_id}' AND emp_flag = '1'))`,
+        `tbl_order.ship_to IN (SELECT ptrl_number FROM tbl_petrol WHERE ptrl_code IN ${managerCodeIn})`,
       );
     }
 
@@ -1337,6 +1366,8 @@ exports.getOrderReportInformation = async (req, res, next) => {
             ORDER BY tbl_order.ist_dt DESC 
             OFFSET (${page_index} * ${page_limit}) LIMIT ${page_limit};
         `;
+
+    console.log(script);
 
     let tbl_temporary = await pgConn.get(
       dbPrefix + lic_code,
@@ -2423,13 +2454,13 @@ const getConfirmOrder = async (lic_code, order_id, action) => {
             // ===== Convert SAP Date to SQL Date =====
             let deli_date_req = sap_order?.RequestedDeliveryDate
               ? moment(sap_order?.RequestedDeliveryDate, "YYYYMMDD").format(
-                "YYYY-MM-DD",
-              )
+                  "YYYY-MM-DD",
+                )
               : null;
             let cus_date_ref = sap_order?.CustomerReferenceDate
               ? moment(sap_order?.CustomerReferenceDate, "YYYYMMDD").format(
-                "YYYY-MM-DD",
-              )
+                  "YYYY-MM-DD",
+                )
               : null;
 
             if (!checkResult.code && checkResult.data.length > 0) {
@@ -2907,7 +2938,7 @@ exports.getOrderInformationHana = async (req, res, next) => {
             // ================ กรณีไม่เจอ Order ในระบบ → เพื่ม Order ใหม่จาก SAP ==================
             console.log(
               "ไม่เจอ SHCustomerReference ในระบบ → กำลังสร้าง Order ใหม่: " +
-              salesOrder.SHCustomerReference,
+                salesOrder.SHCustomerReference,
             );
             console.log(`   ➡️  ไม่เจอออเดอร์ในระบบ (Insert Mode)`);
             console.log(`   ➕  กำลังสร้าง Order ใหม่จากข้อมูล SAP...`);
@@ -2994,7 +3025,7 @@ exports.getOrderInformationHana = async (req, res, next) => {
             } else {
               console.error(
                 "เกิดข้อผิดพลาดในการสร้าง Order ใหม่จาก SAP: " +
-                (res_new_order.message || "Unknown Error"),
+                  (res_new_order.message || "Unknown Error"),
               );
             }
           }
@@ -3279,7 +3310,7 @@ exports.getOrderInformationHanaBackUp = async (req, res, next) => {
             // ================ กรณีไม่เจอ Order ในระบบ → เพื่ม Order ใหม่จาก SAP ==================
             console.log(
               "ไม่เจอ SHCustomerReference ในระบบ → กำลังสร้าง Order ใหม่: " +
-              salesOrder.SHCustomerReference,
+                salesOrder.SHCustomerReference,
             );
             console.log(`   ➡️  ไม่เจอออเดอร์ในระบบ (Insert Mode)`);
             console.log(`   ➕  กำลังสร้าง Order ใหม่จากข้อมูล SAP...`);
@@ -3502,7 +3533,7 @@ exports.getOrderInformationHanaBackUp = async (req, res, next) => {
             } else {
               console.error(
                 "เกิดข้อผิดพลาดในการสร้าง Order ใหม่จาก SAP: " +
-                (res_new_order.message || "Unknown Error"),
+                  (res_new_order.message || "Unknown Error"),
               );
             }
           }
@@ -7349,6 +7380,20 @@ exports.getChildOrderInformation = async (req, res, next) => {
       res.status(200).send(response);
       return;
     }
+    const managerScript = `select ptrl_code from tbl_employee where emp_code = '${action[0].id}'`;
+    let managerData = await pgConn.get(
+      dbPrefix + lic_code,
+      managerScript,
+      config.connectionString(),
+    );
+
+    // const codeIn = JSON.parse(managerData.data?.[0]?.ptrl_code);
+    const codeIn = managerData.data?.[0]?.ptrl_code
+      ?.replace(/[\[\]'"\s]/g, "")
+      .split(",")
+      .filter(Boolean);
+
+    let managerCodeIn = `(${codeIn.map((item) => `'${item}'`).join(", ")})`;
 
     // =========================================================================
     // จัดการ Data Type และ Format สำหรับ Pagination และ Date
@@ -7432,7 +7477,7 @@ exports.getChildOrderInformation = async (req, res, next) => {
     } else if (act_val !== "ALL") {
       // สิทธิ์พนักงานทั่วไป: มองเห็นเฉพาะ Order ที่ตัวเองเป็นคนสร้าง
       conditions.push(
-        `tbl_order.ship_to IN (SELECT ptrl_number FROM tbl_petrol WHERE ptrl_code IN (SELECT ptrl_code FROM tbl_employee WHERE emp_code = '${act_id}' AND emp_flag = '1'))`,
+        `tbl_order.ship_to IN (SELECT ptrl_number FROM tbl_petrol WHERE ptrl_code IN ${managerCodeIn})`,
       );
     }
 
@@ -7712,6 +7757,21 @@ exports.getReportStationOverDaySales = async (req, res, next) => {
       return;
     }
 
+    const managerScript = `select ptrl_code from tbl_employee where emp_code = '${action[0].id}'`;
+    let managerData = await pgConn.get(
+      dbPrefix + lic_code,
+      managerScript,
+      config.connectionString(),
+    );
+
+    // const codeIn = JSON.parse(managerData.data?.[0]?.ptrl_code);
+    const codeIn = managerData.data?.[0]?.ptrl_code
+      ?.replace(/[\[\]'"\s]/g, "")
+      .split(",")
+      .filter(Boolean);
+
+    let managerCodeIn = `(${codeIn.map((item) => `'${item}'`).join(", ")})`;
+
     if (page_index > 0) page_index -= 1;
 
     let conditions = [];
@@ -7729,6 +7789,40 @@ exports.getReportStationOverDaySales = async (req, res, next) => {
       conditions.push(
         `(ptr.ptrl_number = '${ptrl_number}' OR ptr.ptrl_code = '${ptrl_number}')`,
       );
+    }
+
+    // ดัก undefined ให้ Action
+    let act_val = action?.[0]?.value?.toString().toUpperCase() || "ALL";
+    let act_id = action?.[0]?.id || "";
+
+    // จัดการเงื่อนไขตามสิทธิ์การเข้าถึง
+    if (act_val !== "ALL") {
+      if (act_val === "GROUP") {
+        // กรองตาม Petrol Group (ถ้าไม่ได้ระบุกลุ่มไว้ ให้เห็นตามสิทธิ์พื้นที่)
+        conditions.push(`(
+          NOT EXISTS (SELECT 1 FROM tbl_employee_petrol_group WHERE emp_code = '${act_id}' AND emp_pgrp_flag = 1)
+          OR ptr.ptrl_group_code IN (SELECT ptrl_group_code FROM tbl_employee_petrol_group WHERE emp_code = '${act_id}' AND emp_pgrp_flag = 1)
+        )`);
+
+        // กรองตาม Order Type (ZOR1, ZOR2)
+        conditions.push(`(
+          NOT EXISTS (SELECT 1 FROM tbl_employee_order_type WHERE emp_code = '${act_id}' AND emp_otyp_flag = 1)
+          OR ptr.ptrl_sales_type IN (
+            SELECT t2.ord_type_code 
+            FROM tbl_employee_order_type t1 
+            JOIN tbl_order_type t2 ON t1.ord_type_code = t2.ord_type_code 
+            WHERE t1.emp_code = '${act_id}' AND t1.emp_otyp_flag = 1
+          )
+        )`);
+
+        // กรองตาม Sales Org (1000, 1900)
+        conditions.push(`(
+          NOT EXISTS (SELECT 1 FROM tbl_employee_sales_org WHERE emp_code = '${act_id}' AND emp_sorg_flag = 1)
+          OR ptr.ptrl_sales_group IN (SELECT sales_org_code FROM tbl_employee_sales_org WHERE emp_code = '${act_id}' AND emp_sorg_flag = 1)
+        )`);
+      } else {
+        conditions.push(`ptr.ptrl_code IN ${managerCodeIn}`);
+      }
     }
 
     let whereClause =
@@ -9549,7 +9643,11 @@ exports.addOrderInformationV2 = async (req, res, next) => {
           if (!db_createorder2.code) {
             let xpassed = false;
             if (db_createorder2.data.length > 0) {
-              for (var xpass = 0; xpass <= db_createorder2.data.length - 1; xpass++) {
+              for (
+                var xpass = 0;
+                xpass <= db_createorder2.data.length - 1;
+                xpass++
+              ) {
                 if (db_createorder2.data[xpass].veh_type_code != "") {
                   var veh_type_code = db_createorder2.data[xpass].veh_type_code;
                   xscript = `select tvt.veh_type_code, tvt.veh_type_desc, tvt.veh_qty, tvt.capacity_min, tvt.capacity_max,
@@ -9650,10 +9748,14 @@ exports.addOrderInformationV2 = async (req, res, next) => {
                       console.log(xresult);
                       if (xresult.success) {
                         if (xresult.result.length > 0) {
-
                           let xSumCurrentQty = 0;
-                          for (var xcmm = 0; xcmm <= xresult.result.length - 1; xcmm++) {
-                            xSumCurrentQty += xresult.result[xcmm].adjusted_liter;
+                          for (
+                            var xcmm = 0;
+                            xcmm <= xresult.result.length - 1;
+                            xcmm++
+                          ) {
+                            xSumCurrentQty +=
+                              xresult.result[xcmm].adjusted_liter;
                           }
 
                           if (SumCurrentQty == xSumCurrentQty) {
@@ -9679,8 +9781,7 @@ exports.addOrderInformationV2 = async (req, res, next) => {
                 res.status(200).send(response);
                 return;
               }
-            }
-            else {
+            } else {
               let response = [
                 {
                   status: "error",
@@ -10151,9 +10252,14 @@ exports.editOrderItemV2 = async (req, res, next) => {
               if (!db_createorder2.code) {
                 let xpassed = false;
                 if (db_createorder2.data.length > 0) {
-                  for (var xpass = 0; xpass <= db_createorder2.data.length - 1; xpass++) {
+                  for (
+                    var xpass = 0;
+                    xpass <= db_createorder2.data.length - 1;
+                    xpass++
+                  ) {
                     if (db_createorder2.data[xpass].veh_type_code != "") {
-                      var veh_type_code = db_createorder2.data[xpass].veh_type_code;
+                      var veh_type_code =
+                        db_createorder2.data[xpass].veh_type_code;
                       xscript = `select tvt.veh_type_code, tvt.veh_type_desc, tvt.veh_qty, tvt.capacity_min, tvt.capacity_max,
                       compartment_no, compartment_total, vect_compartment_level_id, veh_compartment_type_level_number, veh_compartment_type_level,
                       '' as automatic_code ,'' as ptrl_code, '' as tank_code, '' as itm_code 
@@ -10253,10 +10359,14 @@ exports.editOrderItemV2 = async (req, res, next) => {
 
                           if (xresult.success) {
                             if (xresult.result.length > 0) {
-
                               let xSumCurrentQty = 0;
-                              for (var xcmm = 0; xcmm <= xresult.result.length - 1; xcmm++) {
-                                xSumCurrentQty += xresult.result[xcmm].adjusted_liter;
+                              for (
+                                var xcmm = 0;
+                                xcmm <= xresult.result.length - 1;
+                                xcmm++
+                              ) {
+                                xSumCurrentQty +=
+                                  xresult.result[xcmm].adjusted_liter;
                               }
 
                               if (SumCurrentQty == xSumCurrentQty) {
@@ -10282,8 +10392,7 @@ exports.editOrderItemV2 = async (req, res, next) => {
                     res.status(200).send(response);
                     return;
                   }
-                }
-                else {
+                } else {
                   let response = [
                     {
                       status: "error",
