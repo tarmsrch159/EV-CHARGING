@@ -2645,6 +2645,17 @@ exports.getAutoCalculateOrderInformationV2 = async (req, res, next) => {
                                     }
                                     else {
                                         //update no config depo.
+                                        let response = [
+                                            {
+                                                status: "error",
+                                                invalid_code: "-4",
+                                                message: `ไม่มีข้อมูลคลังน้ำมัน, กรุณาตรวจสอบ`,
+                                                data: [],
+                                                response_time: moment().format("YYYY-MM-DD HH:mm:ss").toString(),
+                                            },
+                                        ];
+                                        res.status(200).send(response);
+                                        return
                                     }
 
                                 }
