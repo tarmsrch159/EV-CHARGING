@@ -52,79 +52,39 @@ exports.getDepotInformation = async (req, res, next) => {
       }
 
 
-      const managerScript = `select ptrl_code from tbl_employee where emp_code = '${action[0].id}'`;
-      let managerData = await pgConn.get(
-        dbPrefix + lic_code,
-        managerScript,
-        config.connectionString(),
-      );
+      // const managerScript = `select ptrl_code from tbl_employee where emp_code = '${action[0].id}'`;
+      // let managerData = await pgConn.get(
+      //   dbPrefix + lic_code,
+      //   managerScript,
+      //   config.connectionString(),
+      // );
 
-      const codeIn = (managerData.data?.[0]?.ptrl_code || "")
-        .replace(/[\[\]'"\s]/g, "")
-        .split(",")
-        .filter(Boolean);
-      // เช็คค่า null ของ manager
-      let act_val = action[0]?.value?.toString().toUpperCase() || "ALL";
-      if (act_val === "MANAGER") {
-        if (codeIn.length === 0) {
-          let response = [
-            {
-              status: "success",
-              invalid_code: "0",
-              message: "",
-              data: [],
-              response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
-              page_total: 0,
-              rows_total: 0,
-            },
-          ];
-          res.status(200).send(response);
-          return;
-        }
-      }
+      // const codeIn = (managerData.data?.[0]?.ptrl_code || "")
+      //   .replace(/[\[\]'"\s]/g, "")
+      //   .split(",")
+      //   .filter(Boolean);
+      // // เช็คค่า null ของ manager
+      // let act_val = action[0]?.value?.toString().toUpperCase() || "ALL";
+      // if (act_val === "MANAGER") {
+      //   if (codeIn.length === 0) {
+      //     let response = [
+      //       {
+      //         status: "success",
+      //         invalid_code: "0",
+      //         message: "",
+      //         data: [],
+      //         response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+      //         page_total: 0,
+      //         rows_total: 0,
+      //       },
+      //     ];
+      //     res.status(200).send(response);
+      //     return;
+      //   }
+      // }
 
-      let managerCodeIn = `(${codeIn.map((item) => `'${item}'`).join(", ")})`;
-      console.log(managerCodeIn)
-      if (
-        dpo_group_code.toString().toUpperCase() != "ALL" &&
-        dpo_group_code.toString().toUpperCase() != ""
-      ) {
-        script += ` and tbl_depot.dpo_group_code = '${dpo_group_code}'`;
-      }
-
-
-      if (search != "") {
-        script += ` and (dpo_number like '%${search}%' 
-                or dpo_desc like UPPER('%${search}%')
-                or dpo_short_desc like '%${search}%' 
-                or dpo_address like '%${search}%')`;
-      }
-
-      // =========================================================================
-      // กรองข้อมูลตามสิทธิ์การเข้าถึง (Role Authorization)
-      // =========================================================================
-      act_val = action[0]?.value?.toString().toUpperCase() || "ALL";
-      let act_id = action[0]?.id || "";
-      if (act_val === "GROUP") {
-        // กรองตาม Order Type (ZOR1, ZOR2)
-        script += ` and (
-                NOT EXISTS (SELECT 1 FROM tbl_employee_order_type WHERE emp_code = '${act_id}' AND emp_otyp_flag = 1)
-                OR tbl_depot.dpo_order_type IN (
-                    SELECT t2.ord_type_code 
-                    FROM tbl_employee_order_type t1 
-                    JOIN tbl_order_type t2 ON t1.ord_type_code = t2.ord_type_code 
-                    WHERE t1.emp_code = '${act_id}' AND t1.emp_otyp_flag = 1
-                )
-            )`;
-
-        // กรองตาม Sales Org (1000, 1900)
-        script += ` and (NOT EXISTS (SELECT 1 FROM tbl_employee_sales_org WHERE emp_code = '${act_id}' AND emp_sorg_flag = 1)
-                OR tbl_depot.dpo_sales_org IN (SELECT sales_org_code FROM tbl_employee_sales_org WHERE emp_code = '${act_id}' AND emp_sorg_flag = 1)
-            )`;
-      } else if (act_val === "MANAGER") {
-        script += ` and dp.ptrl_code in ${managerCodeIn}`;
-      }
-
+      // let managerCodeIn = `(${codeIn.map((item) => `'${item}'`).join(", ")})`;
+      // console.log(managerCodeIn)
 
       if (dpo_code.toString().toUpperCase() != "ALL") {
         script = `select 
@@ -160,7 +120,48 @@ exports.getDepotInformation = async (req, res, next) => {
                 where dpo_flag = '1'`;
       }
 
-      console.log(script)
+      if (
+        dpo_group_code.toString().toUpperCase() != "ALL" &&
+        dpo_group_code.toString().toUpperCase() != ""
+      ) {
+        script += ` and tbl_depot.dpo_group_code = '${dpo_group_code}'`;
+      }
+
+
+      if (search != "") {
+        script += ` and (dpo_number like '%${search}%' 
+                or dpo_desc like UPPER('%${search}%')
+                or dpo_short_desc like '%${search}%' 
+                or dpo_address like '%${search}%')`;
+      }
+
+      // =========================================================================
+      // กรองข้อมูลตามสิทธิ์การเข้าถึง (Role Authorization)
+      // =========================================================================
+      // act_val = action[0]?.value?.toString().toUpperCase() || "ALL";
+      // let act_id = action[0]?.id || "";
+      // if (act_val === "GROUP") {
+      //   // กรองตาม Order Type (ZOR1, ZOR2)
+      //   script += ` and (
+      //           NOT EXISTS (SELECT 1 FROM tbl_employee_order_type WHERE emp_code = '${act_id}' AND emp_otyp_flag = 1)
+      //           OR tbl_depot.dpo_order_type IN (
+      //               SELECT t2.ord_type_code 
+      //               FROM tbl_employee_order_type t1 
+      //               JOIN tbl_order_type t2 ON t1.ord_type_code = t2.ord_type_code 
+      //               WHERE t1.emp_code = '${act_id}' AND t1.emp_otyp_flag = 1
+      //           )
+      //       )`;
+
+      //   // กรองตาม Sales Org (1000, 1900)
+      //   script += ` and (NOT EXISTS (SELECT 1 FROM tbl_employee_sales_org WHERE emp_code = '${act_id}' AND emp_sorg_flag = 1)
+      //           OR tbl_depot.dpo_sales_org IN (SELECT sales_org_code FROM tbl_employee_sales_org WHERE emp_code = '${act_id}' AND emp_sorg_flag = 1)
+      //       )`;
+      // } else 
+
+      // if (act_val === "MANAGER") {
+      //   script += ` and dp.ptrl_code in ${managerCodeIn}`;
+      // }
+
 
 
       script += ` order by ist_dt desc `;
@@ -183,7 +184,7 @@ exports.getDepotInformation = async (req, res, next) => {
           let rows_total = 0;
           script = ``;
           if (dpo_code.toString().toUpperCase() != "ALL") {
-            script = `select ceil((ceil(count(distinct tbl_depot.dpo_code)) / ${page_limit})) as page_total, (count(distinct tbl_depot.dpo_code)) as rows_total 
+            script = `select ceil((ceil(count(tbl_depot.dpo_code)) / ${page_limit})) as page_total, (count(tbl_depot.dpo_code)) as rows_total 
                         from tbl_depot 
                         left join tbl_order_type on tbl_depot.dpo_order_type = tbl_order_type.ord_type_code
                         left join tbl_office on tbl_depot.off_code = tbl_office.off_code 
@@ -194,7 +195,7 @@ exports.getDepotInformation = async (req, res, next) => {
                 left join tbl_petrol_depot dp on tbl_depot.dpo_code = dp.dpo_code
                         where dpo_flag = '1' and tbl_depot.dpo_code = '${dpo_code}' `;
           } else {
-            script = `select ceil((ceil(count(distinct tbl_depot.dpo_code)) / ${page_limit})) as page_total, (count(distinct tbl_depot.dpo_code)) as rows_total 
+            script = `select ceil((ceil(count(tbl_depot.dpo_code)) / ${page_limit})) as page_total, (count(tbl_depot.dpo_code)) as rows_total 
                         from tbl_depot 
                         left join tbl_office on tbl_depot.off_code = tbl_office.off_code 
                         left join tbl_depot_group on tbl_depot.dpo_group_code = tbl_depot_group.dpo_group_code 
@@ -234,32 +235,36 @@ exports.getDepotInformation = async (req, res, next) => {
           // =========================================================================
           // กรองข้อมูลตามสิทธิ์การเข้าถึง (Role Authorization)
           // =========================================================================
-          act_val = action[0]?.value?.toString().toUpperCase() || "ALL";
-          let act_id = action[0]?.id || "";
-          if (act_val === "GROUP") {
-            // กรองตาม Order Type (ZOR1, ZOR2)
-            script += ` and (
-                NOT EXISTS (SELECT 1 FROM tbl_employee_order_type WHERE emp_code = '${act_id}' AND emp_otyp_flag = 1)
-                OR tbl_depot.dpo_order_type IN (
-                    SELECT t2.ord_type_code 
-                    FROM tbl_employee_order_type t1 
-                    JOIN tbl_order_type t2 ON t1.ord_type_code = t2.ord_type_code 
-                    WHERE t1.emp_code = '${act_id}' AND t1.emp_otyp_flag = 1
-                )
-            )`;
+          // act_val = action[0]?.value?.toString().toUpperCase() || "ALL";
+          // let act_id = action[0]?.id || "";
+          // if (act_val === "GROUP") {
+          //   // กรองตาม Order Type (ZOR1, ZOR2)
+          //   script += ` and (
+          //       NOT EXISTS (SELECT 1 FROM tbl_employee_order_type WHERE emp_code = '${act_id}' AND emp_otyp_flag = 1)
+          //       OR tbl_depot.dpo_order_type IN (
+          //           SELECT t2.ord_type_code 
+          //           FROM tbl_employee_order_type t1 
+          //           JOIN tbl_order_type t2 ON t1.ord_type_code = t2.ord_type_code 
+          //           WHERE t1.emp_code = '${act_id}' AND t1.emp_otyp_flag = 1
+          //       )
+          //   )`;
 
-            // กรองตาม Sales Org (1000, 1900)
-            script += ` and (NOT EXISTS (SELECT 1 FROM tbl_employee_sales_org WHERE emp_code = '${act_id}' AND emp_sorg_flag = 1)
-                OR tbl_depot.dpo_sales_org IN (SELECT sales_org_code FROM tbl_employee_sales_org WHERE emp_code = '${act_id}' AND emp_sorg_flag = 1)
-            )`;
-          } else if (act_val === "MANAGER") {
-            script += ` and dp.ptrl_code in ${managerCodeIn}`;
-          }
+          //   // กรองตาม Sales Org (1000, 1900)
+          //   script += ` and (NOT EXISTS (SELECT 1 FROM tbl_employee_sales_org WHERE emp_code = '${act_id}' AND emp_sorg_flag = 1)
+          //       OR tbl_depot.dpo_sales_org IN (SELECT sales_org_code FROM tbl_employee_sales_org WHERE emp_code = '${act_id}' AND emp_sorg_flag = 1)
+          //   )`;
+          // } else 
+
+          // if (act_val === "MANAGER") {
+          //   script += ` and dp.ptrl_code in ${managerCodeIn}`;
+          // }
           let tbl_temporary0 = await pgConn.get(
             dbPrefix + lic_code,
             script,
             config.connectionString(),
           );
+
+          console.log(tbl_temporary0)
 
           if (!tbl_temporary0.code) {
             if (tbl_temporary0.data.length > 0) {
