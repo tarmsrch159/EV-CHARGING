@@ -90,12 +90,11 @@ exports.getDepotInformation = async (req, res, next) => {
         script = `select 
        distinct tbl_depot.dpo_code, dpo_number, dpo_desc, dpo_short_desc, dpo_address, dpo_zip_code, dpo_country_code,
                 dpo_loading_minute, dpo_expenses_per_km, dpo_area, dpo_lat, dpo_lon,
-                tbl_depot.off_code, off_desc, tbl_depot.dpo_group_code, dpo_group_desc, tbl_depot.ist_dt, tbl_depot.mdf_dt, tbl_depot.rm_dt, tbl_depot.prov_code, 
+                tbl_depot.off_code, tbl_depot.dpo_group_code, dpo_group_desc, tbl_depot.ist_dt, tbl_depot.mdf_dt, tbl_depot.rm_dt, tbl_depot.prov_code, 
                 tbl_depot.amph_code, tbl_depot.tamb_code, tbl_province.prov_desc, tbl_amphure.amph_desc, tbl_tambon.tamb_desc, dpo_flag,
                 tbl_depot.dpo_sales_org, tbl_order_type.ord_type_desc, tbl_order_type.sales_order_type
                 from tbl_depot 
                 left join tbl_order_type on tbl_depot.dpo_order_type = tbl_order_type.ord_type_code
-                left join tbl_office on tbl_depot.off_code = tbl_office.off_code 
                 left join tbl_depot_group on tbl_depot.dpo_group_code = tbl_depot_group.dpo_group_code 
                 left join tbl_province on tbl_depot.prov_code = tbl_province.prov_code 
                 left join tbl_amphure on tbl_depot.amph_code = tbl_amphure.amph_code 
@@ -106,12 +105,11 @@ exports.getDepotInformation = async (req, res, next) => {
         script = `select 
         distinct tbl_depot.dpo_code, dpo_number, dpo_desc, dpo_short_desc, dpo_address, dpo_zip_code, dpo_country_code,
                 dpo_loading_minute, dpo_expenses_per_km, dpo_area, dpo_lat, dpo_lon,
-                tbl_depot.off_code, off_desc, tbl_depot.dpo_group_code, dpo_group_desc, tbl_depot.ist_dt, tbl_depot.mdf_dt, tbl_depot.rm_dt, tbl_depot.prov_code, 
+                tbl_depot.off_code, tbl_depot.dpo_group_code, dpo_group_desc, tbl_depot.ist_dt, tbl_depot.mdf_dt, tbl_depot.rm_dt, tbl_depot.prov_code, 
                 tbl_depot.amph_code, tbl_depot.tamb_code, tbl_province.prov_desc, tbl_amphure.amph_desc, tbl_tambon.tamb_desc, dpo_flag,
                 tbl_depot.dpo_sales_org, tbl_order_type.ord_type_desc, tbl_order_type.sales_order_type
                 from tbl_depot 
                 left join tbl_order_type on tbl_depot.dpo_order_type = tbl_order_type.ord_type_code
-                left join tbl_office on tbl_depot.off_code = tbl_office.off_code 
                 left join tbl_depot_group on tbl_depot.dpo_group_code = tbl_depot_group.dpo_group_code 
                 left join tbl_province on tbl_depot.prov_code = tbl_province.prov_code 
                 left join tbl_amphure on tbl_depot.amph_code = tbl_amphure.amph_code 
@@ -187,7 +185,6 @@ exports.getDepotInformation = async (req, res, next) => {
             script = `select ceil((ceil(count(tbl_depot.dpo_code)) / ${page_limit})) as page_total, (count(tbl_depot.dpo_code)) as rows_total 
                         from tbl_depot 
                         left join tbl_order_type on tbl_depot.dpo_order_type = tbl_order_type.ord_type_code
-                        left join tbl_office on tbl_depot.off_code = tbl_office.off_code 
                         left join tbl_depot_group on tbl_depot.dpo_group_code = tbl_depot_group.dpo_group_code 
                         left join tbl_province on tbl_depot.prov_code = tbl_province.prov_code 
                         left join tbl_amphure on tbl_depot.amph_code = tbl_amphure.amph_code 
@@ -197,7 +194,6 @@ exports.getDepotInformation = async (req, res, next) => {
           } else {
             script = `select ceil((ceil(count(tbl_depot.dpo_code)) / ${page_limit})) as page_total, (count(tbl_depot.dpo_code)) as rows_total 
                         from tbl_depot 
-                        left join tbl_office on tbl_depot.off_code = tbl_office.off_code 
                         left join tbl_depot_group on tbl_depot.dpo_group_code = tbl_depot_group.dpo_group_code 
                         left join tbl_order_type on tbl_depot.dpo_order_type = tbl_order_type.ord_type_code
                         left join tbl_province on tbl_depot.prov_code = tbl_province.prov_code 
@@ -214,12 +210,12 @@ exports.getDepotInformation = async (req, res, next) => {
             script += ` and tbl_depot.dpo_group_code = '${dpo_group_code}'`;
           }
 
-          if (
-            off_code.toString().toUpperCase() != "ALL" &&
-            off_code.toString().toUpperCase() != ""
-          ) {
-            script += ` and tbl_depot.off_code = '${off_code}'`;
-          }
+          // if (
+          //   off_code.toString().toUpperCase() != "ALL" &&
+          //   off_code.toString().toUpperCase() != ""
+          // ) {
+          //   script += ` and tbl_depot.off_code = '${off_code}'`;
+          // }
 
           if (search != "") {
             script += ` and (dpo_number like '%${search}%' 
