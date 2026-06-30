@@ -182,7 +182,7 @@ exports.getDepotInformation = async (req, res, next) => {
           let rows_total = 0;
           script = ``;
           if (dpo_code.toString().toUpperCase() != "ALL") {
-            script = `select ceil((ceil(count(tbl_depot.dpo_code)) / ${page_limit})) as page_total, (count(tbl_depot.dpo_code)) as rows_total 
+            script = `select ceil((ceil(count(distinct tbl_depot.dpo_code)) / ${page_limit})) as page_total, (count(distinct tbl_depot.dpo_code)) as rows_total 
                         from tbl_depot 
                         left join tbl_order_type on tbl_depot.dpo_order_type = tbl_order_type.ord_type_code
                         left join tbl_depot_group on tbl_depot.dpo_group_code = tbl_depot_group.dpo_group_code 
@@ -192,7 +192,7 @@ exports.getDepotInformation = async (req, res, next) => {
                 left join tbl_petrol_depot dp on tbl_depot.dpo_code = dp.dpo_code
                         where dpo_flag = '1' and tbl_depot.dpo_code = '${dpo_code}' `;
           } else {
-            script = `select ceil((ceil(count(tbl_depot.dpo_code)) / ${page_limit})) as page_total, (count(tbl_depot.dpo_code)) as rows_total 
+            script = `select ceil((ceil(count(distinct tbl_depot.dpo_code)) / ${page_limit})) as page_total, (count(distinct tbl_depot.dpo_code)) as rows_total 
                         from tbl_depot 
                         left join tbl_depot_group on tbl_depot.dpo_group_code = tbl_depot_group.dpo_group_code 
                         left join tbl_order_type on tbl_depot.dpo_order_type = tbl_order_type.ord_type_code
