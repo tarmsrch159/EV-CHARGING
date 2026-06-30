@@ -59,7 +59,7 @@ router.post(
 );
 router.post(
   "/auto-order/calculate/information",
-  auto_order_calculate.getAutoCalculateOrderInformation,
+  auto_order_calculate.getAutoCalculateOrderInformationV2,
 );
 
 // ========= Child Order ==========

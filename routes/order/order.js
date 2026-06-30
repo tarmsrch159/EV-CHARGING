@@ -2454,13 +2454,13 @@ const getConfirmOrder = async (lic_code, order_id, action) => {
             // ===== Convert SAP Date to SQL Date =====
             let deli_date_req = sap_order?.RequestedDeliveryDate
               ? moment(sap_order?.RequestedDeliveryDate, "YYYYMMDD").format(
-                  "YYYY-MM-DD",
-                )
+                "YYYY-MM-DD",
+              )
               : null;
             let cus_date_ref = sap_order?.CustomerReferenceDate
               ? moment(sap_order?.CustomerReferenceDate, "YYYYMMDD").format(
-                  "YYYY-MM-DD",
-                )
+                "YYYY-MM-DD",
+              )
               : null;
 
             if (!checkResult.code && checkResult.data.length > 0) {
@@ -2938,7 +2938,7 @@ exports.getOrderInformationHana = async (req, res, next) => {
             // ================ กรณีไม่เจอ Order ในระบบ → เพื่ม Order ใหม่จาก SAP ==================
             console.log(
               "ไม่เจอ SHCustomerReference ในระบบ → กำลังสร้าง Order ใหม่: " +
-                salesOrder.SHCustomerReference,
+              salesOrder.SHCustomerReference,
             );
             console.log(`   ➡️  ไม่เจอออเดอร์ในระบบ (Insert Mode)`);
             console.log(`   ➕  กำลังสร้าง Order ใหม่จากข้อมูล SAP...`);
@@ -3025,7 +3025,7 @@ exports.getOrderInformationHana = async (req, res, next) => {
             } else {
               console.error(
                 "เกิดข้อผิดพลาดในการสร้าง Order ใหม่จาก SAP: " +
-                  (res_new_order.message || "Unknown Error"),
+                (res_new_order.message || "Unknown Error"),
               );
             }
           }
@@ -3310,7 +3310,7 @@ exports.getOrderInformationHanaBackUp = async (req, res, next) => {
             // ================ กรณีไม่เจอ Order ในระบบ → เพื่ม Order ใหม่จาก SAP ==================
             console.log(
               "ไม่เจอ SHCustomerReference ในระบบ → กำลังสร้าง Order ใหม่: " +
-                salesOrder.SHCustomerReference,
+              salesOrder.SHCustomerReference,
             );
             console.log(`   ➡️  ไม่เจอออเดอร์ในระบบ (Insert Mode)`);
             console.log(`   ➕  กำลังสร้าง Order ใหม่จากข้อมูล SAP...`);
@@ -3533,7 +3533,7 @@ exports.getOrderInformationHanaBackUp = async (req, res, next) => {
             } else {
               console.error(
                 "เกิดข้อผิดพลาดในการสร้าง Order ใหม่จาก SAP: " +
-                  (res_new_order.message || "Unknown Error"),
+                (res_new_order.message || "Unknown Error"),
               );
             }
           }
@@ -4570,6 +4570,7 @@ exports.addOrderInformation = async (req, res, next) => {
           {
             sh_cus_ref: sh_cus_ref,
             order_id: order_id,
+            veh_type_code: veh_type_code
           },
         ],
         invalid_material_item: invalid_material_item,
@@ -9505,6 +9506,7 @@ exports.addOrderInformationV2 = async (req, res, next) => {
         : deli_date_req;
 
     let script = ``;
+    let veh_type_code = '';
     // =========== Order-No Mockup ===========
     let order_no = "ord-" + moment().format("x");
 
@@ -9514,7 +9516,7 @@ exports.addOrderInformationV2 = async (req, res, next) => {
       for (let i = 0; i < order_item.length; i++) {
         let pre_itm_material_number = order_item[i].itm_material_number;
         if (pre_itm_material_number) {
-          let check_item_script = `SELECT 1 FROM tbl_item WHERE itm_material_number = '${pre_itm_material_number}' LIMIT 1`;
+          let check_item_script = `SELECT 1 FROM tbl_item WHERE itm_material_number = '${pre_itm_material_number}' AND itm_flag = '1' LIMIT 1`;
           let checkItemResult = await pgConn.get(
             dbPrefix + lic_code,
             check_item_script,
@@ -9596,7 +9598,7 @@ exports.addOrderInformationV2 = async (req, res, next) => {
         let item_quantity_check = validationItems[i].item_quantity;
         let itm_material_number = validationItems[i].itm_material_number;
 
-        let scriptCheckItem = `SELECT itm_desc from tbl_item where itm_material_number = '${itm_material_number}' and itm_flag = '1'`;
+        let scriptCheckItem = `SELECT itm_desc from tbl_item where itm_material_number = '${itm_material_number}' and itm_flag = '1' LIMIT 1`;
         console.log("scriptCheckItem", scriptCheckItem);
         let checkItemResult = await pgConn.get(
           dbPrefix + lic_code,
@@ -9628,20 +9630,70 @@ exports.addOrderInformationV2 = async (req, res, next) => {
 
         if (i == validationItems.length - 1) {
           //debugger;
-          var veh_type_code = "";
+          veh_type_code = "";
           //get vehicle type
           xscript = `select 0 as level,tpvt.veh_type_code, tvt.veh_type_desc ,tvt.capacity_max, tvt.capacity_min, tpvt.ptrl_vehicle_type_flag
-              from tbl_petrol_vehicle_type tpvt 
-              inner join tbl_vehicle_type tvt on tpvt.veh_type_code = tvt.veh_type_code 
-              where tpvt.ptrl_code = '${resultPetrol.data[0].ptrl_code}' and tpvt.ptrl_vehicle_type_flag = '1' and tvt.veh_type_flag = '1'`;
+          from tbl_petrol_vehicle_type tpvt 
+          inner join tbl_vehicle_type tvt on tpvt.veh_type_code = tvt.veh_type_code 
+          where tpvt.ptrl_code = '${resultPetrol.data[0].ptrl_code}' 
+          and tpvt.ptrl_vehicle_type_flag = '1' and tvt.veh_type_flag = '1' 
+          and ${SumCurrentQty} >= tvt.capacity_min 
+          and ${SumCurrentQty} <= tvt.capacity_max;`;
 
           let db_createorder2 = await pgConn.get(
             dbPrefix + lic_code,
             xscript,
             config.connectionString(),
           );
+
           if (!db_createorder2.code) {
             let xpassed = false;
+            if (db_createorder2.data.length <= 0) {
+              xscript = `select level, veh_type_code, veh_type_desc, capacity_max, capacity_min
+              from 
+              ((select 0 as level,tpvt.veh_type_code, tvt.veh_type_desc ,tvt.capacity_max, tvt.capacity_min 
+              from tbl_petrol_vehicle_type tpvt 
+              left join tbl_vehicle_type tvt on tpvt.veh_type_code = tpvt.veh_type_code 
+              where tpvt.ptrl_code = '${resultPetrol.data[0].ptrl_code}' 
+              and capacity_min < ${SumCurrentQty} 
+              and capacity_max >= ${SumCurrentQty} 
+
+              union
+
+              select 1 as level,tvt.veh_type_code, tvt.veh_type_desc ,tvt.capacity_max, tvt.capacity_min 
+              from tbl_vehicle_type tvt where capacity_min < ${SumCurrentQty}  
+              and capacity_max >= ${SumCurrentQty} 
+
+              union
+
+              select 2 as level,tvt.veh_type_code, tvt.veh_type_desc ,tvt.capacity_max, tvt.capacity_min 
+              from tbl_vehicle_type tvt where tvt.veh_type_code in 
+              (select veh_type_code from tbl_vehicle_type order by capacity_max desc limit 1)
+              and capacity_min < ${SumCurrentQty} 
+              and capacity_max >= ${SumCurrentQty})) xtable 
+              order by xtable."level" asc`
+
+              db_createorder2 = await pgConn.get(
+                dbPrefix + lic_code,
+                xscript,
+                config.connectionString(),
+              );
+
+              if (!db_createorder2.code) {
+                let response = [
+                  {
+                    status: "error",
+                    invalid_code: "-1",
+                    message: `ไม่มีการกำหนดประเภทรถที่เข้าปั้มได้กรุณาตรวจสอบ<br>ปริมาณของน้ำมันและการตั้งค่าประเภทรถ`,
+                    data: [],
+                    response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+                  },
+                ];
+                res.status(200).send(response);
+                return;
+              }
+            }
+
             if (db_createorder2.data.length > 0) {
               for (
                 var xpass = 0;
@@ -9649,15 +9701,15 @@ exports.addOrderInformationV2 = async (req, res, next) => {
                 xpass++
               ) {
                 if (db_createorder2.data[xpass].veh_type_code != "") {
-                  var veh_type_code = db_createorder2.data[xpass].veh_type_code;
+                  veh_type_code = db_createorder2.data[xpass].veh_type_code;
                   xscript = `select tvt.veh_type_code, tvt.veh_type_desc, tvt.veh_qty, tvt.capacity_min, tvt.capacity_max,
-                      compartment_no, compartment_total, vect_compartment_level_id, veh_compartment_type_level_number, veh_compartment_type_level,
-                      '' as automatic_code ,'' as ptrl_code, '' as tank_code, '' as itm_code 
-                      from tbl_vehicle_type tvt
-                      left join tbl_vehicle_type_compartment tvtim on tvt.veh_type_code = tvtim.veh_type_code 
-                      left join tbl_vehicle_type_compartment_level tvtlev on tvtim.id = tvtlev.compartment_item_id  
-                      where tvt.veh_type_code = '${veh_type_code}' and tvtlev.veh_compartment_type_level_flag = '1'
-                      order by tvtim.compartment_no asc, tvtlev.veh_compartment_type_level_number asc`;
+                  compartment_no, compartment_total, vect_compartment_level_id, veh_compartment_type_level_number, veh_compartment_type_level,
+                  '' as automatic_code ,'' as ptrl_code, '' as tank_code, '' as itm_code 
+                  from tbl_vehicle_type tvt
+                  left join tbl_vehicle_type_compartment tvtim on tvt.veh_type_code = tvtim.veh_type_code 
+                  left join tbl_vehicle_type_compartment_level tvtlev on tvtim.id = tvtlev.compartment_item_id  
+                  where tvt.veh_type_code = '${veh_type_code}' and tvtlev.veh_compartment_type_level_flag = '1'
+                  order by tvtim.compartment_no asc, tvtlev.veh_compartment_type_level_number asc`;
 
                   let db_createorder3 = await pgConn.get(
                     dbPrefix + lic_code,
@@ -9786,7 +9838,7 @@ exports.addOrderInformationV2 = async (req, res, next) => {
                 {
                   status: "error",
                   invalid_code: "-1",
-                  message: `ไม่มีการกำหนดประเภทรถที่เข้าปั้มได้กรุณาตรวจสอบ`,
+                  message: `ไม่มีการกำหนดประเภทรถที่เข้าปั้มได้กรุณาตรวจสอบ<br>ปริมาณของน้ำมันและการตั้งค่าประเภทรถ`,
                   data: [],
                   response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
                 },
@@ -9839,17 +9891,16 @@ exports.addOrderInformationV2 = async (req, res, next) => {
 
     // ====================== เพิ่มข้อมูลลงใน tbl_order ======================
     script = `INSERT INTO public.tbl_order
-            (order_no, order_type, order_group, chanel, division, sold_to, ship_to,
-                cus_ref, cus_date_ref, po_name, order_by, ship_cond, pay_term,
-                deli_date_req, deli_time_req, description, sh_cus_ref, sh_cus_date_ref,
-                status_deli, ist_dt, order_flag, auto_order, order_status, created_by_tms)
-        VALUES
-            (NULL, '${order_type}', '${order_group}', '${chanel}', '${division}',
-                '${sold_to}', '${ship_to}', '${(cus_ref || "").replace(/'/g, "''")}', ${cus_date_ref ? "'" + moment(cus_date_ref).format("YYYY-MM-DD HH:mm:ss") + "'" : "NULL"},
-                '${(po_name || "AOS").replace(/'/g, "''")}', '${(order_by || "AOS").replace(/'/g, "''")}', '${ship_cond || "T1"}', '${pay_term || "Z001"}',
-                ${deli_date_req ? "'" + moment(deli_date_req).format("YYYY-MM-DD HH:mm:ss") + "'" : "NULL"}, '${deli_time_req || ""}',
-                '${(description || "").replace(/'/g, "''")}', '${sh_cus_ref || ""}', ${sh_cus_date_ref ? "'" + moment(sh_cus_date_ref).format("YYYY-MM-DD HH:mm:ss") + "'" : "NULL"},
-                'A', '${moment().format("YYYY-MM-DD HH:mm:ss")}', '1', 0, 0, '${action[0].id}') RETURNING id`;
+    (order_no, order_type, order_group, chanel, division, sold_to, ship_to,
+    cus_ref, cus_date_ref, po_name, order_by, ship_cond, pay_term,
+    deli_date_req, deli_time_req, description, sh_cus_ref, sh_cus_date_ref,
+    status_deli, ist_dt, order_flag, auto_order, order_status, created_by_tms, veh_type_code)
+    VALUES (NULL, '${order_type}', '${order_group}', '${chanel}', '${division}',
+    '${sold_to}', '${ship_to}', '${(cus_ref || "").replace(/'/g, "''")}', ${cus_date_ref ? "'" + moment(cus_date_ref).format("YYYY-MM-DD HH:mm:ss") + "'" : "NULL"},
+    '${(po_name || "AOS").replace(/'/g, "''")}', '${(order_by || "AOS").replace(/'/g, "''")}', '${ship_cond || "T1"}', '${pay_term || "Z001"}',
+    ${deli_date_req ? "'" + moment(deli_date_req).format("YYYY-MM-DD HH:mm:ss") + "'" : "NULL"}, '${deli_time_req || ""}',
+    '${(description || "").replace(/'/g, "''")}', '${sh_cus_ref || ""}', ${sh_cus_date_ref ? "'" + moment(sh_cus_date_ref).format("YYYY-MM-DD HH:mm:ss") + "'" : "NULL"},
+    'A', '${moment().format("YYYY-MM-DD HH:mm:ss")}', '1', 0, 0, '${action[0].id}', '${veh_type_code}') RETURNING id`;
 
     script = script.replace(/'NULL'/gi, "NULL");
     let tbl_temporary = await pgConn.get(
@@ -9930,9 +9981,9 @@ exports.addOrderInformationV2 = async (req, res, next) => {
             for (var k = 0; k < order_item[i].item_text.length; k++) {
               var item_text = order_item[i].item_text[k];
               let script_item = `INSERT INTO public.tbl_order_item
-                        (order_no, item_no, item_qty, long_text_id, long_text, ist_dt, order_item_flag, auto_order, deli_plant, sales_order_item, remark, ptrl_tank_code)
-                        VALUES(${order_id}, '${itm_code}', ${item_quantity}, '${(item_text.long_text_id || "ZT01").replace(/'/g, "''")}', '${(item_text.long_text || "Compartment").replace(/'/g, "''")}',
-                        '${moment().format("YYYY-MM-DD HH:mm:ss")}', '1', 0, '${deli_plant || ""}', '${sales_order_item}', '${remark || ""}', '${ptrl_tank_code || ""}')`;
+              (order_no, item_no, item_qty, long_text_id, long_text, ist_dt, order_item_flag, auto_order, deli_plant, sales_order_item, remark, ptrl_tank_code)
+              VALUES(${order_id}, '${itm_code}', ${item_quantity}, '${(item_text.long_text_id || "ZT01").replace(/'/g, "''")}', '${(item_text.long_text || "Compartment").replace(/'/g, "''")}',
+              '${moment().format("YYYY-MM-DD HH:mm:ss")}', '1', 0, '${deli_plant || ""}', '${sales_order_item}', '${remark || ""}', '${ptrl_tank_code || ""}')`;
 
               console.log(
                 `กำลัง Insert Item [${itm_code}] (with text) สำหรับ Order ${order_id}`,
@@ -9951,9 +10002,9 @@ exports.addOrderInformationV2 = async (req, res, next) => {
           } else {
             // กรณีที่ไม่มี item_text
             let script_item = `INSERT INTO public.tbl_order_item
-                            (order_no, item_no, item_qty, long_text_id, long_text, ist_dt, order_item_flag, auto_order, deli_plant, sales_order_item, remark, ptrl_tank_code)
-                        VALUES(${order_id}, '${itm_code}', ${item_quantity}, '', '',
-                            '${moment().format("YYYY-MM-DD HH:mm:ss")}', '1', 0, '${deli_plant || ""}', '${sales_order_item}', '${remark || ""}', '${ptrl_tank_code || ""}')`;
+            (order_no, item_no, item_qty, long_text_id, long_text, ist_dt, order_item_flag, auto_order, deli_plant, sales_order_item, remark, ptrl_tank_code)
+            VALUES(${order_id}, '${itm_code}', ${item_quantity}, '', '',
+            '${moment().format("YYYY-MM-DD HH:mm:ss")}', '1', 0, '${deli_plant || ""}', '${sales_order_item}', '${remark || ""}', '${ptrl_tank_code || ""}')`;
 
             console.log(
               `กำลัง Insert Item [${itm_code}] (no text) สำหรับ Order ${order_id}`,
@@ -10258,8 +10309,7 @@ exports.editOrderItemV2 = async (req, res, next) => {
                     xpass++
                   ) {
                     if (db_createorder2.data[xpass].veh_type_code != "") {
-                      var veh_type_code =
-                        db_createorder2.data[xpass].veh_type_code;
+                      veh_type_code = db_createorder2.data[xpass].veh_type_code;
                       xscript = `select tvt.veh_type_code, tvt.veh_type_desc, tvt.veh_qty, tvt.capacity_min, tvt.capacity_max,
                       compartment_no, compartment_total, vect_compartment_level_id, veh_compartment_type_level_number, veh_compartment_type_level,
                       '' as automatic_code ,'' as ptrl_code, '' as tank_code, '' as itm_code 
