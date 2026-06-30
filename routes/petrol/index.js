@@ -13,6 +13,7 @@ const petrol_merge_job = require('./petrol-merge-job')
 const petrol_type = require('./petrol-type')
 const petrol = require('./petrol')
 const reportStock = require('../report/report-stock');
+const petrol_merge_job_group = require('./petrol-merge-job-group')
 
 //Petrol
 router.put('/information', petrol.addPetrolInformation);
@@ -100,5 +101,11 @@ router.delete('/type/remove', petrol_type.removePetrolType);
 
 // ============= Stock =============
 router.post('/stock', reportStock.getReportStock);
+
+// ============= Petrol merge job group =============
+router.post('/petrol-merge-job/group/information', petrol_merge_job_group.getPetrolMergeJoGroup);
+router.put('/petrol-merge-job/group', petrol_merge_job_group.addPetrolMergeJobGroupInformation);
+router.patch('/petrol-merge-job/group', petrol_merge_job_group.setPetrolMergeJobInformation);
+router.delete('/petrol-merge-job/group', petrol_merge_job_group.removePetrolMergeJob);
 
 module.exports = router;
