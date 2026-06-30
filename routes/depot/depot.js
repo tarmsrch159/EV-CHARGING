@@ -51,6 +51,7 @@ exports.getDepotInformation = async (req, res, next) => {
         page_index -= 1;
       }
 
+
       const managerScript = `select ptrl_code from tbl_employee where emp_code = '${action[0].id}'`;
       let managerData = await pgConn.get(
         dbPrefix + lic_code,
@@ -58,16 +59,76 @@ exports.getDepotInformation = async (req, res, next) => {
         config.connectionString(),
       );
 
-      // const codeIn = JSON.parse(managerData.data?.[0]?.ptrl_code);
-      const codeIn = managerData.data?.[0]?.ptrl_code
-        ?.replace(/[\[\]'"\s]/g, "")
+      const codeIn = (managerData.data?.[0]?.ptrl_code || "")
+        .replace(/[\[\]'"\s]/g, "")
         .split(",")
         .filter(Boolean);
+      // เช็คค่า null ของ manager
+      let act_val = action[0]?.value?.toString().toUpperCase() || "ALL";
+      if (act_val === "MANAGER") {
+        if (codeIn.length === 0) {
+          let response = [
+            {
+              status: "success",
+              invalid_code: "0",
+              message: "",
+              data: [],
+              response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+              page_total: 0,
+              rows_total: 0,
+            },
+          ];
+          res.status(200).send(response);
+          return;
+        }
+      }
 
       let managerCodeIn = `(${codeIn.map((item) => `'${item}'`).join(", ")})`;
+      console.log(managerCodeIn)
+      if (
+        dpo_group_code.toString().toUpperCase() != "ALL" &&
+        dpo_group_code.toString().toUpperCase() != ""
+      ) {
+        script += ` and tbl_depot.dpo_group_code = '${dpo_group_code}'`;
+      }
+
+
+      if (search != "") {
+        script += ` and (dpo_number like '%${search}%' 
+                or dpo_desc like UPPER('%${search}%')
+                or dpo_short_desc like '%${search}%' 
+                or dpo_address like '%${search}%')`;
+      }
+
+      // =========================================================================
+      // กรองข้อมูลตามสิทธิ์การเข้าถึง (Role Authorization)
+      // =========================================================================
+      act_val = action[0]?.value?.toString().toUpperCase() || "ALL";
+      let act_id = action[0]?.id || "";
+      if (act_val === "GROUP") {
+        // กรองตาม Order Type (ZOR1, ZOR2)
+        script += ` and (
+                NOT EXISTS (SELECT 1 FROM tbl_employee_order_type WHERE emp_code = '${act_id}' AND emp_otyp_flag = 1)
+                OR tbl_depot.dpo_order_type IN (
+                    SELECT t2.ord_type_code 
+                    FROM tbl_employee_order_type t1 
+                    JOIN tbl_order_type t2 ON t1.ord_type_code = t2.ord_type_code 
+                    WHERE t1.emp_code = '${act_id}' AND t1.emp_otyp_flag = 1
+                )
+            )`;
+
+        // กรองตาม Sales Org (1000, 1900)
+        script += ` and (NOT EXISTS (SELECT 1 FROM tbl_employee_sales_org WHERE emp_code = '${act_id}' AND emp_sorg_flag = 1)
+                OR tbl_depot.dpo_sales_org IN (SELECT sales_org_code FROM tbl_employee_sales_org WHERE emp_code = '${act_id}' AND emp_sorg_flag = 1)
+            )`;
+      } else if (act_val === "MANAGER") {
+        script += ` and dp.ptrl_code in ${managerCodeIn}`;
+      }
+
 
       if (dpo_code.toString().toUpperCase() != "ALL") {
-        script = `select tbl_depot.dpo_code, dpo_number, dpo_desc, dpo_short_desc, dpo_address, dpo_zip_code, dpo_country_code,
+        script = `select 
+       distinct tbl_depot.dpo_code, dpo_number, dpo_desc, dpo_short_desc, dpo_address, dpo_zip_code, dpo_country_code,
                 dpo_loading_minute, dpo_expenses_per_km, dpo_area, dpo_lat, dpo_lon,
                 tbl_depot.off_code, off_desc, tbl_depot.dpo_group_code, dpo_group_desc, tbl_depot.ist_dt, tbl_depot.mdf_dt, tbl_depot.rm_dt, tbl_depot.prov_code, 
                 tbl_depot.amph_code, tbl_depot.tamb_code, tbl_province.prov_desc, tbl_amphure.amph_desc, tbl_tambon.tamb_desc, dpo_flag,
@@ -82,7 +143,8 @@ exports.getDepotInformation = async (req, res, next) => {
                 left join tbl_petrol_depot dp on tbl_depot.dpo_code = dp.dpo_code
                 where dpo_flag = '1' and tbl_depot.dpo_code = '${dpo_code}'`;
       } else {
-        script = `select tbl_depot.dpo_code, dpo_number, dpo_desc, dpo_short_desc, dpo_address, dpo_zip_code, dpo_country_code,
+        script = `select 
+        distinct tbl_depot.dpo_code, dpo_number, dpo_desc, dpo_short_desc, dpo_address, dpo_zip_code, dpo_country_code,
                 dpo_loading_minute, dpo_expenses_per_km, dpo_area, dpo_lat, dpo_lon,
                 tbl_depot.off_code, off_desc, tbl_depot.dpo_group_code, dpo_group_desc, tbl_depot.ist_dt, tbl_depot.mdf_dt, tbl_depot.rm_dt, tbl_depot.prov_code, 
                 tbl_depot.amph_code, tbl_depot.tamb_code, tbl_province.prov_desc, tbl_amphure.amph_desc, tbl_tambon.tamb_desc, dpo_flag,
@@ -98,58 +160,18 @@ exports.getDepotInformation = async (req, res, next) => {
                 where dpo_flag = '1'`;
       }
 
-      if (
-        dpo_group_code.toString().toUpperCase() != "ALL" &&
-        dpo_group_code.toString().toUpperCase() != ""
-      ) {
-        script += ` and tbl_depot.dpo_group_code = '${dpo_group_code}'`;
-      }
+      console.log(script)
 
-      // if (off_code.toString().toUpperCase() != 'ALL' && off_code.toString().toUpperCase() != '') {
-      //     script += ` and tbl_depot.off_code = '${off_code}'`
-      // }
-
-      if (search != "") {
-        script += ` and (dpo_number like '%${search}%' 
-                or dpo_desc like UPPER('%${search}%')
-                or dpo_short_desc like '%${search}%' 
-                or dpo_address like '%${search}%')`;
-      }
-
-      // =========================================================================
-      // กรองข้อมูลตามสิทธิ์การเข้าถึง (Role Authorization)
-      // =========================================================================
-      let act_val = action[0]?.value?.toString().toUpperCase() || "ALL";
-      let act_id = action[0]?.id || "";
-      if (act_val !== "ADMIN") {
-        if (act_val === "GROUP") {
-          // กรองตาม Order Type (ZOR1, ZOR2)
-          script += ` and (
-                NOT EXISTS (SELECT 1 FROM tbl_employee_order_type WHERE emp_code = '${act_id}' AND emp_otyp_flag = 1)
-                OR tbl_depot.dpo_order_type IN (
-                    SELECT t2.ord_type_code 
-                    FROM tbl_employee_order_type t1 
-                    JOIN tbl_order_type t2 ON t1.ord_type_code = t2.ord_type_code 
-                    WHERE t1.emp_code = '${act_id}' AND t1.emp_otyp_flag = 1
-                )
-            )`;
-
-          // กรองตาม Sales Org (1000, 1900)
-          script += ` and (NOT EXISTS (SELECT 1 FROM tbl_employee_sales_org WHERE emp_code = '${act_id}' AND emp_sorg_flag = 1)
-                OR tbl_depot.dpo_sales_org IN (SELECT sales_org_code FROM tbl_employee_sales_org WHERE emp_code = '${act_id}' AND emp_sorg_flag = 1)
-            )`;
-        } else {
-          script += ` and dp.ptrl_code in ${managerCodeIn}`;
-        }
-      }
 
       script += ` order by ist_dt desc `;
       script += ` offset (${page_index}*${page_limit}) limit ${page_limit};`;
+
       let tbl_temporary = await pgConn.get(
         dbPrefix + lic_code,
         script,
         config.connectionString(),
       );
+
       if (!tbl_temporary.code) {
         //debugger
         if (tbl_temporary.data.length > 0) {
@@ -161,7 +183,7 @@ exports.getDepotInformation = async (req, res, next) => {
           let rows_total = 0;
           script = ``;
           if (dpo_code.toString().toUpperCase() != "ALL") {
-            script = `select ceil((ceil(count(tbl_depot.dpo_code)) / ${page_limit})) as page_total, (count(tbl_depot.dpo_code)) as rows_total 
+            script = `select ceil((ceil(count(distinct tbl_depot.dpo_code)) / ${page_limit})) as page_total, (count(distinct tbl_depot.dpo_code)) as rows_total 
                         from tbl_depot 
                         left join tbl_order_type on tbl_depot.dpo_order_type = tbl_order_type.ord_type_code
                         left join tbl_office on tbl_depot.off_code = tbl_office.off_code 
@@ -172,7 +194,7 @@ exports.getDepotInformation = async (req, res, next) => {
                 left join tbl_petrol_depot dp on tbl_depot.dpo_code = dp.dpo_code
                         where dpo_flag = '1' and tbl_depot.dpo_code = '${dpo_code}' `;
           } else {
-            script = `select ceil((ceil(count(tbl_depot.dpo_code)) / ${page_limit})) as page_total, (count(tbl_depot.dpo_code)) as rows_total 
+            script = `select ceil((ceil(count(distinct tbl_depot.dpo_code)) / ${page_limit})) as page_total, (count(distinct tbl_depot.dpo_code)) as rows_total 
                         from tbl_depot 
                         left join tbl_office on tbl_depot.off_code = tbl_office.off_code 
                         left join tbl_depot_group on tbl_depot.dpo_group_code = tbl_depot_group.dpo_group_code 
@@ -181,7 +203,7 @@ exports.getDepotInformation = async (req, res, next) => {
                         left join tbl_amphure on tbl_depot.amph_code = tbl_amphure.amph_code 
                         left join tbl_tambon on tbl_depot.tamb_code = tbl_tambon.tamb_code 
                         left join tbl_petrol_depot dp on tbl_depot.dpo_code = dp.dpo_code
-                        where dpo_flag = '1' `;
+                        where dpo_flag = '1'`;
           }
 
           if (
@@ -208,12 +230,15 @@ exports.getDepotInformation = async (req, res, next) => {
                         or dpo_zip_code like '%${search}%')`;
           }
 
-          let act_val = action[0]?.value?.toString().toUpperCase() || "ALL";
+
+          // =========================================================================
+          // กรองข้อมูลตามสิทธิ์การเข้าถึง (Role Authorization)
+          // =========================================================================
+          act_val = action[0]?.value?.toString().toUpperCase() || "ALL";
           let act_id = action[0]?.id || "";
-          if (act_val !== "ADMIN") {
-            if (act_val === "GROUP") {
-              // กรองตาม Order Type (ZOR1, ZOR2)
-              script += ` and (
+          if (act_val === "GROUP") {
+            // กรองตาม Order Type (ZOR1, ZOR2)
+            script += ` and (
                 NOT EXISTS (SELECT 1 FROM tbl_employee_order_type WHERE emp_code = '${act_id}' AND emp_otyp_flag = 1)
                 OR tbl_depot.dpo_order_type IN (
                     SELECT t2.ord_type_code 
@@ -223,15 +248,13 @@ exports.getDepotInformation = async (req, res, next) => {
                 )
             )`;
 
-              // กรองตาม Sales Org (1000, 1900)
-              script += ` and (NOT EXISTS (SELECT 1 FROM tbl_employee_sales_org WHERE emp_code = '${act_id}' AND emp_sorg_flag = 1)
+            // กรองตาม Sales Org (1000, 1900)
+            script += ` and (NOT EXISTS (SELECT 1 FROM tbl_employee_sales_org WHERE emp_code = '${act_id}' AND emp_sorg_flag = 1)
                 OR tbl_depot.dpo_sales_org IN (SELECT sales_org_code FROM tbl_employee_sales_org WHERE emp_code = '${act_id}' AND emp_sorg_flag = 1)
             )`;
-            } else {
-              script += ` and dp.ptrl_code in ${managerCodeIn}`;
-            }
+          } else if (act_val === "MANAGER") {
+            script += ` and dp.ptrl_code in ${managerCodeIn}`;
           }
-
           let tbl_temporary0 = await pgConn.get(
             dbPrefix + lic_code,
             script,
@@ -489,14 +512,14 @@ exports.setDepotInformation = async (req, res, next) => {
     } else {
       dpo_loading_minute =
         dpo_loading_minute === "" ||
-        dpo_loading_minute === undefined ||
-        dpo_loading_minute === null
+          dpo_loading_minute === undefined ||
+          dpo_loading_minute === null
           ? "NULL"
           : dpo_loading_minute;
       dpo_expenses_per_km =
         dpo_expenses_per_km === "" ||
-        dpo_expenses_per_km === undefined ||
-        dpo_expenses_per_km === null
+          dpo_expenses_per_km === undefined ||
+          dpo_expenses_per_km === null
           ? 0
           : dpo_expenses_per_km;
       dpo_area =
@@ -505,14 +528,14 @@ exports.setDepotInformation = async (req, res, next) => {
           : dpo_area;
       dpo_sales_org =
         dpo_sales_org === "" ||
-        dpo_sales_org === undefined ||
-        dpo_sales_org === null
+          dpo_sales_org === undefined ||
+          dpo_sales_org === null
           ? "NULL"
           : dpo_sales_org;
       dpo_order_type =
         dpo_order_type === "" ||
-        dpo_order_type === undefined ||
-        dpo_order_type === null
+          dpo_order_type === undefined ||
+          dpo_order_type === null
           ? "NULL"
           : dpo_order_type;
       dpo_short_desc = dpo_short_desc || "";
@@ -672,14 +695,14 @@ exports.addDepotInformation = async (req, res, next) => {
     } else {
       dpo_loading_minute =
         dpo_loading_minute === "" ||
-        dpo_loading_minute === undefined ||
-        dpo_loading_minute === null
+          dpo_loading_minute === undefined ||
+          dpo_loading_minute === null
           ? "NULL"
           : dpo_loading_minute;
       dpo_expenses_per_km =
         dpo_expenses_per_km === "" ||
-        dpo_expenses_per_km === undefined ||
-        dpo_expenses_per_km === null
+          dpo_expenses_per_km === undefined ||
+          dpo_expenses_per_km === null
           ? 0
           : dpo_expenses_per_km;
       dpo_area =
@@ -688,14 +711,14 @@ exports.addDepotInformation = async (req, res, next) => {
           : dpo_area;
       dpo_sales_org =
         dpo_sales_org === "" ||
-        dpo_sales_org === undefined ||
-        dpo_sales_org === null
+          dpo_sales_org === undefined ||
+          dpo_sales_org === null
           ? "NULL"
           : dpo_sales_org;
       dpo_order_type =
         dpo_order_type === "" ||
-        dpo_order_type === undefined ||
-        dpo_order_type === null
+          dpo_order_type === undefined ||
+          dpo_order_type === null
           ? "NULL"
           : dpo_order_type;
       dpo_short_desc = dpo_short_desc || "";
