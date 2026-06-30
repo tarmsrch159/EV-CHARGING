@@ -1543,6 +1543,7 @@ exports.getAutoCalculateOrderInformationV2 = async (req, res, next) => {
             return;
         }
         else {
+            var veh_type_code = '';
             var xdatabase = dbPrefix + lic_code;
             var xdate = moment().add('days', -1).format('YYYY-MM-DD');
             xscript = `select distinct shipto_no, ptr.ptrl_code, ptr.ptrl_sitecode, ptr.ptrl_number, ptr.stock_provious_days, 
@@ -2297,7 +2298,7 @@ exports.getAutoCalculateOrderInformationV2 = async (req, res, next) => {
                         if (!db_createorder1.code) {
                             if (db_createorder1.data.length > 0) {
                                 for (var xcorder = 0; xcorder <= db_createorder1.data.length - 1; xcorder++) {
-                                    var veh_type_code = '';
+                                    veh_type_code = '';
                                     //get vehicle type
                                     xscript = `select 0 as level,tpvt.veh_type_code, tvt.veh_type_desc ,tvt.capacity_max, tvt.capacity_min, tpvt.ptrl_vehicle_type_flag
                                     from tbl_petrol_vehicle_type tpvt 
@@ -2334,7 +2335,7 @@ exports.getAutoCalculateOrderInformationV2 = async (req, res, next) => {
 
                                         if (db_createorder2.data.length > 0) {
                                             for (var xpass = 0; xpass <= db_createorder2.data.length - 1; xpass++) {
-                                                var veh_type_code = db_createorder2.data[xpass].veh_type_code;
+                                                veh_type_code = db_createorder2.data[xpass].veh_type_code;
 
                                                 if (xpassed == false) {
                                                     xscript = `select tvt.veh_type_code, tvt.veh_type_desc, tvt.veh_qty, tvt.capacity_min, tvt.capacity_max,
@@ -2430,6 +2431,7 @@ exports.getAutoCalculateOrderInformationV2 = async (req, res, next) => {
                                                                             for (var xss = 0; xss <= xresult.result.length - 1; xss++) {
                                                                                 //update fill_volume_actual
                                                                                 if (xresult.result[xss].compartments.length > 0) {
+                                                                                    xpassed = true;
                                                                                     xscript = `update tbl_automatics_tanks_information 
                                                                                     set fill_volume_actual = ${xresult.result[xss].adjusted_liter},
                                                                                     veh_type_code = '${veh_type_code}',
@@ -2631,6 +2633,7 @@ exports.getAutoCalculateOrderInformationV2 = async (req, res, next) => {
                                                             invalid_code: "0",
                                                             message: "",
                                                             data: xresult,
+                                                            veh_type_code: veh_type_code,
                                                             response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
                                                         },
                                                     ];
@@ -2687,6 +2690,7 @@ exports.getAutoCalculateOrderInformationV2 = async (req, res, next) => {
                                                                 invalid_code: "0",
                                                                 message: "",
                                                                 data: xresult,
+                                                                veh_type_code: veh_type_code,
                                                                 response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
                                                             },
                                                         ];
