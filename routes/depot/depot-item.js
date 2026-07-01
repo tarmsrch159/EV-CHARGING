@@ -803,13 +803,12 @@ exports.getDepotItemByDepots = async (req, res, next) => {
         .map((c) => `'${c.replace(/'/g, "''")}'`)
         .join(", ");
 
-      let script = `select 
-                      tdi.dpo_item_code,
-                      tdi.dpo_code,
-                      tdi.itm_code,
-                      ti.itm_desc,
-                      ti.itm_material_number,
-                      ti.itm_unit_code
+      let script = `select distinct 
+                    tdi.dpo_code,
+                    tdi.itm_code,
+                    ti.itm_desc,
+                    ti.itm_material_number,
+                    ti.itm_unit_code
                     from tbl_depot_item tdi
                     left join tbl_item ti on tdi.itm_code = ti.itm_code
                     where tdi.dpo_code in (${dpoCodeIn}) and tdi.dpo_item_flag = '1'

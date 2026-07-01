@@ -642,12 +642,11 @@ exports.getPetrolDepotByPetrols = async (req, res, next) => {
                 .join(", ");
 
             let script = `select 
-                      tpd.ptrl_depot_code,
-                      tpd.ptrl_code,
-                      tpd.dpo_code,
-                      td.dpo_desc,
-                      td.dpo_number,
-                      td.dpo_short_desc
+                     distinct 
+                        td.dpo_code,
+                        td.dpo_number,
+                        td.dpo_desc,
+                        td.dpo_short_desc
                     from tbl_petrol_depot tpd
                     left join tbl_depot td on tpd.dpo_code = td.dpo_code
                     where tpd.ptrl_code in (${ptrlCodeIn}) and tpd.ptrl_depot_flag = '1'
