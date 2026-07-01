@@ -2750,11 +2750,12 @@ exports.getOrderInformationHana = async (req, res, next) => {
         payloadData,
       );
 
-      for (let i = 0; i < apiResponse.data.Response.SalesOrders.length; i++) {
-        let salesOrder = apiResponse.data.Response.SalesOrders[i];
+      let salesOrders = apiResponse.data?.Response?.SalesOrders || [];
+      for (let i = 0; i < salesOrders.length; i++) {
+        let salesOrder = salesOrders[i];
 
         console.log(
-          `[Item ${i + 1}/${apiResponse.data.Response.SalesOrders.length}] 📦 ประมวลผล SHCustomerReference: ${salesOrder.SHCustomerReference}`,
+          `[Item ${i + 1}/${salesOrders.length}] 📦 ประมวลผล SHCustomerReference: ${salesOrder.SHCustomerReference}`,
         );
 
         // =========== เช็ค SHCustomerReference ว่ามีใน tbl_order หรือไม่ ==================
@@ -3144,11 +3145,12 @@ exports.getOrderInformationHanaBackUp = async (req, res, next) => {
         },
       ];
       res.status(200).send(response);
-      for (let i = 0; i < apiResponse.data.Response.SalesOrders.length; i++) {
-        let salesOrder = apiResponse.data.Response.SalesOrders[i];
+      let salesOrders = apiResponse.data?.Response?.SalesOrders || [];
+      for (let i = 0; i < salesOrders.length; i++) {
+        let salesOrder = salesOrders[i];
 
         console.log(
-          `[Item ${i + 1}/${apiResponse.data.Response.SalesOrders.length}] 📦 ประมวลผล SHCustomerReference: ${salesOrder.SHCustomerReference}`,
+          `[Item ${i + 1}/${salesOrders.length}] 📦 ประมวลผล SHCustomerReference: ${salesOrder.SHCustomerReference}`,
         );
 
         // =========== เช็ค SHCustomerReference ว่ามีใน tbl_order หรือไม่ ==================
@@ -10704,4 +10706,392 @@ exports.editOrderItemV2 = async (req, res, next) => {
     ];
     res.status(200).send(response);
   });
+};
+
+exports.getOrderSapSchedule = async (req, res, next) => {
+  return (async () => {
+    let lic_code = req.header("lic_code");
+
+    const pastDate = moment().subtract(5, 'days').format('YYYYMMDD');
+    const currentDate = moment().format('YYYYMMDD');
+
+    // 1. ดึงข้อมูลจาก SOInputParameter ตามโครงสร้าง JSON ใหม่
+    let inputParam = req.body[0]?.SOInputParameter || {};
+    let { SalesOrderList, CreationDate, CreationDateTo, action } = inputParam;
+
+    if (!SalesOrderList || !action) {
+      let response = [
+        {
+          status: "error",
+          invalid_code: "-1",
+          message:
+            "ไม่สามารถดึงข้อมูลได้, เนื่องจากข้อมูลพารามิเตอร์ไม่ถูกต้อง",
+          data: [],
+          response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+        },
+      ];
+      res.status(200).send(response);
+      return;
+    }
+
+    // ================ Construct SAP Payload ==================
+    let sapItems = [];
+
+    let payloadData = JSON.stringify({
+      SOInputParameter: {
+        SalesOrderList: SalesOrderList,
+        SalesOrderTypeList: inputParam.SalesOrderTypeList || [],
+        ShipToPartyList: inputParam.ShipToPartyList || [],
+        CreationDate: pastDate || "",
+        CreationTime: inputParam.CreationTime || "",
+        CreationDateTo: currentDate || "",
+        CreationTimeTo: inputParam.CreationTimeTo || "",
+        CustomerPurchaseOrderType: inputParam.CustomerPurchaseOrderType || "",
+        CustomerGroup1List: inputParam.CustomerGroup1List || [],
+        NameofOrdererList: inputParam.NameofOrdererList || [],
+      },
+    });
+    try {
+      // ============ SAP API ==============
+      let apiResponse = await sapApiClient.post(
+        "/Logistics/SDI024/SODetail",
+        payloadData,
+      );
+
+      let salesOrders = apiResponse.data?.Response?.SalesOrders || [];
+      for (let i = 0; i < salesOrders.length; i++) {
+        let salesOrder = salesOrders[i];
+
+        console.log(
+          `[Item ${i + 1}/${salesOrders.length}] 📦 ประมวลผล SHCustomerReference: ${salesOrder.SHCustomerReference}`,
+        );
+
+        // =========== เช็ค SHCustomerReference ว่ามีใน tbl_order หรือไม่ ==================
+        let check_script_order = `SELECT * FROM tbl_order WHERE sh_cus_ref = '${salesOrder.SHCustomerReference}'`;
+        let check_order = await pgConn.get(
+          dbPrefix + lic_code,
+          check_script_order,
+          config.connectionString(),
+        );
+        if (!check_order.code) {
+          if (check_order.data.length > 0) {
+            console.log(`   ➡️  เจอออเดอร์ในระบบ (Update Mode)`);
+            console.log(
+              "เจอ SHCustomerReference : " + salesOrder.SHCustomerReference,
+            );
+
+            // ================ เช็ค ship_to ว่ามีใน tbl_petrol ==================
+            let isOrderComplete = true;
+            if (salesOrder.ShipToParty) {
+              let check_script_ship_to = `SELECT ptrl_number FROM tbl_petrol WHERE ptrl_number = '${salesOrder.ShipToParty}' LIMIT 1`;
+              let check_ship_to = await pgConn.get(
+                dbPrefix + lic_code,
+                check_script_ship_to,
+                config.connectionString(),
+              );
+              if (check_ship_to.code || check_ship_to.data.length === 0) {
+                console.log(
+                  `   ⚠️  ข้อมูลไม่สมบูรณ์: ไม่พบรหัสปั๊ม ShipToParty [${salesOrder.ShipToParty}] ใน tbl_petrol`,
+                );
+                isOrderComplete = false;
+              }
+            } else {
+              console.log(`   ⚠️  ข้อมูลไม่สมบูรณ์: ไม่มีรหัสปั๊ม ShipToParty`);
+              isOrderComplete = false;
+            }
+
+            // ================ เช็ค Material ใน Items ว่ามีใน tbl_item หรือไม่ ==================
+            if (
+              salesOrder.Items &&
+              Array.isArray(salesOrder.Items) &&
+              salesOrder.Items.length > 0
+            ) {
+              for (let j = 0; j < salesOrder.Items.length; j++) {
+                let item = salesOrder.Items[j];
+                if (item.Material) {
+                  let check_script_material = `SELECT itm_code FROM tbl_item WHERE itm_material_number = '${item.Material}' LIMIT 1`;
+                  let check_material = await pgConn.get(
+                    dbPrefix + lic_code,
+                    check_script_material,
+                    config.connectionString(),
+                  );
+                  if (check_material.code || check_material.data.length === 0) {
+                    console.log(
+                      `   ⚠️  ข้อมูลไม่สมบูรณ์: ไม่พบสินค้ารหัส Material [${item.Material}] ใน tbl_item`,
+                    );
+                    isOrderComplete = false;
+                    break;
+                  }
+                } else {
+                  console.log(
+                    `   ⚠️  ข้อมูลไม่สมบูรณ์: ไม่มีรหัสสินค้า Material`,
+                  );
+                  isOrderComplete = false;
+                  break;
+                }
+              }
+            }
+
+            // ================ ถ้า Order ไม่สมบูรณ์ → set status 9 แต่ยังดำเนินการต่อเพื่อให้ Update Item ได้ ==================
+            let current_order_status = 1;
+            if (!isOrderComplete) {
+              console.log(
+                `   ❌  ข้อมูลมาสเตอร์ไม่ครบ → Set สถานะออเดอร์เป็น 9 แต่ยังดำเนินการอัปเดตรายการสินค้าต่อ`,
+              );
+              current_order_status = 9;
+            }
+            let DoCreate = salesOrder.OverallDeliveryStatus;
+            let rejection = salesOrder.OverallSDDocumentRejectionSts;
+            if (rejection === "C") current_order_status = 2;
+            if (DoCreate === "C") current_order_status = 10;
+
+            // ================ อัพเดต tbl_order ==================
+            // Lookup internal code for order_type (SAP code -> Internal code)
+            let current_sap_order_type_upd = salesOrder.SalesOrderType || "";
+            let checkOrderType_sap_upd = await pgConn.get(
+              dbPrefix + lic_code,
+              `SELECT ord_type_code FROM tbl_order_type WHERE sales_order_type = '${current_sap_order_type_upd}' OR ord_type_code = '${current_sap_order_type_upd}' LIMIT 1`,
+              config.connectionString(),
+            );
+            let final_order_type_upd = current_sap_order_type_upd;
+            if (
+              !checkOrderType_sap_upd.code &&
+              checkOrderType_sap_upd.data.length > 0
+            ) {
+              final_order_type_upd =
+                checkOrderType_sap_upd.data[0].ord_type_code;
+            }
+
+            console.log(`   🔄  กำลังอัปเดต tbl_order และ tbl_order_item...`);
+            let update_script_order = `UPDATE tbl_order SET 
+                            order_no = '${salesOrder.SalesOrder || ""}',
+                            order_type = '${final_order_type_upd}',
+                            order_group = '${salesOrder.SalesOrganization || ""}',
+                            sold_to = '${salesOrder.SoldToParty || ""}',
+                            ship_to = '${salesOrder.ShipToParty || ""}',
+                            cus_ref = '${(salesOrder.CustomerReference || "").replace(/'/g, "''")}',
+                            cus_date_ref = ${salesOrder.CustomerReferenceDate ? `'${salesOrder.CustomerReferenceDate}'` : "NULL"},
+                            status_deli = '${salesOrder.OverallDeliveryStatus || ""}',
+                            status_block = '${salesOrder.TotalBlockStatus || ""}',
+                            status_sd_process = '${salesOrder.OverallSDProcessStatus || ""}',
+                            status_check = '${salesOrder.TotalCreditCheckStatus || ""}',
+                            sd_doc_reject = '${rejection || ""}',
+                            cus_group = '${salesOrder.CustomerGroup1 || ""}',
+                            hana_created = ${salesOrder.CreationDate ? `'${salesOrder.CreationDate}'` : "NULL"},
+                            hana_time = '${salesOrder.CreationTime || ""}',
+                            created_by = '${salesOrder.CreatedByUser || ""}',
+                            deli_date_req = ${salesOrder.RequestedDeliveryDate ? `'${salesOrder.RequestedDeliveryDate}'` : "NULL"},
+                            deli_time_req = ${salesOrder.DeliveryTime ? `'${salesOrder.DeliveryTime}'` : "NULL"},
+                            description = '${(salesOrder.Description || "").replace(/'/g, "''")}',
+                            order_status = ${current_order_status},
+                            mdf_dt = '${moment().format("YYYY-MM-DD HH:mm:ss")}' 
+                            WHERE sh_cus_ref = '${salesOrder.SHCustomerReference}'`;
+            await pgConn.execute(
+              dbPrefix + lic_code,
+              update_script_order,
+              config.connectionString(),
+            );
+
+            // ================ อัพเดต tbl_order_item จาก Items ==================
+            let orderId = check_order.data[0].id;
+            if (
+              salesOrder.Items &&
+              Array.isArray(salesOrder.Items) &&
+              salesOrder.Items.length > 0
+            ) {
+              for (let j = 0; j < salesOrder.Items.length; j++) {
+                let item = salesOrder.Items[j];
+                let itm_code = "";
+                let Quantity = salesOrder.Items[j].OrderQuantity;
+
+                // ===== ค้นหา itm_code จาก material number ของ SAP =====
+                if (item.Material) {
+                  let check_item_script = `SELECT itm_code FROM tbl_item WHERE itm_material_number = '${item.Material}' LIMIT 1`;
+                  let checkItemResult = await pgConn.get(
+                    dbPrefix + lic_code,
+                    check_item_script,
+                    config.connectionString(),
+                  );
+                  if (
+                    !checkItemResult.code &&
+                    checkItemResult.data.length > 0
+                  ) {
+                    itm_code = checkItemResult.data[0].itm_code;
+                  }
+                }
+
+                let update_item_script = `UPDATE tbl_order_item SET 
+                                    item_no = '${itm_code || ""}',
+                                    item_qty = '${Quantity || ""}',
+                                    sales_order_item = '${item.SalesOrderItem || ""}',
+                                    sd_reject_reason = '${item.SalesDocumentRjcnReason || ""}',
+                                    sd_process_status = '${item.SDProcessStatus || ""}',
+                                    deli_status = '${item.DeliveryStatus || ""}',
+                                    misc_deli_no = '${item.MiscellaneousDeliveryNumber || ""}',
+                                    mdf_dt = '${moment().format("YYYY-MM-DD HH:mm:ss")}'
+                                    WHERE order_no = '${orderId}' 
+                                    AND (sales_order_item = '${item.SalesOrderItem}' OR (sales_order_item IS NULL OR sales_order_item = '') AND item_no = '${itm_code}')
+                                    AND order_item_flag = '1'`;
+                await pgConn.execute(
+                  dbPrefix + lic_code,
+                  update_item_script,
+                  config.connectionString(),
+                );
+              }
+            }
+            console.log(`   ✅  อัปเดตสำเร็จ`);
+            console.log(
+              `------------------------------------------------------`,
+            );
+          } else {
+            // ================ กรณีไม่เจอ Order ในระบบ → เพื่ม Order ใหม่จาก SAP ==================
+            console.log(
+              "ไม่เจอ SHCustomerReference ในระบบ → กำลังสร้าง Order ใหม่: " +
+              salesOrder.SHCustomerReference,
+            );
+            console.log(`   ➡️  ไม่เจอออเดอร์ในระบบ (Insert Mode)`);
+            console.log(`   ➕  กำลังสร้าง Order ใหม่จากข้อมูล SAP...`);
+
+            // ================ Insert ข้อมูลออร์เดอของ SAP ลงใน tbl_order ==================
+
+            // Lookup internal code for order_type (SAP code -> Internal code)
+            let current_sap_order_type = salesOrder.SalesOrderType || "";
+            let checkOrderType_sap = await pgConn.get(
+              dbPrefix + lic_code,
+              `SELECT ord_type_code FROM tbl_order_type WHERE sales_order_type = '${current_sap_order_type}' OR ord_type_code = '${current_sap_order_type}' LIMIT 1`,
+              config.connectionString(),
+            );
+            let final_order_type = current_sap_order_type;
+            if (
+              !checkOrderType_sap.code &&
+              checkOrderType_sap.data.length > 0
+            ) {
+              final_order_type = checkOrderType_sap.data[0].ord_type_code;
+            }
+
+            let insert_order_script = `INSERT INTO tbl_order
+                            (order_no, order_type, order_group, chanel, division, sold_to, ship_to,
+                                cus_ref, cus_date_ref, po_name, order_by, ship_cond, pay_term,
+                                deli_date_req, deli_time_req, description, sh_cus_ref, sh_cus_date_ref,
+                                status_deli, status_block, status_sd_process, status_check, sd_doc_reject,
+                                cus_group, hana_created, hana_time, created_by,
+                                ist_dt, order_flag, auto_order, order_status)
+                            VALUES
+                            ('${salesOrder.SalesOrder || ""}', '${final_order_type}', '${salesOrder.SalesOrganization || ""}', 
+                             '${salesOrder.DistributionChannel || ""}', '${salesOrder.OrganizationDivision || ""}',
+                             '${salesOrder.SoldToParty || ""}', '${salesOrder.ShipToParty || ""}', 
+                             '${(salesOrder.CustomerReference || "").replace(/'/g, "''")}', ${salesOrder.CustomerReferenceDate ? `'${salesOrder.CustomerReferenceDate}'` : "NULL"},
+                             '${salesOrder.CustomerPurchaseOrderType || ""}', '${salesOrder.NameofOrderer || ""}', 'T1', '',
+                             ${salesOrder.RequestedDeliveryDate ? `'${salesOrder.RequestedDeliveryDate}'` : "NULL"}, '${salesOrder.DeliveryTime || ""}',
+                             '${(salesOrder.Description || "").replace(/'/g, "''")}', '${salesOrder.SHCustomerReference || ""}', 
+                             ${salesOrder.CustomerReferenceDate ? `'${salesOrder.CustomerReferenceDate}'` : "NULL"},
+                             '${salesOrder.OverallDeliveryStatus || ""}', '${salesOrder.TotalBlockStatus || ""}', 
+                             '${salesOrder.OverallSDProcessStatus || ""}', '${salesOrder.TotalCreditCheckStatus || ""}', 
+                             '${salesOrder.OverallSDDocumentRejectionSts || ""}', '${salesOrder.CustomerGroup1 || ""}',
+                             ${salesOrder.CreationDate ? `'${salesOrder.CreationDate}'` : "NULL"}, '${salesOrder.CreationTime || ""}', 
+                             '${salesOrder.CreatedByUser || ""}',
+                             '${moment().format("YYYY-MM-DD HH:mm:ss")}', '1', 0, 3) RETURNING id`;
+
+            let res_new_order = await pgConn.get(
+              dbPrefix + lic_code,
+              insert_order_script,
+              config.connectionString(),
+            );
+
+            if (!res_new_order.code && res_new_order.data.length > 0) {
+              let newOrderId = res_new_order.data[0].id;
+
+              if (
+                salesOrder.Items &&
+                Array.isArray(salesOrder.Items) &&
+                salesOrder.Items.length > 0
+              ) {
+                for (let j = 0; j < salesOrder.Items.length; j++) {
+                  let item = salesOrder.Items[j];
+                  let itm_code = "";
+                  let itm_no = item.Material || "";
+
+                  let insert_item_script = `INSERT INTO tbl_order_item
+                                                (order_no, item_no, item_qty, ist_dt, order_item_flag, auto_order, 
+                                                 sales_order_item, sd_reject_reason, sd_process_status, deli_status, misc_deli_no)
+                                                VALUES
+                                                (${newOrderId}, '${itm_no}', ${item.OrderQuantity ? parseFloat(item.OrderQuantity) : 0}, 
+                                                 '${moment().format("YYYY-MM-DD HH:mm:ss")}', '1', 0,
+                                                 '${item.SalesOrderItem || ""}', '${item.SalesDocumentRjcnReason || ""}', 
+                                                 '${item.SDProcessStatus || ""}', '${item.DeliveryStatus || ""}', 
+                                                 '${item.MiscellaneousDeliveryNumber || ""}')`;
+
+                  await pgConn.execute(
+                    dbPrefix + lic_code,
+                    insert_item_script,
+                    config.connectionString(),
+                  );
+                }
+              }
+              console.log(
+                `------------------------------------------------------`,
+              );
+            } else {
+              console.error(
+                "เกิดข้อผิดพลาดในการสร้าง Order ใหม่จาก SAP: " +
+                (res_new_order.message || "Unknown Error"),
+              );
+            }
+          }
+        } else {
+          console.error("Database Error (check_order): " + check_order.message);
+        }
+      }
+
+      let response = [
+        {
+          status: "success",
+          invalid_code: "0",
+          message: "ดึงข้อมูล Order จาก SAP",
+          data: apiResponse.data,
+          response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+        },
+      ];
+      res.status(200).send(response);
+    } catch (error) {
+      console.log(error);
+      let errMsg = error.response
+        ? JSON.stringify(error.response.data)
+        : error.message;
+      let response = [
+        {
+          status: "error",
+          invalid_code: "-2",
+          message: "External API Error: " + errMsg,
+          data: [],
+          response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+        },
+      ];
+      res.status(200).send(response);
+
+      // 3. เปลี่ยนตัวแปร log จาก order_no เป็น SalesOrderList เพื่อไม่ให้เกิด error
+      await xglobal.action_logs(
+        lic_code,
+        action[0].id,
+        "confirm_order_api_error",
+        JSON.stringify({ SalesOrderList }),
+        errMsg,
+        action[0].value,
+      );
+      return;
+    }
+  })().catch(async (err) => {
+    console.log(err);
+    let response = [
+      {
+        status: "error",
+        invalid_code: "-4",
+        message: "ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ",
+        data: [],
+        response_time: moment().format("YYYY-MM-DD HH:mm:ss").toString(),
+      },
+    ];
+    res.status(200).send(response);
+  });
+
 };

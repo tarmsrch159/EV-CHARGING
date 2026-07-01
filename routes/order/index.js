@@ -5,6 +5,7 @@ const order_type = require("./order-type");
 const order_sap_logs = require("./order-sap-logs");
 const auto_order = require("./auto-order");
 const auto_order_calculate = require("./auto-order-calculate");
+const orderScheduler = require("./order-sap-scheduler");
 
 // ============= Order =============
 router.post("/information", order.getOrderInformation);
@@ -65,4 +66,17 @@ router.post(
 // ========= Child Order ==========
 router.post("/child-order/information", order.getChildOrderInformation);
 
+// Sap schedule trigger
+router.post("/sap-schedule/test", async (req, res) => {
+  try {
+    const defaultLicCodes = process.env.IS_PROD === 'true' ? ['aos_qa'] : ['aos01'];
+    const licCodes = (process.env.LIC_CODES ? process.env.LIC_CODES.split(',') : defaultLicCodes).map(c => c.trim() === 'aos_01' ? 'aos01' : c.trim());
+    for (const lic_code of licCodes) {
+      await orderScheduler.runSapSyncForLicense(lic_code);
+    }
+    res.status(200).send({ status: "success", message: "Triggered SAP Sync test successfully", licCodes });
+  } catch (err) {
+    res.status(500).send({ status: "error", message: err.message });
+  }
+});
 module.exports = router;
