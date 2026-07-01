@@ -108,6 +108,7 @@ router.post('/petrol-merge-job/group/information', petrol_merge_job_group.getPet
 router.put('/petrol-merge-job/group', petrol_merge_job_group.addPetrolMergeJobGroupInformation);
 router.patch('/petrol-merge-job/group', petrol_merge_job_group.setPetrolMergeJobInformation);
 router.delete('/petrol-merge-job/group', petrol_merge_job_group.removePetrolMergeJob);
+router.post('/petrol-merge-job/group/details', petrol_merge_job_group.getPetrolMergeJobDetails);
 
 // Petrol merge job with petrol
 // router.post('/petrol-merge-job/with/petrol/information', petrol_merge_job_group.getPetrolMergeJobWithPetrolInformation);
