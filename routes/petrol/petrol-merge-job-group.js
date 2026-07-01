@@ -11,7 +11,7 @@ exports.getPetrolMergeJoGroup = async (req, res, next) => {
 
   return (async () => {
     let lic_code = req.header("lic_code");
-    let { ptrl_code, action, search, page_index, page_limit } = req.body[0];
+    let { ptrl_merge_group_code, action, search, page_index, page_limit } = req.body[0];
 
     const page = parseInt(page_index) || 1;
     const limit = parseInt(page_limit) || 10;
@@ -19,7 +19,6 @@ exports.getPetrolMergeJoGroup = async (req, res, next) => {
 
     // เช็คเฉพาะส่วนที่สำคัญ
     if (
-      ptrl_code === undefined ||
       lic_code === undefined ||
       action === undefined
     ) {
@@ -39,45 +38,46 @@ exports.getPetrolMergeJoGroup = async (req, res, next) => {
 
     let conditions = [
       "g.merge_job_group_flag = 1",
-      "p.ptrl_flag = '1'"
+      "d.merge_job_group_details_flag = 1",
+      "di.flag = 1",
+      "p.ptrl_flag = '1'",
+      "depot.dpo_flag = '1'",
+      "ti.itm_flag = '1'"
     ];
 
-    if (ptrl_code.toString().toUpperCase() !== "ALL") {
-      conditions.push(`g.ptrl_code = '${ptrl_code}'`);
-    }
+    if (ptrl_merge_group_code && ptrl_merge_group_code !== "ALL") conditions.push(`g.ptrl_merge_group_code = '${ptrl_merge_group_code.replace(/'/g, "''")}'`)
 
     if (search) {
-      conditions.push(`(g.ptrl_merge_group_desc like '%${search}%' or p.ptrl_desc like '%${search}%' or p.ptrl_number like '%${search}%')`);
+      conditions.push(`(ptrl_merge_group_desc like '%${search.replace(/'/g, "''")}%' or ptrl_merge_group_code like '%${search.replace(/'/g, "''")}%')`);
     }
 
     let where_clause = "where " + conditions.join(" and ");
 
-    let script = `
-    select 
-    min(g.merge_group_code) as merge_group_code, 
-    g.ptrl_merge_group_code, 
+    let script = `select 
+    distinct g.ptrl_merge_group_code, 
     g.ptrl_merge_group_desc, 
-    g.merge_job_group_flag, 
-    min(g.ist_dt) as ist_dt,
     coalesce(
-      jsonb_agg(
-        jsonb_build_object(
-          'ptrl_code', p.ptrl_code,
-          'ptrl_number', p.ptrl_number,
-          'ptrl_desc', p.ptrl_desc
-        )
-      ) filter (where p.ptrl_code is not null), 
-      '[]'::jsonb
-    ) as ptrl_data
-  from tbl_petrol_merge_job_group g 
-  left join tbl_petrol p on g.ptrl_code = p.ptrl_code 
-  ${where_clause} 
-  group by 
-    g.ptrl_merge_group_code, 
-    g.ptrl_merge_group_desc, 
-    g.merge_job_group_flag
-  order by g.ptrl_merge_group_desc asc;`;
-
+        jsonb_agg(
+            jsonb_build_object(
+                'ptrl_desc', p.ptrl_desc,
+                'dpo_desc', depot.dpo_desc,
+                'itm_desc', ti.itm_desc
+            )
+        ) FILTER (WHERE p.ptrl_code IS NOT NULL), 
+        '[]'::jsonb
+    ) AS data
+    from tbl_petrol_merge_job_group g
+    left join tbl_petrol_merge_job_details d on g.ptrl_merge_group_code = d.ptrl_merge_group_code 
+    left join tbl_petrol_merge_job_depot_item di on g.ptrl_merge_group_code = di.ptrl_merge_group_code 
+    left join tbl_petrol p on d.ptrl_code = p.ptrl_code 
+    left join tbl_item ti on di.itm_code = ti.itm_code 
+    left join tbl_depot depot on di.dpo_code  = depot.dpo_code 
+    ${where_clause}
+    group by 
+      g.ptrl_merge_group_code, 
+      g.ptrl_merge_group_desc
+    order by g.ptrl_merge_group_desc asc 
+    limit ${limit} offset ${offset};`;
     let tbl_temporary = await pgConn.get(
       dbPrefix + lic_code,
       script,
@@ -93,10 +93,14 @@ exports.getPetrolMergeJoGroup = async (req, res, next) => {
 
         const countScript = `
             SELECT 
-                COUNT(g.merge_group_code) as rows_total,
-                CEIL(COUNT(g.merge_group_code)::float / ${page_limit}) as page_total
-            from tbl_petrol_merge_job_group g 
-            left join tbl_petrol p on g.ptrl_code = p.ptrl_code 
+                COUNT(DISTINCT g.ptrl_merge_group_code) as rows_total,
+                CEIL(COUNT(g.ptrl_merge_group_code)::float / ${limit}) as page_total
+            from tbl_petrol_merge_job_group g
+            left join tbl_petrol_merge_job_details d on g.ptrl_merge_group_code = d.ptrl_merge_group_code 
+            left join tbl_petrol_merge_job_depot_item di on g.ptrl_merge_group_code = di.ptrl_merge_group_code 
+            left join tbl_petrol p on d.ptrl_code = p.ptrl_code 
+            left join tbl_item ti on di.itm_code = ti.itm_code 
+            left join tbl_depot depot on di.dpo_code  = depot.dpo_code 
             ${where_clause};
         `;
         const tbl_temporary_count = await pgConn.get(
@@ -111,7 +115,6 @@ exports.getPetrolMergeJoGroup = async (req, res, next) => {
           rows_total = parseInt(tbl_temporary_count.data[0].rows_total);
           page_total = parseInt(tbl_temporary_count.data[0].page_total);
         }
-
 
         let response = [
           {
@@ -148,19 +151,11 @@ exports.getPetrolMergeJoGroup = async (req, res, next) => {
           status: "error",
           invalid_code: "-3",
           message: `ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ`,
-          data: xresult,
+          data: [],
           response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
         },
       ];
       res.status(200).send(response);
-      await xglobal.action_logs(
-        lic_code,
-        action[0].id,
-        "ดึงข้อมูลกลุ่มปั๊มพ่วง",
-        JSON.stringify(req.body[0]),
-        "ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ",
-        action[0].value,
-      );
       return;
     }
   })().catch(async (err) => {
@@ -170,28 +165,16 @@ exports.getPetrolMergeJoGroup = async (req, res, next) => {
         status: "error",
         invalid_code: "-4",
         message: `ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ`,
-        data: xresult,
+        data: [],
         response_time: moment().format("YYYY-MM-DD HH:mm:ss").toString(),
       },
     ];
     res.status(200).send(response);
-    const _lic = req.header("lic_code");
-    const _act = req.body?.[0]?.action?.[0] || {};
-    if (_lic && _act.id) {
-      await xglobal.action_logs(
-        _lic,
-        _act.id,
-        "ดึงข้อมูลกลุ่มปั๊มพ่วง",
-        JSON.stringify(req.body?.[0] || {}),
-        "ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ",
-        _act.value,
-      );
-    }
     return;
   });
 };
 
-//Success
+// ========= Success =========
 exports.removePetrolMergeJob = async (req, res, next) => {
   return (async () => {
     let lic_code = req.header("lic_code");
@@ -202,7 +185,8 @@ exports.removePetrolMergeJob = async (req, res, next) => {
     if (
       group_code == undefined ||
       lic_code == undefined ||
-      action == undefined
+      !Array.isArray(action) ||
+      action.length === 0
     ) {
       let response = [
         {
@@ -217,61 +201,63 @@ exports.removePetrolMergeJob = async (req, res, next) => {
       res.status(200).send(response);
       return;
     } else {
-      let groupCodeArr = Array.isArray(group_code)
-        ? group_code
-        : [group_code];
-      let groupCodeIn = groupCodeArr
-        .map((c) => `'${c}'`)
-        .join(", ");
-      let script = `update tbl_petrol_merge_job_group set merge_job_group_flag = 0, rm_dt = '${moment().format("YYYY-MM-DD HH:mm:ss")}' where ptrl_merge_group_code in (${groupCodeIn});`;
 
-      let tbl_temporary = await pgConn.execute(
-        dbPrefix + lic_code,
-        script,
-        config.connectionString(),
-      );
-      if (!tbl_temporary.code) {
-        let response = [
-          {
-            status: "success",
-            invalid_code: "0",
-            message: "ลบข้อมูลสำเร็จ",
-            data: [],
-            response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
-          },
-        ];
+      const transaction = await pgConn.executeTransaction(dbPrefix + lic_code, async (client) => {
+        let groupCodeArr = Array.isArray(group_code) ? group_code : [group_code];
+        let groupCodeIn = groupCodeArr.map((c) => `'${c}'`).join(", ");
 
-        res.status(200).send(response);
+        let script = `update tbl_petrol_merge_job_group set merge_job_group_flag = 0, rm_dt = '${moment().format("YYYY-MM-DD HH:mm:ss")}' where ptrl_merge_group_code in (${groupCodeIn});`;
+        await pgConn.executeWithClient(
+          client,
+          script
+        );
+
+        let scriptRemovePetrolMerge = `update tbl_petrol_merge_job_details set merge_job_group_details_flag = 0, rm_dt = '${moment().format("YYYY-MM-DD HH:mm:ss")}' where ptrl_merge_group_code in (${groupCodeIn});`;
+        await pgConn.executeWithClient(
+          client,
+          scriptRemovePetrolMerge
+        );
+
+        let scriptRemoveDepotItemMerge = `update tbl_petrol_merge_job_depot_item set flag = 0, rm_dt = '${moment().format("YYYY-MM-DD HH:mm:ss")}' where ptrl_merge_group_code in (${groupCodeIn});`;
+        await pgConn.executeWithClient(
+          client,
+          scriptRemoveDepotItemMerge
+        );
+
+
+
+
+
+      }, config.connectionString())
+
+
+      if (transaction.code) {
         await xglobal.action_logs(
           lic_code,
           action[0].id,
-          "ลบข้อมูลกลุ่มปั้มที่พ่วงงานกันได้",
+          "ลบข้อมูลกลุ่มปั๊มที่พ่วงงานกันได้",
           JSON.stringify(req.body[0]),
-          "success",
+          transaction.message,
           action[0].value,
         );
-        return;
-      } else {
-        let response = [
-          {
-            status: "error",
-            invalid_code: "-3",
-            message: `ไม่สามารถลบข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ`,
-            data: [],
-            response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
-          },
-        ];
-        res.status(200).send(response);
-        await xglobal.action_logs(
-          lic_code,
-          action[0].id,
-          "ลบข้อมูลกลุ่มปั้มที่พ่วงงานกันได้",
-          JSON.stringify(req.body[0]),
-          "ไม่สามารถลบข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ",
-          action[0].value,
+        return sendResponse(
+          res,
+          "error",
+          "-3",
+          `ไม่สามารถลบข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ`,
         );
-        return;
       }
+
+      await xglobal.action_logs(
+        lic_code,
+        action[0].id,
+        "ลบข้อมูลกลุ่มปั๊มที่พ่วงงานกันได้",
+        JSON.stringify(req.body[0]),
+        "success",
+        action[0].value,
+      );
+
+      return xglobal.sendResponse(res, "success", "0", "ลบข้อมูลสำเร็จ");
     }
   })().catch(async (err) => {
     console.log(err);
@@ -301,19 +287,20 @@ exports.removePetrolMergeJob = async (req, res, next) => {
   });
 };
 
-//Success
+// ========= Success =========
 exports.setPetrolMergeJobInformation = async (req, res, next) => {
   return (async () => {
     let lic_code = req.header("lic_code");
-    let { ptrl_merge_group_code, ptrl_merge_group_desc, ptrl_code, action } = req.body[0];
+    let { ptrl_merge_group_code } = req.query;
+    let { ptrl_merge_group_desc, ptrl_code, depot_item, action } = req.body[0];
     let group_code = ptrl_merge_group_code || req.query.ptrl_merge_group_code || req.query.ptrl_merge_job_code;
 
     //เช็คเฉพาะส่วนที่สำคัญ
     if (
       group_code == undefined ||
       ptrl_merge_group_desc == undefined ||
-      !Array.isArray(ptrl_code) ||
-      action == undefined ||
+      !Array.isArray(action) ||
+      action.length === 0 ||
       lic_code == undefined
     ) {
       let response = [
@@ -364,71 +351,72 @@ exports.setPetrolMergeJobInformation = async (req, res, next) => {
         return;
       }
 
-      // Soft delete ข้อมูลเดิมในกลุ่มนี้ก่อน
-      let delete_script = `update tbl_petrol_merge_job_group set merge_job_group_flag = 0, rm_dt = '${moment().format("YYYY-MM-DD HH:mm:ss")}' 
-                           where ptrl_merge_group_code = '${group_code}' and merge_job_group_flag = 1;`;
+      let now_dt = moment().format("YYYY-MM-DD HH:mm:ss");
 
-      let delete_tbl_temporary = await pgConn.execute(
+      // ใช้ Transaction ในการรัน
+      let transactionResult = await pgConn.executeTransaction(
         dbPrefix + lic_code,
-        delete_script,
-        config.connectionString(),
+        async (client) => {
+          // อัปเดตชื่อกลุ่ม
+          let updateScript = `update tbl_petrol_merge_job_group 
+                              set ptrl_merge_group_desc = '${ptrl_merge_group_desc.replace(/'/g, "''")}',
+                                  mdf_dt = '${now_dt}' 
+                              where ptrl_merge_group_code = '${group_code}' and merge_job_group_flag = 1;`;
+          await pgConn.executeWithClient(client, updateScript);
+
+          // ลบรายละเอียดปั๊มเดิม
+          let deleteDetailsScript = `delete from tbl_petrol_merge_job_details where ptrl_merge_group_code = '${group_code}'`;
+          await pgConn.executeWithClient(client, deleteDetailsScript);
+
+          // ลบคลังน้ำมัน กับ น้ำมัน
+          let deleteDepotItemScript = `delete from tbl_petrol_merge_job_depot_item where ptrl_merge_group_code = '${group_code}'`;
+          await pgConn.executeWithClient(client, deleteDepotItemScript);
+
+          // บันทึกปั๊มน้ำมันชุดใหม่ (ถ้ามี)
+          if (Array.isArray(ptrl_code)) {
+            for (let ptrlCodeMap of ptrl_code) {
+              let merge_job_details_code = `mjdc-${moment().format("YYYYMMDDHHmmss")}${Math.floor(Math.random() * 1000)}`;
+              let insertDetailsScript = `insert into tbl_petrol_merge_job_details (merge_job_details_code, ptrl_merge_group_code, ptrl_code, ist_dt, merge_job_group_details_flag) 
+                                         values ('${merge_job_details_code}', '${group_code}', '${ptrlCodeMap}', '${now_dt}', 1)`;
+              await pgConn.executeWithClient(client, insertDetailsScript);
+            }
+          }
+
+          // บันทึกคลังน้ำมันและชนิดน้ำมันชุดใหม่ 
+          if (Array.isArray(depot_item)) {
+            for (let di of depot_item) {
+              let dpo_code = di.dpo_code;
+              if (Array.isArray(di.itm_code)) {
+                for (let itmCodeMap of di.itm_code) {
+                  let petrol_merge_depot_item_code = `pmdi-${moment().format("YYYYMMDDHHmmss")}${Math.floor(Math.random() * 1000)}`;
+                  let insertDepotItemScript = `insert into tbl_petrol_merge_job_depot_item (petrol_merge_depot_item_code, ptrl_merge_group_code, dpo_code, itm_code, ist_dt, flag) 
+                                               values ('${petrol_merge_depot_item_code}', '${group_code}', '${dpo_code}', '${itmCodeMap}', '${now_dt}', 1)`;
+                  await pgConn.executeWithClient(client, insertDepotItemScript);
+                }
+              }
+            }
+          }
+          return true;
+        },
+        config.connectionString()
       );
 
-      if (delete_tbl_temporary.code) {
-        let response = [
-          {
-            status: "error",
-            invalid_code: "-3",
-            message: `ไม่สามารถบันทึกข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ`,
-            data: [],
-            response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
-          },
-        ];
-        res.status(200).send(response);
+      if (transactionResult.code) {
         await xglobal.action_logs(
           lic_code,
           action[0].id,
           "แก้ไขข้อมูลปั้มที่สามารถพ่วงกันได้",
           JSON.stringify(req.body[0]),
-          "ไม่สามารถบันทึกข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ",
+          "ไม่สามารถบันทึกข้อมูล: " + transactionResult.message,
           action[0].value,
         );
-        return;
-      }
-
-      // บันทึกข้อมูลปั๊มใหม่เข้ามาในกลุ่มเดิม
-      if (Array.isArray(ptrl_code) && ptrl_code.length > 0) {
-        for (let ptrlCode of ptrl_code) {
-          let mergeGroupCode = `mgc-${moment().format("YYYYMMDDHHmmss")}${Math.floor(Math.random() * 1000)}`;
-          let script = `insert into tbl_petrol_merge_job_group (merge_group_code,ptrl_merge_group_code,ptrl_code,ptrl_merge_group_desc,ist_dt) 
-                            values ('${mergeGroupCode}', '${group_code}', '${ptrlCode}', '${ptrl_merge_group_desc}', '${moment().format("YYYY-MM-DD HH:mm:ss")}')`;
-          let tbl_temporary = await pgConn.execute(
-            dbPrefix + lic_code,
-            script,
-            config.connectionString(),
-          );
-          if (tbl_temporary.code) {
-            let response = [
-              {
-                status: "error",
-                invalid_code: "-3",
-                message: `ไม่สามารถบันทึกข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ`,
-                data: [],
-                response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
-              },
-            ];
-            res.status(200).send(response);
-            await xglobal.action_logs(
-              lic_code,
-              action[0].id,
-              "แก้ไขข้อมูลปั้มที่สามารถพ่วงกันได้",
-              JSON.stringify(req.body[0]),
-              "ไม่สามารถบันทึกข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ",
-              action[0].value,
-            );
-            return;
-          }
-        }
+        return xglobal.sendResponse(
+          res,
+          "error",
+          "-3",
+          "ไม่สามารถบันทึกข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ",
+          [],
+        );
       }
 
       let response = [
@@ -480,25 +468,19 @@ exports.setPetrolMergeJobInformation = async (req, res, next) => {
   });
 };
 
-//Success
+// ========= Success =========
 exports.addPetrolMergeJobGroupInformation = async (req, res, next) => {
   return (async () => {
     let lic_code = req.header("lic_code");
-    let { ptrl_merge_group_desc, ptrl_code, action } = req.body[0];
+    let { ptrl_merge_group_desc, ptrl_code, depot_item, action } = req.body[0];
 
-    //เช็คเฉพาะส่วนที่สำคัญ
-    if (
-      !ptrl_merge_group_desc ||
-      !Array.isArray(ptrl_code) ||
-      !action ||
-      !lic_code
-    ) {
+    // เช็คเฉพาะส่วนที่สำคัญ
+    if (!ptrl_merge_group_desc || !Array.isArray(action) || action.length === 0 || !lic_code) {
       let response = [
         {
           status: "error",
           invalid_code: "-1",
-          message:
-            "ไม่สามารถบันทึกข้อมูล, เนื่องจากข้อมูลพารามิเตอร์ไม่ถูกต้อง",
+          message: "ไม่สามารถบันทึกข้อมูล, เนื่องจากข้อมูลพารามิเตอร์ไม่ถูกต้อง",
           data: [],
           response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
         },
@@ -507,10 +489,10 @@ exports.addPetrolMergeJobGroupInformation = async (req, res, next) => {
       res.status(200).send(response);
       return;
     } else {
-      // ตรวจสอบชื่อกลุ่มซ้ำ (Duplicate Check)
-      let check_script = `SELECT ptrl_merge_group_desc FROM tbl_petrol_merge_job_group 
-                          WHERE ptrl_merge_group_desc = '${ptrl_merge_group_desc.replace(/'/g, "''")}' 
-                          AND merge_job_group_flag = 1;`;
+      // ตรวจสอบชื่อกลุ่มซ้ำ
+      let check_script = `select ptrl_merge_group_desc FROM tbl_petrol_merge_job_group 
+                          where ptrl_merge_group_desc = '${ptrl_merge_group_desc.replace(/'/g, "''")}' 
+                          and merge_job_group_flag = 1;`;
 
       let check_tbl_temporary = await pgConn.get(
         dbPrefix + lic_code,
@@ -540,40 +522,64 @@ exports.addPetrolMergeJobGroupInformation = async (req, res, next) => {
         return;
       }
 
-      let insertedData = [];
-      let isError = false;
-
       let ptrlMergeGroupCode = `ptmg-${moment().format("YYYYMMDDHHmmss")}${Math.floor(Math.random() * 1000)}`;
+      let now_dt = moment().format("YYYY-MM-DD HH:mm:ss");
 
-      if (Array.isArray(ptrl_code) && ptrl_code.length > 0) {
-        for (let ptrlCode of ptrl_code) {
-          let mergeGroupCode = `mgc-${moment().format("YYYYMMDDHHmmss")}${Math.floor(Math.random() * 1000)}`;
-          let script = `insert into tbl_petrol_merge_job_group (merge_group_code,ptrl_merge_group_code,ptrl_code,ptrl_merge_group_desc,ist_dt) 
-                            values ('${mergeGroupCode}', '${ptrlMergeGroupCode}', '${ptrlCode}', '${ptrl_merge_group_desc}', '${moment().format("YYYY-MM-DD HH:mm:ss")}')`;
-          let tbl_temporary = await pgConn.execute(
-            dbPrefix + lic_code,
-            script,
-            config.connectionString(),
-          );
-          if (tbl_temporary.code) {
-            await xglobal.action_logs(
-              lic_code,
-              action[0].id,
-              "เพิ่มข้อมูลปั้มที่สามารถพ่วงกันได้",
-              JSON.stringify(req.body[0]),
-              "ไม่สามารถบันทึกข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ",
-              action[0].value,
-            );
-            return xglobal.sendResponse(
-              res,
-              "error",
-              "-3",
-              "ไม่สามารถบันทึกข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ",
-              [],
-            );
+      let transactionResult = await pgConn.executeTransaction(
+        dbPrefix + lic_code,
+        async (client) => {
+          // เพิ่มข้อมูลกลุ่ม
+          let insertGroupScript = `insert into tbl_petrol_merge_job_group (ptrl_merge_group_code, ptrl_merge_group_desc, ist_dt, merge_job_group_flag) 
+                                   values ('${ptrlMergeGroupCode}', '${ptrl_merge_group_desc.replace(/'/g, "''")}', '${now_dt}', 1)`;
+          await pgConn.executeWithClient(client, insertGroupScript);
+
+          // เพิ่มข้อมูลรายละเอียดปั๊มน้ำมัน
+          if (Array.isArray(ptrl_code) && ptrl_code.length > 0) {
+            for (let ptrlCodeMap of ptrl_code) {
+              let merge_job_details_code = `mjdc-${moment().format("YYYYMMDDHHmmss")}${Math.floor(Math.random() * 1000)}`;
+              let insertDetailsScript = `insert into tbl_petrol_merge_job_details (merge_job_details_code, ptrl_merge_group_code, ptrl_code, ist_dt, merge_job_group_details_flag) 
+                                         values ('${merge_job_details_code}', '${ptrlMergeGroupCode}', '${ptrlCodeMap}', '${now_dt}', 1)`;
+              await pgConn.executeWithClient(client, insertDetailsScript);
+            }
           }
-        }
+
+          // เพิ่มข้อมูลคู่คลังน้ำมันและชนิดน้ำมัน
+          if (Array.isArray(depot_item) && depot_item.length > 0) {
+            for (let di of depot_item) {
+              let dpo_code = di.dpo_code;
+              if (Array.isArray(di.itm_code)) {
+                for (let itmCodeMap of di.itm_code) {
+                  let petrol_merge_depot_item_code = `pmdi-${moment().format("YYYYMMDDHHmmss")}${Math.floor(Math.random() * 1000)}`;
+                  let insertDepotItemScript = `insert into tbl_petrol_merge_job_depot_item (petrol_merge_depot_item_code, ptrl_merge_group_code, dpo_code, itm_code, ist_dt, flag) 
+                                               values ('${petrol_merge_depot_item_code}', '${ptrlMergeGroupCode}', '${dpo_code}', '${itmCodeMap}', '${now_dt}', 1)`;
+                  await pgConn.executeWithClient(client, insertDepotItemScript);
+                }
+              }
+            }
+          }
+          return true;
+        },
+        config.connectionString(),
+      );
+
+      if (transactionResult.code) {
+        await xglobal.action_logs(
+          lic_code,
+          action[0].id,
+          "เพิ่มข้อมูลปั้มที่สามารถพ่วงกันได้",
+          JSON.stringify(req.body[0]),
+          "ไม่สามารถบันทึกข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ: " + transactionResult.message,
+          action[0].value,
+        );
+        return xglobal.sendResponse(
+          res,
+          "error",
+          "-3",
+          "ไม่สามารถบันทึกข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ",
+          [],
+        );
       }
+
       await xglobal.action_logs(
         lic_code,
         action[0].id,
@@ -617,3 +623,5 @@ exports.addPetrolMergeJobGroupInformation = async (req, res, next) => {
     return;
   });
 };
+
+exports.addPetrolMergeJobGroupWithPetrol = exports.addPetrolMergeJobGroupInformation;
