@@ -666,6 +666,7 @@ exports.addDepotInformation = async (req, res, next) => {
       tamb_code,
       dpo_sales_org,
       dpo_order_type,
+      dpo_city,
       action,
     } = req.body[0];
 
@@ -763,12 +764,12 @@ exports.addDepotInformation = async (req, res, next) => {
       let dpo_code = "dpo-" + moment().format("x");
       script = `insert into tbl_depot 
             (dpo_code, dpo_number, dpo_desc, dpo_short_desc, dpo_address, dpo_zip_code, dpo_country_code, dpo_loading_minute,
-            dpo_expenses_per_km, dpo_area, dpo_lat, dpo_lon, off_code, dpo_group_code, prov_code, amph_code, tamb_code, dpo_flag, ist_dt, dpo_sales_org, dpo_order_type) 
+            dpo_expenses_per_km, dpo_area, dpo_lat, dpo_lon, off_code, dpo_group_code, prov_code, amph_code, tamb_code, dpo_flag, ist_dt, dpo_sales_org, dpo_order_type, dpo_city) 
             values 
             ('${dpo_code}', '${dpo_number}', '${dpo_desc}', '${dpo_short_desc}', '${dpo_address}', '${dpo_zip_code}', 
             '${dpo_country_code}', ${dpo_loading_minute}, ${dpo_expenses_per_km}, 
             ${dpo_area}, ${dpo_lat}, ${dpo_lon}, '${off_code}', '${dpo_group_code}',
-            '${prov_code}', '${amph_code}', '${tamb_code}', '1', '${moment().format("YYYY-MM-DD HH:mm:ss")}', '${dpo_sales_org}', '${dpo_order_type}');`;
+            '${prov_code}', '${amph_code}', '${tamb_code}', '1', '${moment().format("YYYY-MM-DD HH:mm:ss")}', '${dpo_sales_org}', '${dpo_order_type}', '${dpo_city}');`;
 
       script = script.replace(/'NULL'/gi, "NULL");
       let tbl_temporary = await pgConn.execute(
