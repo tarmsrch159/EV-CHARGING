@@ -1622,6 +1622,7 @@ exports.getLoggingOrderInformation = async (req, res, next) => {
     script = `SELECT 
             case 
               when tbl_action_logs.action_code = 'Auto Calculator' then 'Auto Calculator'
+              when tbl_action_logs.action_code = 'Auto Sync Order' then 'Auto Sync Order'
               else tbl_employee.emp_name || ' / ' || tbl_employee_role.emp_role_desc
             end as action_by,
             tbl_action_logs.action_desc as event_type,
@@ -10762,6 +10763,8 @@ exports.getOrderSapSchedule = async (req, res, next) => {
       for (let i = 0; i < salesOrders.length; i++) {
         let salesOrder = salesOrders[i];
 
+        let targetOrderId = null;
+
         console.log(
           `[Item ${i + 1}/${salesOrders.length}] 📦 ประมวลผล SHCustomerReference: ${salesOrder.SHCustomerReference}`,
         );
@@ -10894,6 +10897,7 @@ exports.getOrderSapSchedule = async (req, res, next) => {
 
             // ================ อัพเดต tbl_order_item จาก Items ==================
             let orderId = check_order.data[0].id;
+            targetOrderId = orderId;
             if (
               salesOrder.Items &&
               Array.isArray(salesOrder.Items) &&
@@ -11000,6 +11004,7 @@ exports.getOrderSapSchedule = async (req, res, next) => {
 
             if (!res_new_order.code && res_new_order.data.length > 0) {
               let newOrderId = res_new_order.data[0].id;
+              targetOrderId = newOrderId;
 
               if (
                 salesOrder.Items &&
@@ -11041,6 +11046,37 @@ exports.getOrderSapSchedule = async (req, res, next) => {
         } else {
           console.error("Database Error (check_order): " + check_order.message);
         }
+
+        let petrolScript = `select ptrl_desc, ptrl_number, ptrl_sitecode from tbl_petrol where ptrl_number = '${salesOrder.ShipToParty}' or ptrl_sitecode = '${salesOrder.ShipToParty}'`
+        let res_petrol = await pgConn.get(dbPrefix + lic_code, petrolScript, config.connectionString());
+        let petrol = (res_petrol.data && res_petrol.data.length > 0) ? res_petrol.data[0] : {};
+        let envTime = process.env.AOS_SAP_SCHEDULAR || '-'
+
+        let logPayload = {
+          id: targetOrderId || "",
+          order_no: salesOrder.SalesOrder || "-",
+          aos_order_no: salesOrder.SHCustomerReference || "-",
+          ship_to: petrol.ptrl_number || "-",
+          station_name: petrol.ptrl_desc || "-",
+          station_group: "Auto Sync Order",
+          event_type: "Auto Sync Order",
+          action_by: "Auto Sync Order",
+          action_date: moment().format("YYYY-MM-DD HH:mm:ss"),
+          remark: `Auto Sync Order (ระบบจะดึงข้อมูลออเดอร์ SAP ทุกวันเวลา ${envTime} น.)`,
+          field: "",
+          before: "",
+          after: "",
+          changes: [],
+        };
+
+        await xglobal.action_logs(
+          lic_code,
+          "Auto Sync Order",
+          "override",
+          JSON.stringify(logPayload),
+          "success",
+          "Auto Sync Order",
+        );
       }
 
       let response = [
