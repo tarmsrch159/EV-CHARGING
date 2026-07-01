@@ -730,7 +730,7 @@ exports.addDepotInformation = async (req, res, next) => {
       dpo_country_code = dpo_country_code || "";
 
       let script = ``;
-      script = `select dpo_code from tbl_depot where (dpo_desc = '${dpo_desc}' or dpo_short_desc = '${dpo_short_desc}' or dpo_number = '${dpo_number}') and dpo_flag = '1';`;
+      script = `select dpo_code from tbl_depot where (dpo_desc = '${dpo_desc}' or dpo_number = '${dpo_number}') and dpo_flag = '1';`;
       let tbl_temporary0 = await pgConn.get(
         dbPrefix + lic_code,
         script,
