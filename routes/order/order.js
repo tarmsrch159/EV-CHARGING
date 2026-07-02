@@ -659,16 +659,16 @@ exports.getOrderInformationByID = async (req, res, next) => {
                     tank_code,
                     MAX(tnk_capacity) as tnk_capacity,
                     MAX(tnk_deadstock) as tnk_deadstock,
-                    MAX(CASE WHEN stock_at::date = '${moment(orderData.ist_dt).format("YYYY-MM-DD")}'::date - INTERVAL '1 day' THEN stock END) as current_stock,
-                    MAX(CASE WHEN stock_at::date = '${moment(orderData.ist_dt).format("YYYY-MM-DD")}'::date - INTERVAL '2 day' THEN stock END) as yesterday_stock
+                    MAX(CASE WHEN stock_at::date = '${moment().format("YYYY-MM-DD")}'::date - INTERVAL '1 day' THEN stock END)  as yesterday_stock,
+                    MAX(CASE WHEN stock_at::date = '${moment().format("YYYY-MM-DD")}'::date THEN stock END) as current_stock
                 FROM tbl_automatics_tanks_information
                 GROUP BY ptrl_code, tank_code
             ) auto_tank ON tbl_petrol.ptrl_code = auto_tank.ptrl_code 
                  AND tbl_petrol_tank.ptrl_tank_code = auto_tank.tank_code
              LEFT JOIN (
                 SELECT ptrl_code, tank_code, MAX(sale_previous) as sale_previous,
-                MAX(case when sale_at_previous::date = '${moment(orderData.ist_dt).format("YYYY-MM-DD")}'::date - INTERVAL '1 day' THEN sale_previous END),
-                MAX(case when sale_at_previous::date = '${moment(orderData.ist_dt).format("YYYY-MM-DD")}'::date - INTERVAL '2 day' THEN sale_previous END)
+                MAX(CASE WHEN sale_at_previous::date = ('${moment().format("YYYY-MM-DD")}'::date - INTERVAL '1 day') THEN sale_previous END),
+                MAX(CASE WHEN sale_at_previous::date = '${moment().format("YYYY-MM-DD")}'::date THEN sale_previous END)
                 FROM tbl_automatics_sales_previous_information
                 GROUP BY ptrl_code, tank_code
             ) auto_sales ON tbl_petrol.ptrl_code = auto_sales.ptrl_code AND tbl_petrol_tank.ptrl_tank_code = auto_sales.tank_code
@@ -709,22 +709,22 @@ exports.getOrderInformationByID = async (req, res, next) => {
                 (SELECT dpo_desc FROM tbl_depot WHERE dpo_code = (SELECT dpo_code FROM tbl_petrol_depot WHERE ptrl_code = '${orderData.ptrl_code}' AND rm_dt IS NULL LIMIT 1)) as dpo_desc
             FROM tbl_petrol_tank tpt
             LEFT JOIN tbl_item itm ON tpt.itm_code = itm.itm_code
-            LEFT JOIN (
+           LEFT JOIN (
                 SELECT 
                     ptrl_code, 
                     tank_code,
                     MAX(tnk_capacity) as tnk_capacity,
                     MAX(tnk_deadstock) as tnk_deadstock,
-                    MAX(CASE WHEN stock_at::date = '${moment(orderData.ist_dt).format("YYYY-MM-DD")}'::date - INTERVAL '1 day' THEN stock END) as current_stock,
-                    MAX(CASE WHEN stock_at::date = '${moment(orderData.ist_dt).format("YYYY-MM-DD")}'::date - INTERVAL '2 day' THEN stock END) as yesterday_stock
+                     MAX(CASE WHEN stock_at::date = '${moment().format("YYYY-MM-DD")}'::date - INTERVAL '1 day' THEN stock END)  as yesterday_stock,
+                    MAX(CASE WHEN stock_at::date = '${moment().format("YYYY-MM-DD")}'::date THEN stock END) as current_stock
                 FROM tbl_automatics_tanks_information
                 GROUP BY ptrl_code, tank_code
             ) auto_tank ON tpt.ptrl_code = auto_tank.ptrl_code 
                  AND tpt.ptrl_tank_code = auto_tank.tank_code
              LEFT JOIN (
                 SELECT ptrl_code, tank_code, MAX(sale_previous) as sale_previous,
-                MAX(case when sale_at_previous::date = '${moment(orderData.ist_dt).format("YYYY-MM-DD")}'::date - INTERVAL '1 day' THEN sale_previous END),
-                MAX(case when sale_at_previous::date = '${moment(orderData.ist_dt).format("YYYY-MM-DD")}'::date - INTERVAL '2 day' THEN sale_previous END)
+                MAX(CASE WHEN sale_at_previous::date = ('${moment().format("YYYY-MM-DD")}'::date - INTERVAL '1 day') THEN sale_previous END),
+                MAX(CASE WHEN sale_at_previous::date = '${moment().format("YYYY-MM-DD")}'::date THEN sale_previous END)
                 FROM tbl_automatics_sales_previous_information
                 GROUP BY ptrl_code, tank_code
             ) auto_sales ON tpt.ptrl_code = auto_sales.ptrl_code AND tpt.ptrl_tank_code = auto_sales.tank_code
@@ -7450,12 +7450,63 @@ exports.getChildOrderInformation = async (req, res, next) => {
     // รองรับ ptrl_number ทั้งแบบ String และ Array
     if (Array.isArray(ptrl_number) && ptrl_number.length > 0) {
       const sites = ptrl_number.map((s) => `'${s}'`).join(",");
-      conditions.push(`tbl_order.ship_to IN (${sites})`);
+      // conditions.push(`tbl_order.ship_to IN (${sites})`);
+      let ptrlCodeScript = `SELECT ptrl_code FROM tbl_petrol WHERE ptrl_number IN (${sites})`;
+      let ptrlCodeScriptResult = await pgConn.get(dbPrefix + lic_code, ptrlCodeScript, config.connectionString());
+      let ptrlCodeList = "";
+      if (!ptrlCodeScriptResult.code && ptrlCodeScriptResult.data.length > 0) {
+        ptrlCodeList = ptrlCodeScriptResult.data.map((item) => `'${item.ptrl_code}'`).join(",");
+      }
+
+      if (ptrlCodeList) {
+        conditions.push(`tbl_order.id IN (
+          select o.id   
+          from tbl_petrol_merge_job_details tpmjd 
+          left join tbl_petrol p on tpmjd.ptrl_code = p.ptrl_code 
+          left join tbl_order o on p.ptrl_number = o.ship_to 
+          where tpmjd.ptrl_merge_group_code in ( 
+              select ptrl_merge_group_code 
+              from tbl_petrol_merge_job_details 
+              where ptrl_code IN (${ptrlCodeList})
+                and merge_job_group_details_flag = 1 
+          )
+          and o.order_flag = '1' 
+          and o.order_status = 0
+          and o.id is not null
+        )`);
+      } else {
+        conditions.push(`tbl_order.id IS NULL`);
+      }
     } else if (
       ptrl_number !== undefined &&
       ptrl_number.toString().toUpperCase() !== "ALL"
     ) {
-      conditions.push(`tbl_order.ship_to = '${ptrl_number}'`);
+      let getCodeScript = `SELECT ptrl_code FROM tbl_petrol WHERE ptrl_number = '${ptrl_number}' LIMIT 1`;
+      let codeRes = await pgConn.get(dbPrefix + lic_code, getCodeScript, config.connectionString());
+      let target_ptrl_code = "";
+      if (!codeRes.code && codeRes.data.length > 0) {
+        target_ptrl_code = codeRes.data[0].ptrl_code;
+      }
+
+      if (target_ptrl_code) {
+        conditions.push(`tbl_order.id IN (
+          select o.id   
+          from tbl_petrol_merge_job_details tpmjd 
+          left join tbl_petrol p on tpmjd.ptrl_code = p.ptrl_code 
+          left join tbl_order o on p.ptrl_number = o.ship_to 
+          where tpmjd.ptrl_merge_group_code in ( 
+              select ptrl_merge_group_code 
+              from tbl_petrol_merge_job_details 
+              where ptrl_code = '${target_ptrl_code}'
+                and merge_job_group_details_flag = 1 
+          )
+          and o.order_flag = '1' 
+          and o.order_status = 0
+          and o.id is not null
+        )`);
+      } else {
+        conditions.push(`tbl_order.id IS NULL`);
+      }
     }
 
     if (
