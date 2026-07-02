@@ -659,16 +659,16 @@ exports.getOrderInformationByID = async (req, res, next) => {
                     tank_code,
                     MAX(tnk_capacity) as tnk_capacity,
                     MAX(tnk_deadstock) as tnk_deadstock,
-                    MAX(CASE WHEN stock_at::date = '${moment(orderData.ist_dt).format("YYYY-MM-DD")}'::date - INTERVAL '1 day' THEN stock END) as current_stock,
-                    MAX(CASE WHEN stock_at::date = '${moment(orderData.ist_dt).format("YYYY-MM-DD")}'::date - INTERVAL '2 day' THEN stock END) as yesterday_stock
+                    MAX(CASE WHEN stock_at::date = '${moment().format("YYYY-MM-DD")}'::date - INTERVAL '1 day' THEN stock END)  as yesterday_stock,
+                    MAX(CASE WHEN stock_at::date = '${moment().format("YYYY-MM-DD")}'::date THEN stock END) as current_stock
                 FROM tbl_automatics_tanks_information
                 GROUP BY ptrl_code, tank_code
             ) auto_tank ON tbl_petrol.ptrl_code = auto_tank.ptrl_code 
                  AND tbl_petrol_tank.ptrl_tank_code = auto_tank.tank_code
              LEFT JOIN (
                 SELECT ptrl_code, tank_code, MAX(sale_previous) as sale_previous,
-                MAX(case when sale_at_previous::date = '${moment(orderData.ist_dt).format("YYYY-MM-DD")}'::date - INTERVAL '1 day' THEN sale_previous END),
-                MAX(case when sale_at_previous::date = '${moment(orderData.ist_dt).format("YYYY-MM-DD")}'::date - INTERVAL '2 day' THEN sale_previous END)
+                MAX(CASE WHEN sale_at_previous::date = ('${moment().format("YYYY-MM-DD")}'::date - INTERVAL '1 day') THEN sale_previous END),
+                MAX(CASE WHEN sale_at_previous::date = '${moment().format("YYYY-MM-DD")}'::date THEN sale_previous END)
                 FROM tbl_automatics_sales_previous_information
                 GROUP BY ptrl_code, tank_code
             ) auto_sales ON tbl_petrol.ptrl_code = auto_sales.ptrl_code AND tbl_petrol_tank.ptrl_tank_code = auto_sales.tank_code
@@ -709,22 +709,22 @@ exports.getOrderInformationByID = async (req, res, next) => {
                 (SELECT dpo_desc FROM tbl_depot WHERE dpo_code = (SELECT dpo_code FROM tbl_petrol_depot WHERE ptrl_code = '${orderData.ptrl_code}' AND rm_dt IS NULL LIMIT 1)) as dpo_desc
             FROM tbl_petrol_tank tpt
             LEFT JOIN tbl_item itm ON tpt.itm_code = itm.itm_code
-            LEFT JOIN (
+           LEFT JOIN (
                 SELECT 
                     ptrl_code, 
                     tank_code,
                     MAX(tnk_capacity) as tnk_capacity,
                     MAX(tnk_deadstock) as tnk_deadstock,
-                    MAX(CASE WHEN stock_at::date = '${moment(orderData.ist_dt).format("YYYY-MM-DD")}'::date - INTERVAL '1 day' THEN stock END) as current_stock,
-                    MAX(CASE WHEN stock_at::date = '${moment(orderData.ist_dt).format("YYYY-MM-DD")}'::date - INTERVAL '2 day' THEN stock END) as yesterday_stock
+                     MAX(CASE WHEN stock_at::date = '${moment().format("YYYY-MM-DD")}'::date - INTERVAL '1 day' THEN stock END)  as yesterday_stock,
+                    MAX(CASE WHEN stock_at::date = '${moment().format("YYYY-MM-DD")}'::date THEN stock END) as current_stock
                 FROM tbl_automatics_tanks_information
                 GROUP BY ptrl_code, tank_code
             ) auto_tank ON tpt.ptrl_code = auto_tank.ptrl_code 
                  AND tpt.ptrl_tank_code = auto_tank.tank_code
              LEFT JOIN (
                 SELECT ptrl_code, tank_code, MAX(sale_previous) as sale_previous,
-                MAX(case when sale_at_previous::date = '${moment(orderData.ist_dt).format("YYYY-MM-DD")}'::date - INTERVAL '1 day' THEN sale_previous END),
-                MAX(case when sale_at_previous::date = '${moment(orderData.ist_dt).format("YYYY-MM-DD")}'::date - INTERVAL '2 day' THEN sale_previous END)
+                MAX(CASE WHEN sale_at_previous::date = ('${moment().format("YYYY-MM-DD")}'::date - INTERVAL '1 day') THEN sale_previous END),
+                MAX(CASE WHEN sale_at_previous::date = '${moment().format("YYYY-MM-DD")}'::date THEN sale_previous END)
                 FROM tbl_automatics_sales_previous_information
                 GROUP BY ptrl_code, tank_code
             ) auto_sales ON tpt.ptrl_code = auto_sales.ptrl_code AND tpt.ptrl_tank_code = auto_sales.tank_code
