@@ -633,7 +633,10 @@ exports.getPetrolMergeJobDetails = async (req, res, next) => {
 
   return (async () => {
     let lic_code = req.header("lic_code");
-    let { ptrl_code, action } = req.body[0];
+    let { ptrl_code, action, page_index, page_limit } = req.body[0];
+    const page = parseInt(page_index) || 1;
+    const limit = parseInt(page_limit) || 10;
+    const offset = (page > 0 ? page - 1 : 0) * limit;
 
     //เช็คเฉพาะส่วนที่สำคัญ
     if (
@@ -677,7 +680,8 @@ exports.getPetrolMergeJobDetails = async (req, res, next) => {
                     and d.merge_job_group_details_flag = 1
                     and g.merge_job_group_flag = 1
                     and p.ptrl_flag = '1'
-                    and p.ptrl_code <> '${escaped_ptrl_code}';`;
+                    and p.ptrl_code <> '${escaped_ptrl_code}'
+                    limit ${limit} offset ${offset};;`;
 
       let tbl_temporary = await pgConn.get(
         dbPrefix + lic_code,
@@ -686,17 +690,74 @@ exports.getPetrolMergeJobDetails = async (req, res, next) => {
       );
 
       if (!tbl_temporary.code) {
-        let response = [
-          {
-            status: "success",
-            invalid_code: "0",
-            message: "",
-            data: tbl_temporary.data,
-            response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
-          },
-        ];
-        res.status(200).send(response);
-        return;
+        // paging
+        if (tbl_temporary.data.length > 0) {
+          const data = JSON.parse(
+            JSON.stringify(tbl_temporary.data).replace(/\:null/gi, '\:""'),
+          );
+
+          const countScript = `
+            SELECT 
+                COUNT(DISTINCT p.ptrl_code) as rows_total,
+                CEIL(COUNT(p.ptrl_code)::float / ${limit}) as page_total
+            from tbl_petrol_merge_job_details d
+            join tbl_petrol p on d.ptrl_code = p.ptrl_code
+            join tbl_petrol_merge_job_group g on d.ptrl_merge_group_code = g.ptrl_merge_group_code
+            where d.ptrl_merge_group_code in (
+                        select ptrl_merge_group_code 
+                        from tbl_petrol_merge_job_details 
+                        where ptrl_code = '${escaped_ptrl_code}' 
+                          and merge_job_group_details_flag = 1
+                    ) 
+                    and d.merge_job_group_details_flag = 1
+                    and g.merge_job_group_flag = 1
+                    and p.ptrl_flag = '1'
+                    and p.ptrl_code <> '${escaped_ptrl_code}';
+        `;
+          const tbl_temporary_count = await pgConn.get(
+            dbPrefix + lic_code,
+            countScript,
+            config.connectionString(),
+          );
+
+          let page_total = 1,
+            rows_total = 0;
+          if (!tbl_temporary_count.code && tbl_temporary_count.data.length > 0) {
+            rows_total = parseInt(tbl_temporary_count.data[0].rows_total);
+            page_total = parseInt(tbl_temporary_count.data[0].page_total);
+          }
+
+          let response = [
+            {
+              status: "success",
+              invalid_code: "0",
+              message: "",
+              data: data,
+              rows_total: rows_total,
+              page_total: page_total <= 0 ? 1 : page_total,
+              response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+            },
+          ];
+
+          res.status(200).send(response);
+          return;
+        }
+        else {
+          let response = [
+            {
+              status: "success",
+              invalid_code: "0",
+              message: "ไม่พบข้อมูลปั๊มพ่วง",
+              data: [],
+              rows_total: 0,
+              page_total: 0,
+              response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+            },
+          ];
+          res.status(200).send(response);
+          return;
+        }
+
       } else {
         let response = [
           {

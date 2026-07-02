@@ -803,7 +803,8 @@ exports.getDepotItemByDepots = async (req, res, next) => {
         .map((c) => `'${c.replace(/'/g, "''")}'`)
         .join(", ");
 
-      let script = `select distinct 
+      let script = `select 
+              distinct 
                     tdi.dpo_code,
                     tdi.itm_code,
                     ti.itm_desc,
