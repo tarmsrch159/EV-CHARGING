@@ -7384,6 +7384,7 @@ exports.getChildOrderInformation = async (req, res, next) => {
       res.status(200).send(response);
       return;
     }
+
     const managerScript = `select ptrl_code from tbl_employee where emp_code = '${action[0].id}'`;
     let managerData = await pgConn.get(
       dbPrefix + lic_code,
@@ -7450,7 +7451,6 @@ exports.getChildOrderInformation = async (req, res, next) => {
     // รองรับ ptrl_number ทั้งแบบ String และ Array
     if (Array.isArray(ptrl_number) && ptrl_number.length > 0) {
       const sites = ptrl_number.map((s) => `'${s}'`).join(",");
-      // conditions.push(`tbl_order.ship_to IN (${sites})`);
       let ptrlCodeScript = `SELECT ptrl_code FROM tbl_petrol WHERE ptrl_number IN (${sites})`;
       let ptrlCodeScriptResult = await pgConn.get(dbPrefix + lic_code, ptrlCodeScript, config.connectionString());
       let ptrlCodeList = "";
@@ -7468,36 +7468,6 @@ exports.getChildOrderInformation = async (req, res, next) => {
               select ptrl_merge_group_code 
               from tbl_petrol_merge_job_details 
               where ptrl_code IN (${ptrlCodeList})
-                and merge_job_group_details_flag = 1 
-          )
-          and o.order_flag = '1' 
-          and o.order_status = 0
-          and o.id is not null
-        )`);
-      } else {
-        conditions.push(`tbl_order.id IS NULL`);
-      }
-    } else if (
-      ptrl_number !== undefined &&
-      ptrl_number.toString().toUpperCase() !== "ALL"
-    ) {
-      let getCodeScript = `SELECT ptrl_code FROM tbl_petrol WHERE ptrl_number = '${ptrl_number}' LIMIT 1`;
-      let codeRes = await pgConn.get(dbPrefix + lic_code, getCodeScript, config.connectionString());
-      let target_ptrl_code = "";
-      if (!codeRes.code && codeRes.data.length > 0) {
-        target_ptrl_code = codeRes.data[0].ptrl_code;
-      }
-
-      if (target_ptrl_code) {
-        conditions.push(`tbl_order.id IN (
-          select o.id   
-          from tbl_petrol_merge_job_details tpmjd 
-          left join tbl_petrol p on tpmjd.ptrl_code = p.ptrl_code 
-          left join tbl_order o on p.ptrl_number = o.ship_to 
-          where tpmjd.ptrl_merge_group_code in ( 
-              select ptrl_merge_group_code 
-              from tbl_petrol_merge_job_details 
-              where ptrl_code = '${target_ptrl_code}'
                 and merge_job_group_details_flag = 1 
           )
           and o.order_flag = '1' 
@@ -7587,6 +7557,8 @@ exports.getChildOrderInformation = async (req, res, next) => {
             ORDER BY tbl_order.ist_dt DESC 
             OFFSET (${page_index} * ${page_limit}) LIMIT ${page_limit};
         `;
+
+    console.log(dataScript)
 
     // =========================================================================
     // Execute Query หลัก และประมวลผลผลลัพธ์เพื่อส่ง Response
