@@ -375,9 +375,8 @@ exports.setPetrolMergeJobInformation = async (req, res, next) => {
           // บันทึกปั๊มน้ำมันชุดใหม่ (ถ้ามี)
           if (Array.isArray(ptrl_code)) {
             for (let ptrlCodeMap of ptrl_code) {
-              let merge_job_details_code = `mjdc-${moment().format("YYYYMMDDHHmmss")}${Math.floor(Math.random() * 1000)}`;
-              let insertDetailsScript = `insert into tbl_petrol_merge_job_details (merge_job_details_code, ptrl_merge_group_code, ptrl_code, ist_dt, merge_job_group_details_flag) 
-                                         values ('${merge_job_details_code}', '${group_code}', '${ptrlCodeMap}', '${now_dt}', 1)`;
+              let insertDetailsScript = `insert into tbl_petrol_merge_job_details (ptrl_merge_group_code, ptrl_code, ist_dt, merge_job_group_details_flag) 
+                                         values ('${group_code}', '${ptrlCodeMap}', '${now_dt}', 1)`;
               await pgConn.executeWithClient(client, insertDetailsScript);
             }
           }
@@ -388,9 +387,8 @@ exports.setPetrolMergeJobInformation = async (req, res, next) => {
               let dpo_code = di.dpo_code;
               if (Array.isArray(di.itm_code)) {
                 for (let itmCodeMap of di.itm_code) {
-                  let petrol_merge_depot_item_code = `pmdi-${moment().format("YYYYMMDDHHmmss")}${Math.floor(Math.random() * 1000)}`;
-                  let insertDepotItemScript = `insert into tbl_petrol_merge_job_depot_item (petrol_merge_depot_item_code, ptrl_merge_group_code, dpo_code, itm_code, ist_dt, flag) 
-                                               values ('${petrol_merge_depot_item_code}', '${group_code}', '${dpo_code}', '${itmCodeMap}', '${now_dt}', 1)`;
+                  let insertDepotItemScript = `insert into tbl_petrol_merge_job_depot_item (ptrl_merge_group_code, dpo_code, itm_code, ist_dt, flag) 
+                                               values ('${group_code}', '${dpo_code}', '${itmCodeMap}', '${now_dt}', 1)`;
                   await pgConn.executeWithClient(client, insertDepotItemScript);
                 }
               }
@@ -536,9 +534,8 @@ exports.addPetrolMergeJobGroupInformation = async (req, res, next) => {
           // เพิ่มข้อมูลรายละเอียดปั๊มน้ำมัน
           if (Array.isArray(ptrl_code) && ptrl_code.length > 0) {
             for (let ptrlCodeMap of ptrl_code) {
-              let merge_job_details_code = `mjdc-${moment().format("YYYYMMDDHHmmss")}${Math.floor(Math.random() * 1000)}`;
-              let insertDetailsScript = `insert into tbl_petrol_merge_job_details (merge_job_details_code, ptrl_merge_group_code, ptrl_code, ist_dt, merge_job_group_details_flag) 
-                                         values ('${merge_job_details_code}', '${ptrlMergeGroupCode}', '${ptrlCodeMap}', '${now_dt}', 1)`;
+              let insertDetailsScript = `insert into tbl_petrol_merge_job_details (ptrl_merge_group_code, ptrl_code, ist_dt, merge_job_group_details_flag) 
+                                         values ('${ptrlMergeGroupCode}', '${ptrlCodeMap}', '${now_dt}', 1)`;
               await pgConn.executeWithClient(client, insertDetailsScript);
             }
           }
@@ -549,9 +546,8 @@ exports.addPetrolMergeJobGroupInformation = async (req, res, next) => {
               let dpo_code = di.dpo_code;
               if (Array.isArray(di.itm_code)) {
                 for (let itmCodeMap of di.itm_code) {
-                  let petrol_merge_depot_item_code = `pmdi-${moment().format("YYYYMMDDHHmmss")}${Math.floor(Math.random() * 1000)}`;
-                  let insertDepotItemScript = `insert into tbl_petrol_merge_job_depot_item (petrol_merge_depot_item_code, ptrl_merge_group_code, dpo_code, itm_code, ist_dt, flag) 
-                                               values ('${petrol_merge_depot_item_code}', '${ptrlMergeGroupCode}', '${dpo_code}', '${itmCodeMap}', '${now_dt}', 1)`;
+                  let insertDepotItemScript = `insert into tbl_petrol_merge_job_depot_item (ptrl_merge_group_code, dpo_code, itm_code, ist_dt, flag) 
+                                               values ('${ptrlMergeGroupCode}', '${dpo_code}', '${itmCodeMap}', '${now_dt}', 1)`;
                   await pgConn.executeWithClient(client, insertDepotItemScript);
                 }
               }
