@@ -41,15 +41,35 @@ exports.getStockAutoOrderInformation = async (req, res, next) => {
       return;
     }
 
+    let getDateTimeOrder = `select o.ist_dt, p.ptrl_code from tbl_order o left join tbl_petrol p on o.ship_to = p.ptrl_number where o.sh_cus_ref = '${sh_cus_ref}' and o.order_flag = '1' limit 1 `
+    let getDateTimeOrderResult = await pgConn.get(
+      dbPrefix + lic_code,
+      getDateTimeOrder,
+      config.connectionString(),
+    );
+
+    let ist_dt = "";
+    let ptrl_code = "";
+    if (!getDateTimeOrderResult.code) {
+      if (getDateTimeOrderResult.data.length > 0) {
+        ist_dt = getDateTimeOrderResult.data[0].ist_dt;
+        ptrl_code = getDateTimeOrderResult.data[0].ptrl_code;
+      }
+    }
     // =========================================================
     // สร้าง Dynamic WHERE Clause สำหรับ Query หลัก (ดึงข้อมูล Stock)
     // =========================================================
     let conditions = [];
     sh_cus_ref = sh_cus_ref || "ALL";
 
-    if (sh_cus_ref.toString().toUpperCase() !== "ALL") {
+    if (ptrl_code) {
+      conditions.push(`ati.ptrl_code = '${ptrl_code}'`);
+    } else if (sh_cus_ref.toString().toUpperCase() !== "ALL") {
       conditions.push(`ati.sh_cus_ref = '${sh_cus_ref}'`);
     }
+
+    let orderDate = ist_dt ? moment(ist_dt).format("YYYY-MM-DD") : moment().format("YYYY-MM-DD");
+    conditions.push(`ati.stock_at::date = '${orderDate}'::date`);
 
     let whereClause = "";
     if (conditions.length > 0) {
@@ -89,7 +109,7 @@ exports.getStockAutoOrderInformation = async (req, res, next) => {
             ${whereClause}
             ORDER BY tbl_petrol_tank.tnk_number ASC;
         `;
-
+    console.log(dataScript)
 
     let tbl_temporary = await pgConn.get(
       dbPrefix + lic_code,
