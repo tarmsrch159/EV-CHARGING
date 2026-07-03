@@ -7474,44 +7474,10 @@ exports.getChildOrderInformation = async (req, res, next) => {
       );
     }
 
-    // กรองออเดอร์ของปั๊มที่อยู่ภายใต้กลุ่มเดียวกันและรถคันเดียวกัน
+    // กรองออเดอร์ของปั๊มที่ถูกส่งมาโดยตรง
     if (Array.isArray(ptrl_number) && ptrl_number.length > 0) {
       const sites = ptrl_number.map((s) => `'${s}'`).join(",");
-      let ptrlCodeScript = `SELECT ptrl_code FROM tbl_petrol WHERE ptrl_number IN (${sites})`;
-      let ptrlCodeScriptResult = await pgConn.get(dbPrefix + lic_code, ptrlCodeScript, config.connectionString());
-      let ptrlCodeList = "";
-      if (!ptrlCodeScriptResult.code && ptrlCodeScriptResult.data.length > 0) {
-        ptrlCodeList = ptrlCodeScriptResult.data.map((item) => `'${item.ptrl_code}'`).join(",");
-      }
-
-      if (ptrlCodeList) {
-        conditions.push(`tbl_order.id IN (
-          select o.id   
-          from tbl_petrol_merge_job_details tpmjd 
-          left join tbl_petrol p on tpmjd.ptrl_code = p.ptrl_code 
-          left join tbl_order o on p.ptrl_number = o.ship_to 
-          left join tbl_petrol_vehicle_type tpvt on p.ptrl_code = tpvt.ptrl_code
-          where tpmjd.ptrl_merge_group_code in ( 
-              select ptrl_merge_group_code 
-              from tbl_petrol_merge_job_details 
-              where ptrl_code IN (${ptrlCodeList})
-                and merge_job_group_details_flag = 1 
-          )
-          and o.order_flag = '1' 
-          and o.order_status = 0
-          and o.id is not null
-          and tpvt.veh_type_code = o.veh_type_code
-          and o.veh_type_code in (
-              select veh_type_code 
-              from tbl_petrol_vehicle_type 
-              where ptrl_code IN (${ptrlCodeList})
-                and ptrl_vehicle_type_flag = '1'
-          )
-          
-        )`);
-      } else {
-        conditions.push(`tbl_order.id IS NULL`);
-      }
+      conditions.push(`tbl_order.ship_to IN (${sites})`);
     }
 
     if (
