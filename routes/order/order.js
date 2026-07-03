@@ -7477,7 +7477,17 @@ exports.getChildOrderInformation = async (req, res, next) => {
     // กรองออเดอร์ของปั๊มที่ถูกส่งมาโดยตรง
     if (Array.isArray(ptrl_number) && ptrl_number.length > 0) {
       const sites = ptrl_number.map((s) => `'${s}'`).join(",");
+      // กรองให้ได้ออเดอร์ของสถานีที่ส่งเข้ามา
       conditions.push(`tbl_order.ship_to IN (${sites})`);
+      //  กรองเฉพาะประเภทรถที่สถานีนั้น ๆ รองรับ
+      conditions.push(`tbl_order.veh_type_code IN (
+        SELECT tpvt.veh_type_code 
+        FROM tbl_petrol_vehicle_type tpvt 
+        JOIN tbl_petrol p ON tpvt.ptrl_code = p.ptrl_code 
+        WHERE p.ptrl_number IN (${sites}) 
+          AND tpvt.ptrl_vehicle_type_flag = '1'
+          AND tpvt.rm_dt IS NULL
+      )`);
     }
 
     if (
