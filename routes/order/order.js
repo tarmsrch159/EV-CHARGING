@@ -566,7 +566,8 @@ exports.getOrderInformationByID = async (req, res, next) => {
                 case 
 	                when tbl_order.created_by_tms = 'automatic' then 'automatic'
 	                else emp.emp_name
-                end as created_name
+                end as created_name,
+                coalesce(tbl_vehicle_type.veh_type_desc, '') as veh_type_desc
             FROM tbl_order  
             LEFT JOIN tbl_employee emp on tbl_order.created_by_tms = emp.emp_code 
             LEFT JOIN tbl_order_type ON tbl_order.order_type = tbl_order_type.ord_type_code
@@ -580,6 +581,7 @@ exports.getOrderInformationByID = async (req, res, next) => {
                 ORDER BY ptrl_code, emp_role_code DESC
             ) tbl_employee ON tbl_petrol.ptrl_code = tbl_employee.ptrl_code
             LEFT JOIN tbl_employee_role ON tbl_employee.emp_role_code = tbl_employee_role.emp_role_code
+            LEFT JOIN tbl_vehicle_type ON tbl_order.veh_type_code = tbl_vehicle_type.veh_type_code
             WHERE tbl_order.rm_dt IS NULL AND tbl_order.id = ${id}`;
 
     let orderResult = await pgConn.get(
@@ -711,7 +713,8 @@ exports.getOrderInformationByID = async (req, res, next) => {
                 (COALESCE(auto_sales.sale_current_day_previous, 0) + COALESCE(auto_tank.tnk_deadstock, tpt.tnk_deadstock, 0)) as min_stock,
                 NULL as remark,
                 (SELECT dpo_desc FROM tbl_depot WHERE dpo_code = (SELECT dpo_code FROM tbl_petrol_depot WHERE ptrl_code = '${orderData.ptrl_code}' AND rm_dt IS NULL LIMIT 1)) as dpo_desc
-            FROM tbl_petrol_tank tpt
+
+                FROM tbl_petrol_tank tpt
             LEFT JOIN tbl_item itm ON tpt.itm_code = itm.itm_code
            LEFT JOIN (
                 SELECT 
