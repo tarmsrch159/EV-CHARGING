@@ -7472,8 +7472,6 @@ exports.getChildOrderInformation = async (req, res, next) => {
           left join tbl_petrol p on tpmjd.ptrl_code = p.ptrl_code 
           left join tbl_order o on p.ptrl_number = o.ship_to 
           left join tbl_petrol_vehicle_type tpvt on p.ptrl_code = tpvt.ptrl_code
-          left join tbl_petrol_depot tpd on p.ptrl_code = tpd.ptrl_code and tpd.rm_dt is null
-          left join tbl_order_item oi on o.id = oi.order_no and oi.rm_dt is null
           where tpmjd.ptrl_merge_group_code in ( 
               select ptrl_merge_group_code 
               from tbl_petrol_merge_job_details 
@@ -7484,26 +7482,13 @@ exports.getChildOrderInformation = async (req, res, next) => {
           and o.order_status = 0
           and o.id is not null
           and tpvt.veh_type_code = o.veh_type_code
-          and tpd.dpo_code in (
-              select dpo_code 
-              from tbl_petrol_depot 
-              where ptrl_code IN (${ptrlCodeList})
-                and rm_dt is null
-          )
-        
-          and oi.deli_plant in (
-              select dpo_code 
-              from tbl_petrol_depot 
-              where ptrl_code IN (${ptrlCodeList})
-                and rm_dt is null
-          )
           and o.veh_type_code in (
               select veh_type_code 
               from tbl_petrol_vehicle_type 
               where ptrl_code IN (${ptrlCodeList})
                 and ptrl_vehicle_type_flag = '1'
           )
-          and p.ptrl_code not in (${ptrlCodeList})
+          
         )`);
       } else {
         conditions.push(`tbl_order.id IS NULL`);
@@ -7604,6 +7589,8 @@ exports.getChildOrderInformation = async (req, res, next) => {
       dataScript,
       config.connectionString(),
     );
+
+    console.log(tbl_temporary)
 
     // ตรวจสอบว่า Query สำเร็จหรือไม่
     if (!tbl_temporary.code) {
