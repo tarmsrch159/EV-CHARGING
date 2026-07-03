@@ -48,7 +48,7 @@ exports.getPetrolMergeJoGroup = async (req, res, next) => {
     if (ptrl_merge_group_code && ptrl_merge_group_code !== "ALL") conditions.push(`g.ptrl_merge_group_code = '${ptrl_merge_group_code.replace(/'/g, "''")}'`)
 
     if (search) {
-      conditions.push(`(g.ptrl_merge_group_desc like '%${search.replace(/'/g, "''")}%' or g.ptrl_merge_group_code like '%${search.replace(/'/g, "''")}%')`);
+      conditions.push(`(ptrl_merge_group_desc like '%${search.replace(/'/g, "''")}%' or ptrl_merge_group_code like '%${search.replace(/'/g, "''")}%')`);
     }
 
     let where_clause = "where " + conditions.join(" and ");
@@ -61,12 +61,11 @@ exports.getPetrolMergeJoGroup = async (req, res, next) => {
             jsonb_build_object(
                 'ptrl_desc', p.ptrl_desc,
                 'dpo_desc', depot.dpo_desc,
-                'itm_desc', ti.itm_desc,
-                'itm_material_number', ti.itm_material_number
+                'itm_desc', ti.itm_desc
             )
-        ) filter (where p.ptrl_code is not null), 
+        ) FILTER (WHERE p.ptrl_code IS NOT NULL), 
         '[]'::jsonb
-    ) as data
+    ) AS data
     from tbl_petrol_merge_job_group g
     left join tbl_petrol_merge_job_details d on g.ptrl_merge_group_code = d.ptrl_merge_group_code 
     left join tbl_petrol_merge_job_depot_item di on g.ptrl_merge_group_code = di.ptrl_merge_group_code 
@@ -93,9 +92,9 @@ exports.getPetrolMergeJoGroup = async (req, res, next) => {
         );
 
         const countScript = `
-            select 
-                count(distinct g.ptrl_merge_group_code) as rows_total,
-                ceil(count(g.ptrl_merge_group_code)::float / ${limit}) as page_total
+            SELECT 
+                COUNT(DISTINCT g.ptrl_merge_group_code) as rows_total,
+                CEIL(COUNT(g.ptrl_merge_group_code)::float / ${limit}) as page_total
             from tbl_petrol_merge_job_group g
             left join tbl_petrol_merge_job_details d on g.ptrl_merge_group_code = d.ptrl_merge_group_code 
             left join tbl_petrol_merge_job_depot_item di on g.ptrl_merge_group_code = di.ptrl_merge_group_code 
@@ -208,16 +207,16 @@ exports.removePetrolMergeJob = async (req, res, next) => {
 
       // ตรวจสอบว่ามีออเดอร์ในกลุ่มนี้กำลังดำเนินการพ่วงจัดส่งอยู่หรือไม่
       let checkActiveOrdersScript = `
-        select o.id, o.order_no 
-        from tbl_order o
-        join tbl_petrol p on o.ship_to = p.ptrl_number
-        join tbl_petrol_merge_job_details d on p.ptrl_code = d.ptrl_code
-        where d.ptrl_merge_group_code in (${groupCodeIn})
-          and d.merge_job_group_details_flag = 1
-          and o.order_flag = '1'
-          and o.order_status = 0
-          and o.consignment_no is not null
-        limit 1;
+        SELECT o.id, o.order_no 
+        FROM tbl_order o
+        JOIN tbl_petrol p ON o.ship_to = p.ptrl_number
+        JOIN tbl_petrol_merge_job_details d ON p.ptrl_code = d.ptrl_code
+        WHERE d.ptrl_merge_group_code IN (${groupCodeIn})
+          AND d.merge_job_group_details_flag = 1
+          AND o.order_flag = '1'
+          AND o.order_status = 0
+          AND o.consignment_no IS NOT NULL
+        LIMIT 1;
       `;
       let activeCheckResult = await pgConn.get(
         dbPrefix + lic_code,
@@ -267,6 +266,10 @@ exports.removePetrolMergeJob = async (req, res, next) => {
           scriptRemoveDepotItemMerge
         );
 
+
+
+
+
       }, config.connectionString())
 
 
@@ -279,7 +282,7 @@ exports.removePetrolMergeJob = async (req, res, next) => {
           transaction.message,
           action[0].value,
         );
-        return xglobal.sendResponse(
+        return sendResponse(
           res,
           "error",
           "-3",
@@ -393,7 +396,7 @@ exports.setPetrolMergeJobInformation = async (req, res, next) => {
 
       // 2.1 ตรวจสอบสถานีปั๊มน้ำมัน
       let ptrlIn = uniquePtrlCodes.map(c => `'${c.replace(/'/g, "''")}'`).join(", ");
-      let checkPtrlScript = `select count(*) as total from tbl_petrol where ptrl_code in (${ptrlIn}) and ptrl_flag = '1'`;
+      let checkPtrlScript = `SELECT COUNT(*) AS total FROM tbl_petrol WHERE ptrl_code IN (${ptrlIn}) AND ptrl_flag = '1'`;
       let ptrlCheckRes = await pgConn.get(dbPrefix + lic_code, checkPtrlScript, config.connectionString());
       if (ptrlCheckRes.code || parseInt(ptrlCheckRes.data[0].total) !== uniquePtrlCodes.length) {
         let response = [
@@ -411,7 +414,7 @@ exports.setPetrolMergeJobInformation = async (req, res, next) => {
 
       // 2.2 ตรวจสอบคลังน้ำมัน
       let dpoIn = uniqueDpoCodes.map(c => `'${c.replace(/'/g, "''")}'`).join(", ");
-      let checkDpoScript = `select count(*) as total from tbl_depot where dpo_code in (${dpoIn}) and dpo_flag = '1'`;
+      let checkDpoScript = `SELECT COUNT(*) AS total FROM tbl_depot WHERE dpo_code IN (${dpoIn}) AND dpo_flag = '1'`;
       let dpoCheckRes = await pgConn.get(dbPrefix + lic_code, checkDpoScript, config.connectionString());
       if (dpoCheckRes.code || parseInt(dpoCheckRes.data[0].total) !== uniqueDpoCodes.length) {
         let response = [
@@ -690,7 +693,7 @@ exports.addPetrolMergeJobGroupInformation = async (req, res, next) => {
 
       // 2.1 ตรวจสอบสถานีปั๊มน้ำมัน
       let ptrlIn = uniquePtrlCodes.map(c => `'${c.replace(/'/g, "''")}'`).join(", ");
-      let checkPtrlScript = `select count(*) as total from tbl_petrol where ptrl_code in (${ptrlIn}) and ptrl_flag = '1'`;
+      let checkPtrlScript = `SELECT COUNT(*) AS total FROM tbl_petrol WHERE ptrl_code IN (${ptrlIn}) AND ptrl_flag = '1'`;
       let ptrlCheckRes = await pgConn.get(dbPrefix + lic_code, checkPtrlScript, config.connectionString());
       if (ptrlCheckRes.code || parseInt(ptrlCheckRes.data[0].total) !== uniquePtrlCodes.length) {
         let response = [
@@ -708,7 +711,7 @@ exports.addPetrolMergeJobGroupInformation = async (req, res, next) => {
 
       // 2.2 ตรวจสอบคลังน้ำมัน
       let dpoIn = uniqueDpoCodes.map(c => `'${c.replace(/'/g, "''")}'`).join(", ");
-      let checkDpoScript = `select count(*) as total from tbl_depot where dpo_code in (${dpoIn}) and dpo_flag = '1'`;
+      let checkDpoScript = `SELECT COUNT(*) AS total FROM tbl_depot WHERE dpo_code IN (${dpoIn}) AND dpo_flag = '1'`;
       let dpoCheckRes = await pgConn.get(dbPrefix + lic_code, checkDpoScript, config.connectionString());
       if (dpoCheckRes.code || parseInt(dpoCheckRes.data[0].total) !== uniqueDpoCodes.length) {
         let response = [
@@ -781,7 +784,7 @@ exports.addPetrolMergeJobGroupInformation = async (req, res, next) => {
       }
 
       // ตรวจสอบชื่อกลุ่มซ้ำ
-      let check_script = `select ptrl_merge_group_desc from tbl_petrol_merge_job_group 
+      let check_script = `select ptrl_merge_group_desc FROM tbl_petrol_merge_job_group 
                           where ptrl_merge_group_desc = '${ptrl_merge_group_desc.replace(/'/g, "''")}' 
                           and merge_job_group_flag = 1;`;
 
@@ -970,7 +973,7 @@ exports.getPetrolMergeJobDetails = async (req, res, next) => {
                     and g.merge_job_group_flag = 1
                     and p.ptrl_flag = '1'
                     and p.ptrl_code <> '${escaped_ptrl_code}'
-                    limit ${limit} offset ${offset};`;
+                    limit ${limit} offset ${offset};;`;
 
       let tbl_temporary = await pgConn.get(
         dbPrefix + lic_code,
@@ -986,9 +989,9 @@ exports.getPetrolMergeJobDetails = async (req, res, next) => {
           );
 
           const countScript = `
-            select 
-                count(distinct p.ptrl_code) as rows_total,
-                ceil(count(p.ptrl_code)::float / ${limit}) as page_total
+            SELECT 
+                COUNT(DISTINCT p.ptrl_code) as rows_total,
+                CEIL(COUNT(p.ptrl_code)::float / ${limit}) as page_total
             from tbl_petrol_merge_job_details d
             join tbl_petrol p on d.ptrl_code = p.ptrl_code
             join tbl_petrol_merge_job_group g on d.ptrl_merge_group_code = g.ptrl_merge_group_code

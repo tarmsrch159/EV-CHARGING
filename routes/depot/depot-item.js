@@ -811,8 +811,10 @@ exports.getDepotItemByDepots = async (req, res, next) => {
                     ti.itm_material_number,
                     ti.itm_unit_code
                     from tbl_depot_item tdi
-                    left join tbl_item ti on tdi.itm_code = ti.itm_code
-                    where tdi.dpo_code in (${dpoCodeIn}) and tdi.dpo_item_flag = '1'
+                    join tbl_item ti on tdi.itm_code = ti.itm_code
+                    where tdi.dpo_code in (${dpoCodeIn}) 
+                      and tdi.dpo_item_flag = '1' 
+                      and ti.itm_flag = '1'
                     order by ti.itm_desc asc;`;
 
       let tbl_temporary = await pgConn.get(
