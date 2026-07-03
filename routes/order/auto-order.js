@@ -81,6 +81,7 @@ exports.getStockAutoOrderInformation = async (req, res, next) => {
     // =========================================================================
     let baseSelectQuery = `
             SELECT 
+              distinct
                 ati.sh_cus_ref,
                 tbl_petrol.ptrl_code,
                 tbl_petrol.ptrl_desc,
@@ -245,71 +246,112 @@ exports.getSalesAutoOrderInformation = async (req, res, next) => {
     sh_cus_ref = sh_cus_ref || "ALL";
 
     if (ptrl_code) {
-      conditions.push(`ats.ptrl_code = '${ptrl_code}'`);
+      conditions.push(`sub_ats.ptrl_code = '${ptrl_code}'`);
     } else if (sh_cus_ref.toString().toUpperCase() !== "ALL") {
-      conditions.push(`ats.sh_cus_ref = '${sh_cus_ref}'`);
+      conditions.push(`sub_ats.sh_cus_ref = '${sh_cus_ref}'`);
     }
 
     let orderDate = ist_dt ? moment(ist_dt).format("YYYY-MM-DD") : moment().format("YYYY-MM-DD");
-    conditions.push(`ats.sale_at_previous::date = '${orderDate}'::date`);
+    conditions.push(`sub_ats.sale_at_previous::date = '${orderDate}'::date`);
 
     let whereClause = "";
     if (conditions.length > 0) {
       whereClause = "WHERE " + conditions.join(" AND ");
     }
 
+    // base query
     // =========================================================================
-    // SQL Query 
+    // sql query (แก้ไขแบบเด็ดขาด: ยุบยอดขายด้วย DISTINCT ON ใน subquery ก่อนทำการ join)
     // =========================================================================
     let baseSelectQuery = `
-            SELECT 
-                ats.sh_cus_ref,
+            select 
+                sub_ats.sh_cus_ref,
                 tbl_petrol.ptrl_code,
                 tbl_petrol.ptrl_desc,
                 tbl_item.itm_code,
                 tbl_item.itm_desc,
                 tbl_petrol_tank.tnk_number,
-                ats.sale_previous,
-                ats.sale_at_previous,
-                ats.sale_previous1,
-                ats.sale_at_previous1,
-                ats.sale_previous2,
-                ats.sale_at_previous2,
-                ats.sale_previous3,
-                ats.sale_at_previous3,
-                ats.sale_previous4,
-                ats.sale_at_previous4,
-                ats.sale_previous5,
-                ats.sale_at_previous5,
-                ats.sale_previous6,
-                ats.sale_at_previous6,
-                ats.sale_previous7,
-                ats.sale_at_previous7,
-                ats.sale_previous8,
-                ats.sale_at_previous8,
-                ats.sale_previous9,
-                ats.sale_at_previous9,
-                ats.sale_previous10,
-                ats.sale_at_previous10,
-                ats.sale_previous11,
-                ats.sale_at_previous11,
-                ats.sale_previous12,
-                ats.sale_at_previous12,
-                ats.sale_previous13,
-                ats.sale_at_previous13,
-                ats.sale_previous14,
-                ats.sale_at_previous14
-            FROM tbl_automatics_sales_previous_information ats
-            LEFT JOIN tbl_petrol ON ats.ptrl_code = tbl_petrol.ptrl_code
-            LEFT JOIN tbl_item ON ats.itm_code = tbl_item.itm_code
-            LEFT JOIN tbl_petrol_tank ON ats.tank_code = tbl_petrol_tank.ptrl_tank_code
+                sub_ats.sale_previous,
+                sub_ats.sale_at_previous,
+                sub_ats.sale_previous1,
+                sub_ats.sale_at_previous1,
+                sub_ats.sale_previous2,
+                sub_ats.sale_at_previous2,
+                sub_ats.sale_previous3,
+                sub_ats.sale_at_previous3,
+                sub_ats.sale_previous4,
+                sub_ats.sale_at_previous4,
+                sub_ats.sale_previous5,
+                sub_ats.sale_at_previous5,
+                sub_ats.sale_previous6,
+                sub_ats.sale_at_previous6,
+                sub_ats.sale_previous7,
+                sub_ats.sale_at_previous7,
+                sub_ats.sale_previous8,
+                sub_ats.sale_at_previous8,
+                sub_ats.sale_previous9,
+                sub_ats.sale_at_previous9,
+                sub_ats.sale_previous10,
+                sub_ats.sale_at_previous10,
+                sub_ats.sale_previous11,
+                sub_ats.sale_at_previous11,
+                sub_ats.sale_previous12,
+                sub_ats.sale_at_previous12,
+                sub_ats.sale_previous13,
+                sub_ats.sale_at_previous13,
+                sub_ats.sale_previous14,
+                sub_ats.sale_at_previous14
+            from (
+                select distinct on (ptrl_code, tank_code, sale_at_previous::date)
+                    sh_cus_ref,
+                    ptrl_code,
+                    itm_code,
+                    tank_code,
+                    sale_previous,
+                    sale_at_previous,
+                    sale_previous1,
+                    sale_at_previous1,
+                    sale_previous2,
+                    sale_at_previous2,
+                    sale_previous3,
+                    sale_at_previous3,
+                    sale_previous4,
+                    sale_at_previous4,
+                    sale_previous5,
+                    sale_at_previous5,
+                    sale_previous6,
+                    sale_at_previous6,
+                    sale_previous7,
+                    sale_at_previous7,
+                    sale_previous8,
+                    sale_at_previous8,
+                    sale_previous9,
+                    sale_at_previous9,
+                    sale_previous10,
+                    sale_at_previous10,
+                    sale_previous11,
+                    sale_at_previous11,
+                    sale_previous12,
+                    sale_at_previous12,
+                    sale_previous13,
+                    sale_at_previous13,
+                    sale_previous14,
+                    sale_at_previous14
+                from tbl_automatics_sales_previous_information
+                order by ptrl_code, tank_code, sale_at_previous::date, ist_dt desc
+            ) sub_ats
+            left join tbl_petrol on sub_ats.ptrl_code = tbl_petrol.ptrl_code
+            left join tbl_item on sub_ats.itm_code = tbl_item.itm_code
+            left join tbl_petrol_tank on sub_ats.tank_code = tbl_petrol_tank.ptrl_tank_code
         `;
 
     let dataScript = `
             ${baseSelectQuery}
-            ${whereClause}
-            ORDER BY tbl_petrol_tank.tnk_number ASC;
+            ${whereClause} 
+            order by tbl_petrol_tank.tnk_number asc;
         `;
+
+    console.log(dataScript)
 
     let tbl_temporary = await pgConn.get(
       dbPrefix + lic_code,

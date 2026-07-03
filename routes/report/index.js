@@ -29,21 +29,21 @@ router.post('/manual/pos-tank', reportPos.addPosTank); // อัปเดตย�
 router.post('/manual/pos-meter', reportPos.addPosMeter); // อัปเดตยอดขายรายหัวจ่าย
 
 // คำนวณยอดขาย
-const runSyncSalesTask = () => {
-    console.log('Running sync sales task:', moment().format('YYYY-MM-DD HH:mm:ss'));
-    let lic_code = 'aos02';
-    let ptrl_number = '';
-    let date_at = moment().format('YYYY-MM-DD');
-    // let date_at = '2026-04-01';
-    reportStock.syncSalesInfo(date_at, ptrl_number, lic_code);
-};
+// const runSyncSalesTask = () => {
+//     console.log('Running sync sales task:', moment().format('YYYY-MM-DD HH:mm:ss'));
+//     let lic_code = 'aos02';
+//     let ptrl_number = '';
+//     let date_at = moment().format('YYYY-MM-DD');
+//     // let date_at = '2026-04-01';
+//     reportStock.syncSalesInfo(date_at, ptrl_number, lic_code);
+// };
 
-// สั่งให้ทำงานทันที 1 ครั้งเมื่อ Start Service
-runSyncSalesTask();
+// // สั่งให้ทำงานทันที 1 ครั้งเมื่อ Start Service
+// runSyncSalesTask();
 
-// ตั้งเวลาให้ทำงานรอบต่อไปตาม Cron (นาทีที่ 15 ของทุกชั่วโมง)
-cron.schedule('15 * * * *', () => {
-    runSyncSalesTask();
-});
+// // ตั้งเวลาให้ทำงานรอบต่อไปตาม Cron (นาทีที่ 15 ของทุกชั่วโมง)
+// cron.schedule('15 * * * *', () => {
+//     runSyncSalesTask();
+// });
 
 module.exports = router;

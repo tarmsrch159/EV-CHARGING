@@ -268,3 +268,47 @@ exports.runTransaction = async (dbname, callback, connectionstring) => {
   }
 };
 
+
+exports.executeTransaction = async (dbname, callback, connectionstring) => {
+  let temporary = JSON.parse(JSON.stringify(connectionstring));
+  if (dbname != null) {
+    temporary.database = dbname;
+  }
+
+  const clientPool = new Pool(temporary);
+  const client = await clientPool.connect();
+  try {
+    await client.query('BEGIN');
+    const result = await callback(client);
+    await client.query('COMMIT');
+    return {
+      code: false,
+      data: result
+    };
+  } catch (e) {
+    await client.query('ROLLBACK');
+    console.error('Transaction Error:', e.message);
+    return {
+      code: true,
+      message: e.message
+    };
+  } finally {
+    client.release();
+    await clientPool.end(); // Close the temporary pool
+  }
+};
+
+exports.executeWithClient = async (client, script, params = []) => {
+  try {
+    const res = await client.query(script, params);
+    return {
+      code: false,
+      rowaction: res.rowCount,
+      data: res.rows
+    };
+  } catch (e) {
+    console.error('Query with Client Error:', e.message);
+    throw e; // Rethrow to let the transaction handler manage it
+  }
+};
+

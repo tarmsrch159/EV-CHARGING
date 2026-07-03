@@ -592,3 +592,110 @@ exports.addPetrolDepotInformation = async (req, res, next) => {
         return;
     });
 };
+
+
+// ========= Success =========
+exports.getPetrolDepotByPetrols = async (req, res, next) => {
+    var xresult = [];
+
+    return (async () => {
+        let lic_code = req.header("lic_code");
+        let { ptrl_code, action } = req.body[0];
+
+        //เช็คเฉพาะส่วนที่สำคัญ
+        if (
+            ptrl_code == undefined ||
+            lic_code == undefined ||
+            action == undefined
+        ) {
+            let response = [
+                {
+                    status: "error",
+                    invalid_code: "-1",
+                    message:
+                        "ไม่สามารถดึงข้อมูลได้, เนื่องจากข้อมูลพารามิเตอร์ไม่ถูกต้อง",
+                    data: xresult,
+                    response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+                },
+            ];
+
+            res.status(200).send(response);
+            return;
+        } else {
+            let ptrlCodeArr = Array.isArray(ptrl_code) ? ptrl_code : [ptrl_code];
+            if (ptrlCodeArr.length === 0) {
+                let response = [
+                    {
+                        status: "success",
+                        invalid_code: "0",
+                        message: "",
+                        data: [],
+                        response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+                    },
+                ];
+                res.status(200).send(response);
+                return;
+            }
+
+            let ptrlCodeIn = ptrlCodeArr
+                .map((c) => `'${c.replace(/'/g, "''")}'`)
+                .join(", ");
+
+            let script = `select 
+                     distinct 
+                        td.dpo_code,
+                        td.dpo_number,
+                        td.dpo_desc,
+                        td.dpo_short_desc
+                    from tbl_petrol_depot tpd
+                    left join tbl_depot td on tpd.dpo_code = td.dpo_code
+                    where tpd.ptrl_code in (${ptrlCodeIn}) and tpd.ptrl_depot_flag = '1'
+                    order by td.dpo_desc asc;`;
+
+            let tbl_temporary = await pgConn.get(
+                dbPrefix + lic_code,
+                script,
+                config.connectionString(),
+            );
+
+            if (!tbl_temporary.code) {
+                let response = [
+                    {
+                        status: "success",
+                        invalid_code: "0",
+                        message: "",
+                        data: tbl_temporary.data,
+                        response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+                    },
+                ];
+                res.status(200).send(response);
+                return;
+            } else {
+                let response = [
+                    {
+                        status: "error",
+                        invalid_code: "-3",
+                        message: `ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ`,
+                        data: [],
+                        response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+                    },
+                ];
+                res.status(200).send(response);
+                return;
+            }
+        }
+    })().catch(async (err) => {
+        console.log(err);
+        let response = [
+            {
+                status: "error",
+                invalid_code: "-4",
+                message: `ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ`,
+                data: [],
+                response_time: moment().format("YYYY-MM-DD HH:mm:ss").toString(),
+            },
+        ];
+        res.status(200).send(response);
+        return;
+    });
+};

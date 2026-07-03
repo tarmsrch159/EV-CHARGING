@@ -1618,7 +1618,8 @@ exports.getAutoCalculateOrderInformationV2 = async (req, res, next) => {
                             inner join tbl_item itm on ptank.itm_code = itm.itm_code 
                             and eod.tank_no = ptank.tnk_number 
                             where date_at >= '${xdate} 00:00:00.000' 
-                            and date_at <= '${xdate} 23:59:59.000' and eod.shipto_no = '${shipto_no}'
+                            and date_at <= '${xdate} 23:59:59.000' and eod.shipto_no = '${shipto_no}' 
+                            and eod.tank_start > 0 and eod.tank_end > 0 
                             and ptank.ptrl_tank_flag = '1'
                             order by eod.tank_no asc;`
 
@@ -1723,8 +1724,7 @@ exports.getAutoCalculateOrderInformationV2 = async (req, res, next) => {
                                 left join tbl_petrol_tank ptank on ptr.ptrl_code = ptank.ptrl_code 
                                 and eod.tank_no = ptank.tnk_number
                                 where buy_date >= '${xdate_previous[xdatesale2]} 00:00:00.000' 
-                                and buy_date <= '${xdate_previous[xdatesale2]} 23:59:59.000' and ptank.ptrl_tank_flag = '1' and eod.shipto_no = '${shipto_no}' 
-                                order by eod.tank_no, eod.ist_dt asc;`
+                                and buy_date <= '${xdate_previous[xdatesale2]} 23:59:59.000' and ptank.ptrl_tank_flag = '1' and eod.shipto_no = '${shipto_no}' order by eod.tank_no, eod.ist_dt asc;`
 
                                 let db_saleprovious = await pgConn.get(xdatabase, xscript, config.connectionString());
                                 if (!db_saleprovious.code) {
@@ -2594,17 +2594,17 @@ exports.getAutoCalculateOrderInformationV2 = async (req, res, next) => {
                                             for (var xrds = 0; xrds <= db_createorderxx5.data.length - 1; xrds++) {
 
                                                 xscript = `update tbl_automatics_tanks_information set result = 'create order complete.',
-                                                    sh_cus_ref = '${sh_cus_ref}' 
-                                                    where automatic_code =  '${db_createorderxx5.data[xrds].automatic_code}';`
+                                                sh_cus_ref = '${sh_cus_ref}' 
+                                                where automatic_code =  '${db_createorderxx5.data[xrds].automatic_code}';`
                                                 var db_createorderxx7 = await pgConn.execute(xdatabase, xscript, config.connectionString());
                                                 console.log('update tbl_automatics_tanks_information,', db_createorderxx5.data[xrds].automatic_code, !db_createorderxx7.code);
 
                                                 xscript = `update tbl_automatics_sales_previous_information 
-                                                    set sh_cus_ref = '${sh_cus_ref}' 
-                                                    where ptrl_code = '${db_createorderxx5.data[xrds].ptrl_code}' 
-                                                    and tank_code = '${db_createorderxx5.data[xrds].tank_code}' 
-                                                    and itm_code = '${db_createorderxx5.data[xrds].itm_code}' 
-                                                    and sale_at_previous = '${xdate} 00:00:00.000';`
+                                                set sh_cus_ref = '${sh_cus_ref}' 
+                                                where ptrl_code = '${db_createorderxx5.data[xrds].ptrl_code}' 
+                                                and tank_code = '${db_createorderxx5.data[xrds].tank_code}' 
+                                                and itm_code = '${db_createorderxx5.data[xrds].itm_code}' 
+                                                and sale_at_previous = '${xdate} 00:00:00.000';`
                                                 var db_createorderxx8 = await pgConn.execute(xdatabase, xscript, config.connectionString());
 
                                                 xresult.push({

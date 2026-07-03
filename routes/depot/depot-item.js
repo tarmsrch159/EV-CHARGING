@@ -755,3 +755,113 @@ exports.getDuplicateItemInDepot = async (req, res, next) => {
   });
 };
 
+
+// ========= Success =========
+exports.getDepotItemByDepots = async (req, res, next) => {
+  var xresult = [];
+
+  return (async () => {
+    let lic_code = req.header("lic_code");
+    let { dpo_code, action } = req.body[0];
+
+    //เช็คเฉพาะส่วนที่สำคัญ
+    if (
+      dpo_code == undefined ||
+      lic_code == undefined ||
+      action == undefined
+    ) {
+      let response = [
+        {
+          status: "error",
+          invalid_code: "-1",
+          message:
+            "ไม่สามารถดึงข้อมูลได้, เนื่องจากข้อมูลพารามิเตอร์ไม่ถูกต้อง",
+          data: xresult,
+          response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+        },
+      ];
+
+      res.status(200).send(response);
+      return;
+    } else {
+      let dpoCodeArr = Array.isArray(dpo_code) ? dpo_code : [dpo_code];
+      if (dpoCodeArr.length === 0) {
+        let response = [
+          {
+            status: "success",
+            invalid_code: "0",
+            message: "",
+            data: [],
+            response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+          },
+        ];
+        res.status(200).send(response);
+        return;
+      }
+
+      let dpoCodeIn = dpoCodeArr
+        .map((c) => `'${c.replace(/'/g, "''")}'`)
+        .join(", ");
+
+      let script = `select 
+              distinct 
+                    tdi.dpo_code,
+                    tdi.itm_code,
+                    ti.itm_desc,
+                    ti.itm_material_number,
+                    ti.itm_unit_code
+                    from tbl_depot_item tdi
+                    join tbl_item ti on tdi.itm_code = ti.itm_code
+                    where tdi.dpo_code in (${dpoCodeIn}) 
+                      and tdi.dpo_item_flag = '1' 
+                      and ti.itm_flag = '1'
+                    order by ti.itm_desc asc;`;
+
+      let tbl_temporary = await pgConn.get(
+        dbPrefix + lic_code,
+        script,
+        config.connectionString(),
+      );
+
+      if (!tbl_temporary.code) {
+        let response = [
+          {
+            status: "success",
+            invalid_code: "0",
+            message: "",
+            data: tbl_temporary.data,
+            response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+          },
+        ];
+        res.status(200).send(response);
+        return;
+      } else {
+        let response = [
+          {
+            status: "error",
+            invalid_code: "-3",
+            message: `ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ`,
+            data: [],
+            response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+          },
+        ];
+        res.status(200).send(response);
+        return;
+      }
+    }
+  })().catch(async (err) => {
+    console.log(err);
+    let response = [
+      {
+        status: "error",
+        invalid_code: "-4",
+        message: `ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ`,
+        data: [],
+        response_time: moment().format("YYYY-MM-DD HH:mm:ss").toString(),
+      },
+    ];
+    res.status(200).send(response);
+    return;
+  });
+};
+

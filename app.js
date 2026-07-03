@@ -43,6 +43,7 @@ const autoOrderMailsScheduler = require('./routes/auto-order-mails/auto-order-ma
 const orderController = require('./routes/order/order');
 var lowStockAlertRouter = require('./routes/low-stock/index');
 const lowStockAlertScheduler = require('./routes/low-stock/low-stock-scheduler');
+const orderScheduler = require('./routes/order/order-sap-scheduler');
 var app = express();
 var cors = require('cors');
 var config = require('./configuration/connection');
@@ -407,16 +408,11 @@ app.use(function (err, req, res, next) {
     res.render('error');
 });
 
-// =========================================================
-//  เริ่มระบบ Auto Order Mail Background Loop
-// =========================================================
+// Background Scheduler สำหรับ Auto Order Mail
 autoOrderMailsScheduler.startAutoOrderMailLoop(); // Production รันทุกๆ 10 นาที
-// autoOrderMailsScheduler.startAutoOrderMailLoopTest(); // Test รันทุกๆ 10 วินาที
-// autoOrderMailsScheduler.startAutoOrderMailLoopCustom("14:49", "18:00", 10); // Custom เวลาได้
-
-// =========================================================
-// เริ่มต้น Background Scheduler สำหรับแจ้งเตือน Low Stock
-// =========================================================
+// Background Scheduler สำหรับแจ้งเตือน Low Stock
 lowStockAlertScheduler.startLowStockLoop();
+// Background Scheduler สำหรับดึงข้อมูลออเดอร์จาก SAP
+orderScheduler.startOrderSapScheduler();
 
 module.exports = app;

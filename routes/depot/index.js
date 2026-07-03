@@ -24,6 +24,7 @@ router.delete('/item/information', depot_item.removeDepotItem);
 router.patch('/item/information', depot_item.setDepotItemInformation);
 router.put('/item/information', depot_item.addDepotItemInformation);
 router.post('/item/duplicate', depot_item.getDuplicateItemInDepot);
+router.post('/item/by-depots', depot_item.getDepotItemByDepots);
 
 //Depot worked
 router.post('/worked/information', depot_worked.getDepotWorkedDateInformation);

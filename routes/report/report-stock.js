@@ -11,161 +11,162 @@ const formatIfValid = (date) => {
     : null;
 };
 
-exports.syncSalesInfo = async (date_at, ptrl_number, lic_code) => {
-  date_at = date_at
-    ? moment(date_at).format("YYYY-MM-DD")
-    : moment().format("YYYY-MM-DD");
-  date_at = moment(date_at).subtract(1, "days").format("YYYY-MM-DD");
-  ptrl_number = ptrl_number ? ptrl_number : "ALL";
+// exports.syncSalesInfo = async (date_at, ptrl_number, lic_code) => {
+//   date_at = date_at
+//     ? moment(date_at).format("YYYY-MM-DD")
+//     : moment().format("YYYY-MM-DD");
+//   date_at = moment(date_at).subtract(1, "days").format("YYYY-MM-DD");
+//   ptrl_number = ptrl_number ? ptrl_number : "ALL";
 
-  if (!lic_code) {
-    return;
-  }
+//   if (!lic_code) {
+//     return;
+//   }
 
-  try {
-    let wh = "";
-    let param = [];
-    param.push(date_at);
+//   try {
+//     let wh = "";
+//     let param = [];
+//     param.push(date_at);
 
-    if (ptrl_number && ptrl_number !== "ALL" && ptrl_number !== "") {
-      param.push(ptrl_number);
-      wh += ` AND tpr.ptrl_number = $${param.length} `;
-    }
+//     if (ptrl_number && ptrl_number !== "ALL" && ptrl_number !== "") {
+//       param.push(ptrl_number);
+//       wh += ` AND tpr.ptrl_number = $${param.length} `;
+//     }
 
-    const dayIndex = moment(date_at).day();
-    const coverageDays = 3;
-    const threshold = 2000; // ถ้าน้อยกว่า 2000 ลิตร ไม่ต้องสั่ง
+//     const dayIndex = moment(date_at).day();
+//     const coverageDays = 3;
+//     const threshold = 2000; // ถ้าน้อยกว่า 2000 ลิตร ไม่ต้องสั่ง
 
-    let scriptSql = `
-            WITH daily_stats AS (
-                SELECT 
-                    tpr.ptrl_sitecode,
-                    tpt.tnk_number,
-                    tpt.tnk_capacity,
-                    tpt.tnk_target,
-                    tpt.tnk_deadstock AS un_pump,
-                    tank.date_at::date as record_date,
-                    COALESCE(meter_summary.day_sales, 0) AS day_sales,
-                    COALESCE(tank.tank_end, 0) + COALESCE(tank.recive_val::NUMERIC, 0) AS current_stock
-                FROM tbl_petrol_tank tpt 
-                INNER JOIN tbl_petrol tpr ON tpt.ptrl_code = tpr.ptrl_code
-                LEFT JOIN tbl_order_eodtank tank ON (tpt.tnk_number = tank.tank_no AND tpr.ptrl_sitecode = tank.shipto_no)
-                LEFT JOIN (
-                    SELECT tank_no, shipto_no, buy_date, SUM(meter_diff) AS day_sales
-                    FROM (
-                        SELECT DISTINCT ON (shipto_no, tank_no, buy_date, meter_start)
-                            shipto_no, tank_no, buy_date, ABS(meter_end - meter_start) AS meter_diff
-                        FROM tbl_order_eodmeter
-                        ORDER BY shipto_no, tank_no, buy_date, meter_start, id DESC
-                    ) AS m GROUP BY tank_no, shipto_no, buy_date
-                ) meter_summary ON (tpt.tnk_number = meter_summary.tank_no AND tpr.ptrl_sitecode = meter_summary.shipto_no AND tank.date_at = meter_summary.buy_date)
-                WHERE 1=1 ${wh}
-            ),
-            raw_data AS (
-                SELECT 
-                    ptrl_sitecode,
-                    tnk_number,
-                    tnk_capacity,
-                    tnk_target,
-                    un_pump,
-                    MAX(CASE WHEN record_date = $1 THEN day_sales END) AS day_sales,
-                    COALESCE(
-                        MAX(CASE WHEN record_date = $1 THEN current_stock END),
-                        MAX(CASE WHEN record_date = $1::date - 1 THEN current_stock END),
-                        0
-                    ) AS current_stock,
-                    AVG(CASE WHEN record_date < $1 
-                            AND record_date >= $1::date - INTERVAL '7 weeks'
-                            AND EXTRACT(DOW FROM record_date) = ${dayIndex}
-                        THEN day_sales END
-                    ) AS avg_prev,
-                    AVG(CASE 
-                        WHEN record_date BETWEEN ($1::date - INTERVAL '1 year') 
-                            AND ($1::date - INTERVAL '1 year' + INTERVAL '7 weeks')
-                        AND EXTRACT(DOW FROM record_date) = ${dayIndex}
-                        THEN day_sales END
-                    ) AS avg_next,
-                    $1::date AS at_date,
-                    NOW() AS now_time
-                FROM daily_stats
-                GROUP BY ptrl_sitecode, tnk_number, tnk_capacity, tnk_target, un_pump
-            ),
-            source_data AS (
-                SELECT *,
-                    (CASE WHEN current_stock IS NOT NULL THEN (tnk_target - current_stock) END ) AS suggest_qty
-                FROM raw_data
-            ),
-            ins_sales AS (
-                INSERT INTO tbl_petrol_sales (
-                    ptrl_sitecode, tnk_number, day_sales, 
-                    avg_prev, avg_next, sales_at, ist_dt, mdf_dt
-                )
-                SELECT 
-                    ptrl_sitecode, tnk_number, day_sales, 
-                    COALESCE(avg_prev, 0), COALESCE(avg_next, 0), 
-                    at_date, now_time, now_time     
-                FROM source_data
-                WHERE day_sales IS NOT NULL AND day_sales > 0
-                ON CONFLICT (ptrl_sitecode, tnk_number, sales_at) 
-                DO UPDATE SET 
-                    day_sales = EXCLUDED.day_sales,
-                    avg_prev = EXCLUDED.avg_prev,
-                    avg_next = EXCLUDED.avg_next,
-                    mdf_dt = NOW()
-                RETURNING *
-            ),
-            ins_stock AS (
-                INSERT INTO tbl_petrol_stock (ptrl_sitecode, tnk_number, stock, stock_at, ist_dt, mdf_dt)
-                SELECT ptrl_sitecode, tnk_number, current_stock, at_date, now_time, now_time 
-                FROM source_data
-                WHERE current_stock > 0
-                ON CONFLICT (ptrl_sitecode, tnk_number, stock_at) 
-                DO UPDATE SET stock = EXCLUDED.stock, mdf_dt = NOW()
-            )
-            INSERT INTO tbl_petrol_order (ptrl_sitecode, tnk_number, suggest_qty, at_date, ist_dt, mdf_dt)
-            SELECT 
-                ptrl_sitecode, 
-                tnk_number, 
-                suggest_qty, 
-                at_date, 
-                now_time, 
-                now_time 
-            FROM source_data
-            WHERE suggest_qty > 0
-            ON CONFLICT (ptrl_sitecode, tnk_number, at_date) 
-            DO UPDATE SET 
-                suggest_qty = EXCLUDED.suggest_qty, 
-                mdf_dt = NOW();
-        `;
+//     let scriptSql = `
+//             WITH daily_stats AS (
+//                 SELECT 
+//                     tpr.ptrl_sitecode,
+//                     tpt.tnk_number,
+//                     tpt.tnk_capacity,
+//                     tpt.tnk_target,
+//                     tpt.tnk_deadstock AS un_pump,
+//                     tank.date_at::date as record_date,
+//                     COALESCE(meter_summary.day_sales, 0) AS day_sales,
+//                     COALESCE(tank.tank_end, 0) + COALESCE(tank.recive_val::NUMERIC, 0) AS current_stock
+//                 FROM tbl_petrol_tank tpt 
+//                 INNER JOIN tbl_petrol tpr ON tpt.ptrl_code = tpr.ptrl_code
+//                 LEFT JOIN tbl_order_eodtank tank ON (tpt.tnk_number = tank.tank_no AND tpr.ptrl_sitecode = tank.shipto_no)
+//                 LEFT JOIN (
+//                     SELECT tank_no, shipto_no, buy_date, SUM(meter_diff) AS day_sales
+//                     FROM (
+//                         SELECT DISTINCT ON (shipto_no, tank_no, buy_date, meter_start)
+//                             shipto_no, tank_no, buy_date, ABS(meter_end - meter_start) AS meter_diff
+//                         FROM tbl_order_eodmeter
+//                         ORDER BY shipto_no, tank_no, buy_date, meter_start, id DESC
+//                     ) AS m GROUP BY tank_no, shipto_no, buy_date
+//                 ) meter_summary ON (tpt.tnk_number = meter_summary.tank_no AND tpr.ptrl_sitecode = meter_summary.shipto_no AND tank.date_at = meter_summary.buy_date)
+//                 WHERE 1=1 ${wh}
+//             ),
+//             raw_data AS (
+//                 SELECT 
+//                     ptrl_sitecode,
+//                     tnk_number,
+//                     tnk_capacity,
+//                     tnk_target,
+//                     un_pump,
+//                     MAX(CASE WHEN record_date = $1 THEN day_sales END) AS day_sales,
+//                     COALESCE(
+//                         MAX(CASE WHEN record_date = $1 THEN current_stock END),
+//                         MAX(CASE WHEN record_date = $1::date - 1 THEN current_stock END),
+//                         0
+//                     ) AS current_stock,
+//                     AVG(CASE WHEN record_date < $1 
+//                             AND record_date >= $1::date - INTERVAL '7 weeks'
+//                             AND EXTRACT(DOW FROM record_date) = ${dayIndex}
+//                         THEN day_sales END
+//                     ) AS avg_prev,
+//                     AVG(CASE 
+//                         WHEN record_date BETWEEN ($1::date - INTERVAL '1 year') 
+//                             AND ($1::date - INTERVAL '1 year' + INTERVAL '7 weeks')
+//                         AND EXTRACT(DOW FROM record_date) = ${dayIndex}
+//                         THEN day_sales END
+//                     ) AS avg_next,
+//                     $1::date AS at_date,
+//                     NOW() AS now_time
+//                 FROM daily_stats
+//                 GROUP BY ptrl_sitecode, tnk_number, tnk_capacity, tnk_target, un_pump
+//             ),
+//             source_data AS (
+//                 SELECT DISTINCT ON (ptrl_sitecode, tnk_number) *,
+//                     (CASE WHEN current_stock IS NOT NULL THEN (tnk_target - current_stock) END ) AS suggest_qty
+//                 FROM raw_data
+//                 ORDER BY ptrl_sitecode, tnk_number
+//             ),
+//             ins_sales AS (
+//                 INSERT INTO tbl_petrol_sales (
+//                     ptrl_sitecode, tnk_number, day_sales, 
+//                     avg_prev, avg_next, sales_at, ist_dt, mdf_dt
+//                 )
+//                 SELECT 
+//                     ptrl_sitecode, tnk_number, day_sales, 
+//                     COALESCE(avg_prev, 0), COALESCE(avg_next, 0), 
+//                     at_date, now_time, now_time     
+//                 FROM source_data
+//                 WHERE day_sales IS NOT NULL AND day_sales > 0
+//                 ON CONFLICT (ptrl_sitecode, tnk_number, sales_at) 
+//                 DO UPDATE SET 
+//                     day_sales = EXCLUDED.day_sales,
+//                     avg_prev = EXCLUDED.avg_prev,
+//                     avg_next = EXCLUDED.avg_next,
+//                     mdf_dt = NOW()
+//                 RETURNING *
+//             ),
+//             ins_stock AS (
+//                 INSERT INTO tbl_petrol_stock (ptrl_sitecode, tnk_number, stock, stock_at, ist_dt, mdf_dt)
+//                 SELECT ptrl_sitecode, tnk_number, current_stock, at_date, now_time, now_time 
+//                 FROM source_data
+//                 WHERE current_stock > 0
+//                 ON CONFLICT (ptrl_sitecode, tnk_number, stock_at) 
+//                 DO UPDATE SET stock = EXCLUDED.stock, mdf_dt = NOW()
+//             )
+//             INSERT INTO tbl_petrol_order (ptrl_sitecode, tnk_number, suggest_qty, at_date, ist_dt, mdf_dt)
+//             SELECT 
+//                 ptrl_sitecode, 
+//                 tnk_number, 
+//                 suggest_qty, 
+//                 at_date, 
+//                 now_time, 
+//                 now_time 
+//             FROM source_data
+//             WHERE suggest_qty > 0
+//             ON CONFLICT (ptrl_sitecode, tnk_number, at_date) 
+//             DO UPDATE SET 
+//                 suggest_qty = EXCLUDED.suggest_qty, 
+//                 mdf_dt = NOW();
+//         `;
 
-    await pgConn.getWithParams(
-      dbPrefix + lic_code,
-      scriptSql,
-      param,
-      config.connectionString(),
-    );
-    await xglobal.action_logs(
-      lic_code,
-      "SYSTEM",
-      "Sync Sales",
-      JSON.stringify({ date_at, ptrl_number }),
-      "success",
-      "SYSTEM",
-    );
-    return;
-  } catch (error) {
-    console.log(error);
-    await xglobal.action_logs(
-      lic_code,
-      "SYSTEM",
-      "Sync Sales",
-      JSON.stringify({ date_at, ptrl_number }),
-      "error",
-      "SYSTEM",
-    );
-    return;
-  }
-};
+//     await pgConn.getWithParams(
+//       dbPrefix + lic_code,
+//       scriptSql,
+//       param,
+//       config.connectionString(),
+//     );
+//     await xglobal.action_logs(
+//       lic_code,
+//       "SYSTEM",
+//       "Sync Sales",
+//       JSON.stringify({ date_at, ptrl_number }),
+//       "success",
+//       "SYSTEM",
+//     );
+//     return;
+//   } catch (error) {
+//     console.log(error);
+//     await xglobal.action_logs(
+//       lic_code,
+//       "SYSTEM",
+//       "Sync Sales",
+//       JSON.stringify({ date_at, ptrl_number }),
+//       "error",
+//       "SYSTEM",
+//     );
+//     return;
+//   }
+// };
 
 exports.getReportStock = async (req, res, next) => {
   debugger;
@@ -277,8 +278,6 @@ SELECT
       config.connectionString(),
     );
 
-    console.log(scriptSql);
-    console.log(param);
 
     if (result.code) {
       res.status(200).json(result);

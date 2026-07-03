@@ -81,6 +81,7 @@ router.post('/depot/information', petrol_depot.getPetrolDepotInformation);
 router.delete('/depot/information', petrol_depot.removePetrolDepot);
 router.patch('/depot/information', petrol_depot.setPetrolDepotInformation);
 router.put('/depot/information', petrol_depot.addPetrolDepotInformation);
+router.post('/depot/by-petrols', petrol_depot.getPetrolDepotByPetrols);
 
 //Petrol merge job
 router.post('/petrol-merge-job/information', petrol_merge_job.getPetrolMergeJobInformation);
@@ -107,5 +108,12 @@ router.post('/petrol-merge-job/group/information', petrol_merge_job_group.getPet
 router.put('/petrol-merge-job/group', petrol_merge_job_group.addPetrolMergeJobGroupInformation);
 router.patch('/petrol-merge-job/group', petrol_merge_job_group.setPetrolMergeJobInformation);
 router.delete('/petrol-merge-job/group', petrol_merge_job_group.removePetrolMergeJob);
+router.post('/petrol-merge-job/group/details', petrol_merge_job_group.getPetrolMergeJobDetails);
+
+// Petrol merge job with petrol
+// router.post('/petrol-merge-job/with/petrol/information', petrol_merge_job_group.getPetrolMergeJobWithPetrolInformation);
+// router.delete('/petrol-merge-job/with/petrol', petrol_merge_job_group.removePetrolMergeJob);
+// router.patch('/petrol-merge-job/with/petrol', petrol_merge_job_group.setPetrolMergeJobWithPetrolInformation);
+// router.put('/petrol-merge-job/with/petrol', petrol_merge_job_group.addPetrolMergeJobGroupWithPetrol);
 
 module.exports = router;
