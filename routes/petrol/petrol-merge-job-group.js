@@ -202,10 +202,52 @@ exports.removePetrolMergeJob = async (req, res, next) => {
       return;
     } else {
 
-      const transaction = await pgConn.executeTransaction(dbPrefix + lic_code, async (client) => {
-        let groupCodeArr = Array.isArray(group_code) ? group_code : [group_code];
-        let groupCodeIn = groupCodeArr.map((c) => `'${c}'`).join(", ");
+      let groupCodeArr = Array.isArray(group_code) ? group_code : [group_code];
+      let groupCodeIn = groupCodeArr.map((c) => `'${c.replace(/'/g, "''")}'`).join(", ");
 
+      // ตรวจสอบว่ามีออเดอร์ในกลุ่มนี้กำลังดำเนินการพ่วงจัดส่งอยู่หรือไม่
+      let checkActiveOrdersScript = `
+        SELECT o.id, o.order_no 
+        FROM tbl_order o
+        JOIN tbl_petrol p ON o.ship_to = p.ptrl_number
+        JOIN tbl_petrol_merge_job_details d ON p.ptrl_code = d.ptrl_code
+        WHERE d.ptrl_merge_group_code IN (${groupCodeIn})
+          AND d.merge_job_group_details_flag = 1
+          AND o.order_flag = '1'
+          AND o.order_status = 0
+          AND o.consignment_no IS NOT NULL
+        LIMIT 1;
+      `;
+      let activeCheckResult = await pgConn.get(
+        dbPrefix + lic_code,
+        checkActiveOrdersScript,
+        config.connectionString()
+      );
+
+      if (!activeCheckResult.code && activeCheckResult.data.length > 0) {
+        let response = [
+          {
+            status: "error",
+            invalid_code: "-5",
+            message: "ไม่สามารถลบกลุ่มพ่วงได้ เนื่องจากมีออเดอร์ในกลุ่มกำลังดำเนินการพ่วงจัดส่งอยู่",
+            data: [],
+            response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+          },
+        ];
+        res.status(200).send(response);
+
+        await xglobal.action_logs(
+          lic_code,
+          action[0].id,
+          "ลบข้อมูลกลุ่มปั๊มที่พ่วงงานกันได้",
+          JSON.stringify(req.body[0]),
+          "ไม่สามารถลบกลุ่มพ่วงได้ เนื่องจากมีออเดอร์ในกลุ่มกำลังดำเนินการพ่วงจัดส่งอยู่",
+          action[0].value,
+        );
+        return;
+      }
+
+      const transaction = await pgConn.executeTransaction(dbPrefix + lic_code, async (client) => {
         let script = `update tbl_petrol_merge_job_group set merge_job_group_flag = 0, rm_dt = '${moment().format("YYYY-MM-DD HH:mm:ss")}' where ptrl_merge_group_code in (${groupCodeIn});`;
         await pgConn.executeWithClient(
           client,
@@ -317,7 +359,94 @@ exports.setPetrolMergeJobInformation = async (req, res, next) => {
       res.status(200).send(response);
       return;
     } else {
-      // ตรวจสอบชื่อกลุ่มซ้ำ (Duplicate Check) ยกเว้นกลุ่มปัจจุบันที่กำลังแก้ไข
+      // validate ปั๊ม
+      let uniquePtrlCodes = [];
+      if (Array.isArray(ptrl_code)) {
+        uniquePtrlCodes = [...new Set(ptrl_code.filter(c => c))];
+      }
+
+      let uniqueDpoCodes = [];
+      let uniqueItmCodes = [];
+      if (Array.isArray(depot_item)) {
+        uniqueDpoCodes = [...new Set(depot_item.map(di => di.dpo_code).filter(c => c))];
+        let allItmCodes = [];
+        for (let di of depot_item) {
+          if (Array.isArray(di.itm_code)) {
+            allItmCodes.push(...di.itm_code.filter(c => c));
+          }
+        }
+        uniqueItmCodes = [...new Set(allItmCodes)];
+      }
+
+      if (uniquePtrlCodes.length === 0 || uniqueDpoCodes.length === 0 || uniqueItmCodes.length === 0) {
+        let response = [
+          {
+            status: "error",
+            invalid_code: "-1",
+            message: "ไม่สามารถบันทึกข้อมูล, กรุณาระบุปั๊มน้ำมัน คลังน้ำมัน และชนิดน้ำมันให้ครบถ้วนและถูกต้อง",
+            data: [],
+            response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+          },
+        ];
+        res.status(200).send(response);
+        return;
+      }
+
+      // validate ปั๊มน้ำมัน
+      let ptrlIn = uniquePtrlCodes.map(c => `'${c.replace(/'/g, "''")}'`).join(", ");
+      let checkPtrlScript = `SELECT COUNT(*) AS total FROM tbl_petrol WHERE ptrl_code IN (${ptrlIn}) AND ptrl_flag = '1'`;
+      let ptrlCheckRes = await pgConn.get(dbPrefix + lic_code, checkPtrlScript, config.connectionString());
+      if (ptrlCheckRes.code || parseInt(ptrlCheckRes.data[0].total) !== uniquePtrlCodes.length) {
+        let response = [
+          {
+            status: "error",
+            invalid_code: "-6",
+            message: "ไม่สามารถบันทึกข้อมูล, เนื่องจากพบรหัสปั๊มน้ำมันที่ไม่ถูกต้องหรือไม่พร้อมใช้งานในระบบ",
+            data: [],
+            response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+          },
+        ];
+        res.status(200).send(response);
+        return;
+      }
+
+      // validate คลังน้ำมัน
+      let dpoIn = uniqueDpoCodes.map(c => `'${c.replace(/'/g, "''")}'`).join(", ");
+      let checkDpoScript = `SELECT COUNT(*) AS total FROM tbl_depot WHERE dpo_code IN (${dpoIn}) AND dpo_flag = '1'`;
+      let dpoCheckRes = await pgConn.get(dbPrefix + lic_code, checkDpoScript, config.connectionString());
+      if (dpoCheckRes.code || parseInt(dpoCheckRes.data[0].total) !== uniqueDpoCodes.length) {
+        let response = [
+          {
+            status: "error",
+            invalid_code: "-7",
+            message: "ไม่สามารถบันทึกข้อมูล, เนื่องจากพบรหัสคลังน้ำมันที่ไม่ถูกต้องหรือไม่พร้อมใช้งานในระบบ",
+            data: [],
+            response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+          },
+        ];
+        res.status(200).send(response);
+        return;
+      }
+
+      // validate น้ำมัน
+      let itmIn = uniqueItmCodes.map(c => `'${c.replace(/'/g, "''")}'`).join(", ");
+      let checkItmScript = `SELECT COUNT(*) AS total FROM tbl_item WHERE itm_code IN (${itmIn}) AND itm_flag = '1'`;
+      let itmCheckRes = await pgConn.get(dbPrefix + lic_code, checkItmScript, config.connectionString());
+      if (itmCheckRes.code || parseInt(itmCheckRes.data[0].total) !== uniqueItmCodes.length) {
+        let response = [
+          {
+            status: "error",
+            invalid_code: "-8",
+            message: "ไม่สามารถบันทึกข้อมูล, เนื่องจากพบรหัสผลิตภัณฑ์น้ำมันที่ไม่ถูกต้องหรือไม่พร้อมใช้งานในระบบ",
+            data: [],
+            response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+          },
+        ];
+        res.status(200).send(response);
+        return;
+      }
+
+      // duplicate ชื่อกลุ่ม
       let check_script = `select ptrl_merge_group_desc from tbl_petrol_merge_job_group 
                           where ptrl_merge_group_desc = '${ptrl_merge_group_desc.replace(/'/g, "''")}' 
                           and ptrl_merge_group_code != '${group_code}' 
@@ -487,6 +616,95 @@ exports.addPetrolMergeJobGroupInformation = async (req, res, next) => {
       res.status(200).send(response);
       return;
     } else {
+      // 1. ตรวจสอบเงื่อนไขกลุ่มว่างเปล่า (Empty Group Check)
+      let uniquePtrlCodes = [];
+      if (Array.isArray(ptrl_code)) {
+        uniquePtrlCodes = [...new Set(ptrl_code.filter(c => c))];
+      }
+
+      let uniqueDpoCodes = [];
+      let uniqueItmCodes = [];
+      if (Array.isArray(depot_item)) {
+        uniqueDpoCodes = [...new Set(depot_item.map(di => di.dpo_code).filter(c => c))];
+        let allItmCodes = [];
+        for (let di of depot_item) {
+          if (Array.isArray(di.itm_code)) {
+            allItmCodes.push(...di.itm_code.filter(c => c));
+          }
+        }
+        uniqueItmCodes = [...new Set(allItmCodes)];
+      }
+
+      if (uniquePtrlCodes.length === 0 || uniqueDpoCodes.length === 0 || uniqueItmCodes.length === 0) {
+        let response = [
+          {
+            status: "error",
+            invalid_code: "-1",
+            message: "ไม่สามารถบันทึกข้อมูล, กรุณาระบุปั๊มน้ำมัน คลังน้ำมัน และชนิดน้ำมันให้ครบถ้วนและถูกต้อง",
+            data: [],
+            response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+          },
+        ];
+        res.status(200).send(response);
+        return;
+      }
+
+      // 2. ตรวจสอบความถูกต้องของรหัสอ้างอิง (Referential Integrity Check)
+
+      // 2.1 ตรวจสอบสถานีปั๊มน้ำมัน
+      let ptrlIn = uniquePtrlCodes.map(c => `'${c.replace(/'/g, "''")}'`).join(", ");
+      let checkPtrlScript = `SELECT COUNT(*) AS total FROM tbl_petrol WHERE ptrl_code IN (${ptrlIn}) AND ptrl_flag = '1'`;
+      let ptrlCheckRes = await pgConn.get(dbPrefix + lic_code, checkPtrlScript, config.connectionString());
+      if (ptrlCheckRes.code || parseInt(ptrlCheckRes.data[0].total) !== uniquePtrlCodes.length) {
+        let response = [
+          {
+            status: "error",
+            invalid_code: "-6",
+            message: "ไม่สามารถบันทึกข้อมูล, เนื่องจากพบรหัสปั๊มน้ำมันที่ไม่ถูกต้องหรือไม่พร้อมใช้งานในระบบ",
+            data: [],
+            response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+          },
+        ];
+        res.status(200).send(response);
+        return;
+      }
+
+      // 2.2 ตรวจสอบคลังน้ำมัน
+      let dpoIn = uniqueDpoCodes.map(c => `'${c.replace(/'/g, "''")}'`).join(", ");
+      let checkDpoScript = `SELECT COUNT(*) AS total FROM tbl_depot WHERE dpo_code IN (${dpoIn}) AND dpo_flag = '1'`;
+      let dpoCheckRes = await pgConn.get(dbPrefix + lic_code, checkDpoScript, config.connectionString());
+      if (dpoCheckRes.code || parseInt(dpoCheckRes.data[0].total) !== uniqueDpoCodes.length) {
+        let response = [
+          {
+            status: "error",
+            invalid_code: "-7",
+            message: "ไม่สามารถบันทึกข้อมูล, เนื่องจากพบรหัสคลังน้ำมันที่ไม่ถูกต้องหรือไม่พร้อมใช้งานในระบบ",
+            data: [],
+            response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+          },
+        ];
+        res.status(200).send(response);
+        return;
+      }
+
+      // 2.3 ตรวจสอบผลิตภัณฑ์น้ำมัน
+      let itmIn = uniqueItmCodes.map(c => `'${c.replace(/'/g, "''")}'`).join(", ");
+      let checkItmScript = `SELECT COUNT(*) AS total FROM tbl_item WHERE itm_code IN (${itmIn}) AND itm_flag = '1'`;
+      let itmCheckRes = await pgConn.get(dbPrefix + lic_code, checkItmScript, config.connectionString());
+      if (itmCheckRes.code || parseInt(itmCheckRes.data[0].total) !== uniqueItmCodes.length) {
+        let response = [
+          {
+            status: "error",
+            invalid_code: "-8",
+            message: "ไม่สามารถบันทึกข้อมูล, เนื่องจากพบรหัสผลิตภัณฑ์น้ำมันที่ไม่ถูกต้องหรือไม่พร้อมใช้งานในระบบ",
+            data: [],
+            response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+          },
+        ];
+        res.status(200).send(response);
+        return;
+      }
+
       // ตรวจสอบชื่อกลุ่มซ้ำ
       let check_script = `select ptrl_merge_group_desc FROM tbl_petrol_merge_job_group 
                           where ptrl_merge_group_desc = '${ptrl_merge_group_desc.replace(/'/g, "''")}' 
