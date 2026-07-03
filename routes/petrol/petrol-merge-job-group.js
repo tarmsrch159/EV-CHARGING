@@ -953,13 +953,32 @@ exports.getPetrolMergeJobDetails = async (req, res, next) => {
     } else {
       let escaped_ptrl_code = ptrl_code.replace(/'/g, "''");
 
-      let script = `select distinct 
+      let script = `select 
                       p.ptrl_code,
                       p.ptrl_number,
                       p.ptrl_desc,
                       p.ptrl_short_desc,
                       d.ptrl_merge_group_code,
-                      g.ptrl_merge_group_desc
+                      g.ptrl_merge_group_desc,
+                      coalesce(
+                          (
+                              select jsonb_agg(
+                                  jsonb_build_object(
+                                      'dpo_code', td.dpo_code,
+                                      'dpo_desc', td.dpo_desc,
+                                      'itm_code', ti.itm_code,
+                                      'itm_desc', ti.itm_desc,
+                                      'itm_material_number', ti.itm_material_number
+                                  )
+                              )
+                              from tbl_petrol_depot tpd
+                              join tbl_depot td on tpd.dpo_code = td.dpo_code and td.dpo_flag = '1'
+                              join tbl_depot_item tdi on tpd.dpo_code = tdi.dpo_code and tdi.dpo_item_flag = '1'
+                              join tbl_item ti on tdi.itm_code = ti.itm_code and ti.itm_flag = '1'
+                              where tpd.ptrl_code = p.ptrl_code and tpd.ptrl_depot_flag = '1'
+                          ),
+                          '[]'::jsonb
+                      ) as depot_item
                     from tbl_petrol_merge_job_details d
                     join tbl_petrol p on d.ptrl_code = p.ptrl_code
                     join tbl_petrol_merge_job_group g on d.ptrl_merge_group_code = g.ptrl_merge_group_code
@@ -973,7 +992,8 @@ exports.getPetrolMergeJobDetails = async (req, res, next) => {
                     and g.merge_job_group_flag = 1
                     and p.ptrl_flag = '1'
                     and p.ptrl_code <> '${escaped_ptrl_code}'
-                    limit ${limit} offset ${offset};;`;
+                    order by p.ptrl_desc asc
+                    limit ${limit} offset ${offset};`;
 
       let tbl_temporary = await pgConn.get(
         dbPrefix + lic_code,
