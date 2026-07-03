@@ -7555,7 +7555,9 @@ exports.getChildOrderInformation = async (req, res, next) => {
                 tbl_order.hana_created, tbl_order.hana_time, tbl_order.created_by, 
                 tbl_order.ist_dt, tbl_order.mdf_dt, tbl_order.rm_dt, tbl_order.auto_order,
                 COALESCE(tbl_sum_item.total_qty, 0) as total_item_qty,
-                tbl_employee.emp_name
+                tbl_employee.emp_name,
+                tbl_order.veh_type_code,
+                vt.veh_type_desc
             FROM tbl_order  
             LEFT JOIN tbl_order_type ON tbl_order.order_type = tbl_order_type.ord_type_code
             LEFT JOIN tbl_petrol_group ON tbl_petrol_group.ptrl_group_code = tbl_order.order_group
@@ -7570,6 +7572,7 @@ exports.getChildOrderInformation = async (req, res, next) => {
                 WHERE rm_dt IS NULL 
                 GROUP BY TRIM(CAST(order_no AS TEXT))
             ) tbl_sum_item ON TRIM(CAST(tbl_order.id AS TEXT)) = tbl_sum_item.order_no_text
+            LEFT JOIN tbl_vehicle_type vt on vt.veh_type_code = tbl_order.veh_type_code
         `;
 
     let dataScript = `
