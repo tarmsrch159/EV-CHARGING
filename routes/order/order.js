@@ -7403,7 +7403,7 @@ exports.getChildOrderInformation = async (req, res, next) => {
     const codeIn = managerData.data?.[0]?.ptrl_code
       ?.replace(/[\[\]'"\s]/g, "")
       .split(",")
-      .filter(Boolean);
+      .filter(Boolean) || [];
 
     let managerCodeIn = `(${codeIn.map((item) => `'${item}'`).join(", ")})`;
 
@@ -7429,9 +7429,28 @@ exports.getChildOrderInformation = async (req, res, next) => {
     } else if (is_consignment.toString().toUpperCase() === "Y") {
       conditions.push("tbl_order.consignment_no IS NOT NULL");
     }
+    // กรองออเดอร์ประเภทรถเดียวกัน
+    if (order_id.toString().toUpperCase() !== "ALL") {
+      // ดึงประเภทรถของออเดอร์
+      const parentOrderScript = `
+        select veh_type_code 
+        from tbl_order 
+        where id = '${order_id}'
+      `;
+      const parentOrderResult = await pgConn.get(
+        dbPrefix + lic_code,
+        parentOrderScript,
+        config.connectionString()
+      );
 
-    if (order_id.toString().toUpperCase() !== "ALL")
-      conditions.push(`tbl_order.id = '${order_id}'`);
+      if (!parentOrderResult.code && parentOrderResult.data.length > 0) {
+        const parentVehTypeCode = parentOrderResult.data[0].veh_type_code;
+        if (parentVehTypeCode) {
+          conditions.push(`tbl_order.veh_type_code = '${parentVehTypeCode}'`);
+        }
+      }
+
+    }
 
     if (order_no.toString().toUpperCase() !== "ALL")
       conditions.push(`tbl_order.order_no = '${order_no}'`);
@@ -7455,59 +7474,10 @@ exports.getChildOrderInformation = async (req, res, next) => {
       );
     }
 
-    // กรองออเดอร์ของปั๊มที่อยู่ภายใต้กลุ่มเดียวกันและรถคันเดียวกัน
+    // กรองออเดอร์ของปั๊มที่ถูกส่งมาโดยตรง
     if (Array.isArray(ptrl_number) && ptrl_number.length > 0) {
       const sites = ptrl_number.map((s) => `'${s}'`).join(",");
-      let ptrlCodeScript = `SELECT ptrl_code FROM tbl_petrol WHERE ptrl_number IN (${sites})`;
-      let ptrlCodeScriptResult = await pgConn.get(dbPrefix + lic_code, ptrlCodeScript, config.connectionString());
-      let ptrlCodeList = "";
-      if (!ptrlCodeScriptResult.code && ptrlCodeScriptResult.data.length > 0) {
-        ptrlCodeList = ptrlCodeScriptResult.data.map((item) => `'${item.ptrl_code}'`).join(",");
-      }
-
-      if (ptrlCodeList) {
-        conditions.push(`tbl_order.id IN (
-          select o.id   
-          from tbl_petrol_merge_job_details tpmjd 
-          left join tbl_petrol p on tpmjd.ptrl_code = p.ptrl_code 
-          left join tbl_order o on p.ptrl_number = o.ship_to 
-          left join tbl_petrol_vehicle_type tpvt on p.ptrl_code = tpvt.ptrl_code
-          left join tbl_petrol_depot tpd on p.ptrl_code = tpd.ptrl_code and tpd.rm_dt is null
-          left join tbl_order_item oi on o.id = oi.order_no and oi.rm_dt is null
-          where tpmjd.ptrl_merge_group_code in ( 
-              select ptrl_merge_group_code 
-              from tbl_petrol_merge_job_details 
-              where ptrl_code IN (${ptrlCodeList})
-                and merge_job_group_details_flag = 1 
-          )
-          and o.order_flag = '1' 
-          and o.order_status = 0
-          and o.id is not null
-          and tpvt.veh_type_code = o.veh_type_code
-          and tpd.dpo_code in (
-              select dpo_code 
-              from tbl_petrol_depot 
-              where ptrl_code IN (${ptrlCodeList})
-                and rm_dt is null
-          )
-        
-          and oi.deli_plant in (
-              select dpo_code 
-              from tbl_petrol_depot 
-              where ptrl_code IN (${ptrlCodeList})
-                and rm_dt is null
-          )
-          and o.veh_type_code in (
-              select veh_type_code 
-              from tbl_petrol_vehicle_type 
-              where ptrl_code IN (${ptrlCodeList})
-                and ptrl_vehicle_type_flag = '1'
-          )
-          and p.ptrl_code not in (${ptrlCodeList})
-        )`);
-      } else {
-        conditions.push(`tbl_order.id IS NULL`);
-      }
+      conditions.push(`tbl_order.ship_to IN (${sites})`);
     }
 
     if (
@@ -7570,7 +7540,9 @@ exports.getChildOrderInformation = async (req, res, next) => {
                 tbl_order.hana_created, tbl_order.hana_time, tbl_order.created_by, 
                 tbl_order.ist_dt, tbl_order.mdf_dt, tbl_order.rm_dt, tbl_order.auto_order,
                 COALESCE(tbl_sum_item.total_qty, 0) as total_item_qty,
-                tbl_employee.emp_name
+                tbl_employee.emp_name,
+                tbl_order.veh_type_code,
+                vt.veh_type_desc
             FROM tbl_order  
             LEFT JOIN tbl_order_type ON tbl_order.order_type = tbl_order_type.ord_type_code
             LEFT JOIN tbl_petrol_group ON tbl_petrol_group.ptrl_group_code = tbl_order.order_group
@@ -7585,6 +7557,7 @@ exports.getChildOrderInformation = async (req, res, next) => {
                 WHERE rm_dt IS NULL 
                 GROUP BY TRIM(CAST(order_no AS TEXT))
             ) tbl_sum_item ON TRIM(CAST(tbl_order.id AS TEXT)) = tbl_sum_item.order_no_text
+            LEFT JOIN tbl_vehicle_type vt on vt.veh_type_code = tbl_order.veh_type_code
         `;
 
     let dataScript = `
@@ -7604,6 +7577,8 @@ exports.getChildOrderInformation = async (req, res, next) => {
       dataScript,
       config.connectionString(),
     );
+
+    console.log(tbl_temporary)
 
     // ตรวจสอบว่า Query สำเร็จหรือไม่
     if (!tbl_temporary.code) {
