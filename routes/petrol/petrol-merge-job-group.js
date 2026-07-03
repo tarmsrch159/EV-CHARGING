@@ -402,7 +402,7 @@ exports.setPetrolMergeJobInformation = async (req, res, next) => {
         let response = [
           {
             status: "error",
-            invalid_code: "-6",
+            invalid_code: "-1",
             message: "ไม่สามารถบันทึกข้อมูล, เนื่องจากพบรหัสปั๊มน้ำมันที่ไม่ถูกต้องหรือไม่พร้อมใช้งานในระบบ",
             data: [],
             response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
@@ -420,7 +420,7 @@ exports.setPetrolMergeJobInformation = async (req, res, next) => {
         let response = [
           {
             status: "error",
-            invalid_code: "-7",
+            invalid_code: "-1",
             message: "ไม่สามารถบันทึกข้อมูล, เนื่องจากพบรหัสคลังน้ำมันที่ไม่ถูกต้องหรือไม่พร้อมใช้งานในระบบ",
             data: [],
             response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
@@ -476,7 +476,7 @@ exports.setPetrolMergeJobInformation = async (req, res, next) => {
         let response = [
           {
             status: "error",
-            invalid_code: "-8",
+            invalid_code: "-1",
             message: errorMsg,
             data: [],
             response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
@@ -699,7 +699,7 @@ exports.addPetrolMergeJobGroupInformation = async (req, res, next) => {
         let response = [
           {
             status: "error",
-            invalid_code: "-6",
+            invalid_code: "-1",
             message: "ไม่สามารถบันทึกข้อมูล, เนื่องจากพบรหัสปั๊มน้ำมันที่ไม่ถูกต้องหรือไม่พร้อมใช้งานในระบบ",
             data: [],
             response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
@@ -717,7 +717,7 @@ exports.addPetrolMergeJobGroupInformation = async (req, res, next) => {
         let response = [
           {
             status: "error",
-            invalid_code: "-7",
+            invalid_code: "-1",
             message: "ไม่สามารถบันทึกข้อมูล, เนื่องจากพบรหัสคลังน้ำมันที่ไม่ถูกต้องหรือไม่พร้อมใช้งานในระบบ",
             data: [],
             response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
@@ -773,7 +773,7 @@ exports.addPetrolMergeJobGroupInformation = async (req, res, next) => {
         let response = [
           {
             status: "error",
-            invalid_code: "-8",
+            invalid_code: "-1",
             message: errorMsg,
             data: [],
             response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
@@ -798,7 +798,7 @@ exports.addPetrolMergeJobGroupInformation = async (req, res, next) => {
         let response = [
           {
             status: "error",
-            invalid_code: "-3",
+            invalid_code: "-1",
             message: `ไม่สามารถบันทึกข้อมูล, เนื่องจากมีข้อมูลกลุ่มนี้อยู่แล้ว`,
             data: [],
             response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
