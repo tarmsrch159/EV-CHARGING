@@ -42,7 +42,7 @@ exports.runSapSyncForLicense = async (lic_code) => {
 // รันทุกวันตามเวลาที่กำหนด [Default 18:00]
 exports.startOrderSapScheduler = () => {
     // .env time
-    const time = process.env.AOS_SAP_SCHEDULAR;
+    const time = process.env.AOS_SAP_SCHEDULAR || "18:00";
     const [hour, minute] = time.toString().split(':');
     const cronExpression = `${parseInt(minute)} ${parseInt(hour)} * * *`;
     console.log(`[AOS SAP Schedular] : ระบบจะดึงข้อมูลออเดอร์ SAP ทุกวันเวลา ${time} น.`);
