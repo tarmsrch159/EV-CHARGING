@@ -401,7 +401,7 @@ exports.setPetrolMergeJobInformation = async (req, res, next) => {
           {
             status: "error",
             invalid_code: "-6",
-            message: "ไม่สามารถบันทึกข้อมูล, เนื่องจากพบรหัสปั๊มน้ำมันที่ไม่ถูกต้องหรือไม่พร้อมใช้งานในระบบ",
+            message: `ไม่สามารถบันทึกข้อมูล, เนื่องจากพบรหัสปั๊มน้ำมันที่ไม่ถูกต้องหรือไม่พร้อมใช้งานในระบบ ${ptrlIn}`,
             data: [],
             response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
           },
@@ -419,7 +419,7 @@ exports.setPetrolMergeJobInformation = async (req, res, next) => {
           {
             status: "error",
             invalid_code: "-7",
-            message: "ไม่สามารถบันทึกข้อมูล, เนื่องจากพบรหัสคลังน้ำมันที่ไม่ถูกต้องหรือไม่พร้อมใช้งานในระบบ",
+            message: `ไม่สามารถบันทึกข้อมูล, เนื่องจากพบรหัสคลังน้ำมันที่ไม่ถูกต้องหรือไม่พร้อมใช้งานในระบบ ${dpoIn}`,
             data: [],
             response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
           },
@@ -437,7 +437,7 @@ exports.setPetrolMergeJobInformation = async (req, res, next) => {
           {
             status: "error",
             invalid_code: "-8",
-            message: "ไม่สามารถบันทึกข้อมูล, เนื่องจากพบรหัสผลิตภัณฑ์น้ำมันที่ไม่ถูกต้องหรือไม่พร้อมใช้งานในระบบ",
+            message: `ไม่สามารถบันทึกข้อมูล, เนื่องจากพบรหัสผลิตภัณฑ์น้ำมันที่ไม่ถูกต้องหรือไม่พร้อมใช้งานในระบบ ${itmIn}`,
             data: [],
             response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
           },
@@ -649,9 +649,7 @@ exports.addPetrolMergeJobGroupInformation = async (req, res, next) => {
         return;
       }
 
-      // 2. ตรวจสอบความถูกต้องของรหัสอ้างอิง (Referential Integrity Check)
-
-      // 2.1 ตรวจสอบสถานีปั๊มน้ำมัน
+      // validate ปั๊ม
       let ptrlIn = uniquePtrlCodes.map(c => `'${c.replace(/'/g, "''")}'`).join(", ");
       let checkPtrlScript = `SELECT COUNT(*) AS total FROM tbl_petrol WHERE ptrl_code IN (${ptrlIn}) AND ptrl_flag = '1'`;
       let ptrlCheckRes = await pgConn.get(dbPrefix + lic_code, checkPtrlScript, config.connectionString());
@@ -660,7 +658,7 @@ exports.addPetrolMergeJobGroupInformation = async (req, res, next) => {
           {
             status: "error",
             invalid_code: "-6",
-            message: "ไม่สามารถบันทึกข้อมูล, เนื่องจากพบรหัสปั๊มน้ำมันที่ไม่ถูกต้องหรือไม่พร้อมใช้งานในระบบ",
+            message: `ไม่สามารถบันทึกข้อมูล, เนื่องจากพบรหัสปั๊มน้ำมันที่ไม่ถูกต้องหรือไม่พร้อมใช้งานในระบบ ${ptrlIn}`,
             data: [],
             response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
           },
@@ -669,7 +667,7 @@ exports.addPetrolMergeJobGroupInformation = async (req, res, next) => {
         return;
       }
 
-      // 2.2 ตรวจสอบคลังน้ำมัน
+      // validate คลัง
       let dpoIn = uniqueDpoCodes.map(c => `'${c.replace(/'/g, "''")}'`).join(", ");
       let checkDpoScript = `SELECT COUNT(*) AS total FROM tbl_depot WHERE dpo_code IN (${dpoIn}) AND dpo_flag = '1'`;
       let dpoCheckRes = await pgConn.get(dbPrefix + lic_code, checkDpoScript, config.connectionString());
@@ -678,7 +676,7 @@ exports.addPetrolMergeJobGroupInformation = async (req, res, next) => {
           {
             status: "error",
             invalid_code: "-7",
-            message: "ไม่สามารถบันทึกข้อมูล, เนื่องจากพบรหัสคลังน้ำมันที่ไม่ถูกต้องหรือไม่พร้อมใช้งานในระบบ",
+            message: `ไม่สามารถบันทึกข้อมูล, เนื่องจากพบรหัสคลังน้ำมันที่ไม่ถูกต้องหรือไม่พร้อมใช้งานในระบบ ${dpoIn}`,
             data: [],
             response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
           },
@@ -687,7 +685,7 @@ exports.addPetrolMergeJobGroupInformation = async (req, res, next) => {
         return;
       }
 
-      // 2.3 ตรวจสอบผลิตภัณฑ์น้ำมัน
+      // validate น้ำมัน
       let itmIn = uniqueItmCodes.map(c => `'${c.replace(/'/g, "''")}'`).join(", ");
       let checkItmScript = `SELECT COUNT(*) AS total FROM tbl_item WHERE itm_code IN (${itmIn}) AND itm_flag = '1'`;
       let itmCheckRes = await pgConn.get(dbPrefix + lic_code, checkItmScript, config.connectionString());
@@ -696,7 +694,7 @@ exports.addPetrolMergeJobGroupInformation = async (req, res, next) => {
           {
             status: "error",
             invalid_code: "-8",
-            message: "ไม่สามารถบันทึกข้อมูล, เนื่องจากพบรหัสผลิตภัณฑ์น้ำมันที่ไม่ถูกต้องหรือไม่พร้อมใช้งานในระบบ",
+            message: `ไม่สามารถบันทึกข้อมูล, เนื่องจากพบรหัสผลิตภัณฑ์น้ำมันที่ไม่ถูกต้องหรือไม่พร้อมใช้งานในระบบ ${itmIn}`,
             data: [],
             response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
           },
