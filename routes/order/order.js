@@ -7421,7 +7421,7 @@ exports.getChildOrderInformation = async (req, res, next) => {
     // =========================================================================
     // สร้าง Dynamic WHERE Clause สำหรับ Query หลัก (ดึงข้อมูล Order)
     // =========================================================================
-    let conditions = ["tbl_order.rm_dt IS NULL", "tbl_order.order_flag = '1'"];
+    let conditions = ["tbl_order.rm_dt IS NULL", "tbl_order.order_flag = '1'", "tbl_order.auto_order = 0"];
 
     // ======== N = ไม่แสดงข้อมูลออเดอร์ที่ยังไม่ถูกพ่วง , Y = แสดงข้อมูลออเดอร์ที่ถูกพ่วง  ========
     if (is_consignment.toString().toUpperCase() === "N") {
