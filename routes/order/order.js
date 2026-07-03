@@ -7403,7 +7403,7 @@ exports.getChildOrderInformation = async (req, res, next) => {
     const codeIn = managerData.data?.[0]?.ptrl_code
       ?.replace(/[\[\]'"\s]/g, "")
       .split(",")
-      .filter(Boolean);
+      .filter(Boolean) || [];
 
     let managerCodeIn = `(${codeIn.map((item) => `'${item}'`).join(", ")})`;
 
