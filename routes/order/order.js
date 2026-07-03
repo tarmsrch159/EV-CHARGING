@@ -7429,9 +7429,28 @@ exports.getChildOrderInformation = async (req, res, next) => {
     } else if (is_consignment.toString().toUpperCase() === "Y") {
       conditions.push("tbl_order.consignment_no IS NOT NULL");
     }
+    // กรองออเดอร์ประเภทรถเดียวกัน
+    if (order_id.toString().toUpperCase() !== "ALL") {
+      // ดึงประเภทรถของออเดอร์
+      const parentOrderScript = `
+        select veh_type_code 
+        from tbl_order 
+        where id = '${order_id}'
+      `;
+      const parentOrderResult = await pgConn.get(
+        dbPrefix + lic_code,
+        parentOrderScript,
+        config.connectionString()
+      );
 
-    if (order_id.toString().toUpperCase() !== "ALL")
-      conditions.push(`tbl_order.id = '${order_id}'`);
+      if (!parentOrderResult.code && parentOrderResult.data.length > 0) {
+        const parentVehTypeCode = parentOrderResult.data[0].veh_type_code;
+        if (parentVehTypeCode) {
+          conditions.push(`tbl_order.veh_type_code = '${parentVehTypeCode}'`);
+        }
+      }
+
+    }
 
     if (order_no.toString().toUpperCase() !== "ALL")
       conditions.push(`tbl_order.order_no = '${order_no}'`);
