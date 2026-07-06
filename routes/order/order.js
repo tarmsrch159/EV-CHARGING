@@ -6432,6 +6432,24 @@ exports.addLinkedOrderInformation = async (req, res, next) => {
     const transactionResult = await pgConn.runTransaction(
       dbPrefix + lic_code,
       async (client) => {
+        // ตรวจสอบว่าประเภทรถนั้นพ่วงได้สูงสุดกี่ออเดอร์
+        if (child_order_id && child_order_id.length > 0) {
+          const getVehTypeRes = await client.query(
+            `select o.veh_type_code, vt.max_merg, vt.veh_type_desc 
+             from tbl_order o
+             left join tbl_vehicle_type vt ON o.veh_type_code = vt.veh_type_code
+             where o.id = any($1) and o.rm_dt is null and o.veh_type_code is not null limit 1`,
+            [child_order_id]
+          );
+          if (getVehTypeRes.rows.length > 0) {
+            const { max_merg, veh_type_desc } = getVehTypeRes.rows[0];
+            const maxMergeLimit = parseInt(max_merg);
+            const totalOrders = child_order_id.length + 1;
+            if (maxMergeLimit > 0 && totalOrders > maxMergeLimit) {
+              throw new Error(`ประเภทรถ ${veh_type_desc} จำกัดการพ่วงออเดอร์ได้สูงสุด ${maxMergeLimit} ออเดอร์ (ออเดอร์ที่เลือกพ่วงมีทั้งหมด ${totalOrders} ออเดอร์)`);
+            }
+          }
+        }
         const consignment_no =
           "csmn-" +
           moment().format("YYYYMMDD") +
@@ -11025,3 +11043,7 @@ exports.getOrderSapSchedule = async (req, res, next) => {
   });
 
 };
+
+
+
+
