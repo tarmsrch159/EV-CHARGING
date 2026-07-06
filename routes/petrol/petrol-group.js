@@ -823,27 +823,6 @@ exports.setPetrolGroupInformation = async (req, res, next) => {
           }
         }
 
-        // เคลียร์ปั๊มที่เคยอยู่ในกลุ่มปั๊มออกเมื่อมีการอัพเดตใหม่แล้วจังหวัดของปั๊มไม่ได้อยู่ในกลุ่มปั๊มนั้นแล้ว
-        const clearPetrolGroupScript = `
-          update tbl_petrol 
-          set 
-              ptrl_group_code = null,
-              mdf_dt = '${moment().format("YYYY-MM-DD HH:mm:ss")}'
-          where ptrl_group_code = '${ptrl_group_code}'
-            and (prov_code, amph_code, tamb_code) not in (
-              select prov_code, amph_code, tamb_code 
-              from tbl_petrol_group_address 
-              where ptrl_group_code = '${ptrl_group_code}' 
-                and flag = '1'
-            )
-            and ptrl_flag = '1'
-            and rm_dt is null;
-        `;
-        await pgConn.execute(
-          dbPrefix + lic_code,
-          clearPetrolGroupScript,
-          config.connectionString()
-        );
 
         // อัพเดตกลุ่มปั๊มใหม่ให้กับปั๊มที่อยู่ภายใต้โซนใหม่ที่มีการแก้ไขหรือสร้างใหม่
         const updatePetrolGroupScript = `
@@ -865,6 +844,9 @@ exports.setPetrolGroupInformation = async (req, res, next) => {
           updatePetrolGroupScript,
           config.connectionString()
         );
+
+
+
 
         //debugger
         let response = [
@@ -1053,7 +1035,6 @@ exports.addPetrolGroupInformation = async (req, res, next) => {
         config.connectionString(),
       );
 
-      console.log(tbl_temporary0);
       if (!tbl_temporary0.code) {
         if (tbl_temporary0.data.length > 0) {
           let response = [
@@ -1156,27 +1137,7 @@ exports.addPetrolGroupInformation = async (req, res, next) => {
           }
         }
 
-        // เคลียร์ปั๊มที่เคยสังกัดกลุ่มนี้ แต่ที่อยู่ไมู่อยู่ในพื้นที่ของกลุ่มนี้แล้ว
-        const clearPetrolGroupScript = `
-          update tbl_petrol 
-          set 
-              ptrl_group_code = null,
-              mdf_dt = '${moment().format("YYYY-MM-DD HH:mm:ss")}'
-          where ptrl_group_code = '${ptrl_group_code}'
-            and (prov_code, amph_code, tamb_code) not in (
-              select prov_code, amph_code, tamb_code 
-              from tbl_petrol_group_address 
-              where ptrl_group_code = '${ptrl_group_code}' 
-                and flag = '1'
-            )
-            and ptrl_flag = '1'
-            and rm_dt is null;
-        `;
-        await pgConn.execute(
-          dbPrefix + lic_code,
-          clearPetrolGroupScript,
-          config.connectionString()
-        );
+
 
         // อัพเดตกลุ่มปั๊มใหม่ให้กับปั๊มที่อยู่ภายใต้โซนใหม่ที่มีการแก้ไขหรือสร้างใหม่
         const updatePetrolGroupScript = `
