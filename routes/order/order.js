@@ -7295,12 +7295,11 @@ exports.getChildOrderInformation = async (req, res, next) => {
         getPetrolVehicleType,
         config.connectionString()
       );
-      console.log('Vehicle Type : ', getPetrolVehicleTypeResult)
       if (!getPetrolVehicleTypeResult.code && getPetrolVehicleTypeResult.data.length > 0) {
-        const getPetrolVehicleTypeCode = getPetrolVehicleTypeResult.data[0].veh_type_code;
-        if (getPetrolVehicleTypeCode) {
-          conditions.push(`tbl_order.veh_type_code = '${getPetrolVehicleTypeCode}'`);
-        }
+        const vehicleTypeCode = getPetrolVehicleTypeResult.data
+          .map((item) => `'${item.veh_type_code}'`)
+          .join(",");
+        conditions.push(`tbl_order.veh_type_code in (${vehicleTypeCode})`);
       }
     }
 
@@ -7439,7 +7438,7 @@ exports.getChildOrderInformation = async (req, res, next) => {
       config.connectionString(),
     );
 
-    console.log(tbl_temporary)
+
 
     // ตรวจสอบว่า Query สำเร็จหรือไม่
     if (!tbl_temporary.code) {
