@@ -64,7 +64,7 @@ exports.getPetrolVehicleTypeInformation = async (req, res, next) => {
                 left join tbl_vehicle_type on tbl_petrol_vehicle_type.veh_type_code = tbl_vehicle_type.veh_type_code 
                 left join tbl_petrol_group on tbl_petrol.ptrl_group_code = tbl_petrol_group.ptrl_group_code 
                 where tbl_petrol_vehicle_type.ptrl_vehicle_type_flag = '1' and ptrl_vehicle_type_code is not null 
-                and tbl_petrol_vehicle_type.veh_type_code = '${veh_type_code}' `;
+                and tbl_petrol_vehicle_type.veh_type_code = '${veh_type_code}' and tbl_petrol_vehicle_type.ptrl_vehicle_type_flag = '1' and tbl_vehicle_type.veh_type_flag = '1' `;
       } else {
         script = `select
                 ptrl_vehicle_type_code,
@@ -86,7 +86,7 @@ exports.getPetrolVehicleTypeInformation = async (req, res, next) => {
                 left join tbl_petrol_vehicle_type on tbl_petrol.ptrl_code = tbl_petrol_vehicle_type.ptrl_code 
                 left join tbl_vehicle_type on tbl_petrol_vehicle_type.veh_type_code = tbl_vehicle_type.veh_type_code 
                 left join tbl_petrol_group on tbl_petrol.ptrl_group_code = tbl_petrol_group.ptrl_group_code 
-                where tbl_petrol_vehicle_type.ptrl_vehicle_type_flag = '1' and ptrl_vehicle_type_code is not null `;
+                where tbl_petrol_vehicle_type.ptrl_vehicle_type_flag = '1' and ptrl_vehicle_type_code is not null  and tbl_vehicle_type.veh_type_flag = '1'  `;
       }
 
       if (ptrl_code.toString().toUpperCase() != "ALL") {
