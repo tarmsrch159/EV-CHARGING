@@ -823,6 +823,49 @@ exports.setPetrolGroupInformation = async (req, res, next) => {
           }
         }
 
+        // เคลียร์ปั๊มที่เคยอยู่ในกลุ่มปั๊มออกเมื่อมีการอัพเดตใหม่แล้วจังหวัดของปั๊มไม่ได้อยู่ในกลุ่มปั๊มนั้นแล้ว
+        const clearPetrolGroupScript = `
+          update tbl_petrol 
+          set 
+              ptrl_group_code = null,
+              mdf_dt = '${moment().format("YYYY-MM-DD HH:mm:ss")}'
+          where ptrl_group_code = '${ptrl_group_code}'
+            and (prov_code, amph_code, tamb_code) not in (
+              select prov_code, amph_code, tamb_code 
+              from tbl_petrol_group_address 
+              where ptrl_group_code = '${ptrl_group_code}' 
+                and flag = '1'
+            )
+            and ptrl_flag = '1'
+            and rm_dt is null;
+        `;
+        await pgConn.execute(
+          dbPrefix + lic_code,
+          clearPetrolGroupScript,
+          config.connectionString()
+        );
+
+        // อัพเดตกลุ่มปั๊มใหม่ให้กับปั๊มที่อยู่ภายใต้โซนใหม่ที่มีการแก้ไขหรือสร้างใหม่
+        const updatePetrolGroupScript = `
+          update tbl_petrol 
+          set 
+              ptrl_group_code = '${ptrl_group_code}',
+              mdf_dt = '${moment().format("YYYY-MM-DD HH:mm:ss")}'
+          where (prov_code, amph_code, tamb_code) in (
+            select prov_code, amph_code, tamb_code 
+            from tbl_petrol_group_address 
+            where ptrl_group_code = '${ptrl_group_code}' 
+              and flag = '1'
+          )
+            and ptrl_flag = '1'
+            and rm_dt is null;
+        `;
+        await pgConn.execute(
+          dbPrefix + lic_code,
+          updatePetrolGroupScript,
+          config.connectionString()
+        );
+
         //debugger
         let response = [
           {
@@ -927,6 +970,9 @@ exports.addPetrolGroupInformation = async (req, res, next) => {
       res.status(200).send(response);
       return;
     } else {
+      const provCodes = [];
+      const amphureCodes = []
+      const tambonCodes = []
       // Validation: Ensure address structure is complete
       if (
         address != undefined &&
@@ -934,6 +980,9 @@ exports.addPetrolGroupInformation = async (req, res, next) => {
         address.length > 0
       ) {
         for (const prov of address) {
+          if (prov.prov_code) {
+            provCodes.push(`'${prov.prov_code}'`);
+          }
           const districts = prov.districts || prov.district;
           if (
             !prov.prov_code ||
@@ -1106,6 +1155,49 @@ exports.addPetrolGroupInformation = async (req, res, next) => {
             });
           }
         }
+
+        // เคลียร์ปั๊มที่เคยสังกัดกลุ่มนี้ แต่ที่อยู่ไมู่อยู่ในพื้นที่ของกลุ่มนี้แล้ว
+        const clearPetrolGroupScript = `
+          update tbl_petrol 
+          set 
+              ptrl_group_code = null,
+              mdf_dt = '${moment().format("YYYY-MM-DD HH:mm:ss")}'
+          where ptrl_group_code = '${ptrl_group_code}'
+            and (prov_code, amph_code, tamb_code) not in (
+              select prov_code, amph_code, tamb_code 
+              from tbl_petrol_group_address 
+              where ptrl_group_code = '${ptrl_group_code}' 
+                and flag = '1'
+            )
+            and ptrl_flag = '1'
+            and rm_dt is null;
+        `;
+        await pgConn.execute(
+          dbPrefix + lic_code,
+          clearPetrolGroupScript,
+          config.connectionString()
+        );
+
+        // อัพเดตกลุ่มปั๊มใหม่ให้กับปั๊มที่อยู่ภายใต้โซนใหม่ที่มีการแก้ไขหรือสร้างใหม่
+        const updatePetrolGroupScript = `
+          update tbl_petrol 
+          set 
+              ptrl_group_code = '${ptrl_group_code}',
+              mdf_dt = '${moment().format("YYYY-MM-DD HH:mm:ss")}'
+          where (prov_code, amph_code, tamb_code) in (
+            select prov_code, amph_code, tamb_code 
+            from tbl_petrol_group_address 
+            where ptrl_group_code = '${ptrl_group_code}' 
+              and flag = '1'
+          )
+            and ptrl_flag = '1'
+            and rm_dt is null;
+        `;
+        await pgConn.execute(
+          dbPrefix + lic_code,
+          updatePetrolGroupScript,
+          config.connectionString()
+        );
 
         //debugger
         let response = [
