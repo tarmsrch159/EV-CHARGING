@@ -7355,6 +7355,7 @@ exports.getChildOrderInformation = async (req, res, next) => {
       page_limit,
       action,
       is_consignment,
+      main_ptrl_code
     } = req.body[0] || {};
 
     // กำหนด Default Values ให้กับตัวแปรสำคัญที่ไม่ได้ส่งมา
@@ -7450,6 +7451,22 @@ exports.getChildOrderInformation = async (req, res, next) => {
         }
       }
 
+    }
+
+    if (main_ptrl_code.toString().toUpperCase() !== "ALL") {
+      let getPetrolVehicleType = `select veh_type_code from tbl_petrol_vehicle_type where ptrl_code = '${main_ptrl_code}' and ptrl_vehicle_type_flag = '1' and rm_dt is null`
+      let getPetrolVehicleTypeResult = await pgConn.get(
+        dbPrefix + lic_code,
+        getPetrolVehicleType,
+        config.connectionString()
+      );
+      console.log('Vehicle Type : ', getPetrolVehicleTypeResult)
+      if (!getPetrolVehicleTypeResult.code && getPetrolVehicleTypeResult.data.length > 0) {
+        const getPetrolVehicleTypeCode = getPetrolVehicleTypeResult.data[0].veh_type_code;
+        if (getPetrolVehicleTypeCode) {
+          conditions.push(`tbl_order.veh_type_code = '${getPetrolVehicleTypeCode}'`);
+        }
+      }
     }
 
     if (order_no.toString().toUpperCase() !== "ALL")
@@ -7577,7 +7594,6 @@ exports.getChildOrderInformation = async (req, res, next) => {
             OFFSET (${page_index} * ${page_limit}) LIMIT ${page_limit};
         `;
 
-    console.log(dataScript)
 
     // =========================================================================
     // Execute Query หลัก และประมวลผลผลลัพธ์เพื่อส่ง Response
