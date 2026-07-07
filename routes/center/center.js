@@ -56,6 +56,8 @@ const tbl_vehicle_unavailable_type = require("./script/tbl_vehicle_unavailable_t
 const tbl_vehicle_unavailable = require("./script/tbl_vehicle_unavailable");
 const tbl_vehicle = require("./script/tbl_vehicle");
 const tbl_order_compartment = require("./script/tbl_order_compartment");
+const tbl_menu = require("./script/tbl_menu");
+const tbl_menu_permission = require("./script/tbl_menu_permission");
 
 const dCreate = async (database) => {
 
@@ -266,6 +268,14 @@ const dCreate = async (database) => {
 
             if (xresult) {
                 xresult = await tbl_order_compartment.execute(database);
+            }
+
+            if (xresult) {
+                xresult = await tbl_menu.execute(database);
+            }
+
+            if (xresult) {
+                xresult = await tbl_menu_permission.execute(database);
             }
         }
     }

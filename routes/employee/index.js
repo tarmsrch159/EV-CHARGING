@@ -3,6 +3,7 @@ const router = express.Router();
 const employee = require('./employee');
 const employee_group = require('./employee-group');
 const employee_role = require('./employee-role');
+const menu_permission = require('./menu-permission');
 
 //employee
 router.post('/information', employee.getEmployeeInformation);
@@ -19,5 +20,20 @@ router.put('/group/information', employee_group.addEmployeeGroupInformation);
 
 //role
 router.post('/role/information', employee_role.getEmployeeRoleInformation);
+
+//menu
+router.post('/menu/information', menu_permission.getMenuInformation);
+router.put('/menu/information', menu_permission.addMenuInformation);
+router.patch('/menu/information', menu_permission.setMenuInformation);
+router.delete('/menu/information', menu_permission.removeMenu);
+
+//menu-permission
+router.post('/menu/permission/information', menu_permission.getMenuPermissionInformation);
+router.put('/menu/permission/information', menu_permission.addMenuPermissionInformation);
+router.patch('/menu/permission/information', menu_permission.setMenuPermissionInformation);
+router.delete('/menu/permission/information', menu_permission.removeMenuPermission);
+
+// permission status
+router.post('/menu/permission/check', menu_permission.getMenuPermissionCheck);
 
 module.exports = router;
