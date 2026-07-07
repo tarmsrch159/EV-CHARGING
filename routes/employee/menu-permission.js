@@ -703,9 +703,9 @@ exports.getMenuPermissionCheck = async (req, res, next) => {
           menu_group: row.menu_group,
           menu_parent_code: row.menu_parent_code || null,
           display: row.display === 1 || row.display === '1',
-          edit: row.edit === 1 || row.edit === '1',
           create_perm: row.create_perm === 1 || row.create_perm === '1',
-          delete_perm: row.delete_perm === 1 || row.delete_perm === '1'
+          // edit: row.edit === 1 || row.edit === '1',
+          // delete_perm: row.delete_perm === 1 || row.delete_perm === '1'
         }));
 
         const parentMap = {};
