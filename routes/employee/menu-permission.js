@@ -523,68 +523,76 @@ exports.setMenuPermissionInformation = async (req, res, next) => {
   return (async () => {
     let lic_code = req.header("lic_code");
     if (!req.body || req.body.length === 0) {
-      return res.status(200).send([{
-        status: "error",
-        invalid_code: "-1",
-        message: "ข้อมูลพารามิเตอร์ไม่ถูกต้อง",
-        data: xresult,
-        response_time: moment().format("YYYY-MM-DD HH:mm:ss")
-      }]);
+      return xglobal.sendResponse(res, "error", "-1", "ข้อมูลพารามิเตอร์ไม่ถูกต้อง");
     }
+    const { menu, action } = req.body[0]
 
-    let { emp_role_code, menu_code, display, edit, create_perm, delete_perm, action } = req.body[0];
-    if (emp_role_code == undefined || menu_code == undefined || display == undefined || edit == undefined || lic_code == undefined || action == undefined) {
-      return res.status(200).send([{
-        status: "error",
-        invalid_code: "-1",
-        message: "ไม่สามารถแก้ไขข้อมูล, เนื่องจากข้อมูลพารามิเตอร์ไม่ถูกต้อง",
-        data: xresult,
-        response_time: moment().format("YYYY-MM-DD HH:mm:ss")
-      }]);
-    }
 
     const database = dbPrefix + lic_code;
+    const items = Array.isArray(menu) ? menu : [menu];
+    const updatedItems = [];
+    let hasError = false;
+    let errorMessage = "";
 
-    let updateScript = `update tbl_menu_permission 
-                        set display = '${display || 0}', 
-                            edit = '${edit || 0}', 
-                            create_perm = '${create_perm || 0}', 
-                            delete_perm = '${delete_perm || 0}', 
-                            mdf_dt = '${moment().format("YYYY-MM-DD HH:mm:ss")}',
-                            rm_dt = null
-                        where emp_role_code = '${emp_role_code}' and menu_code = '${menu_code}'`;
+    // for loop update menu permission
+    for (const item of items) {
+      let { emp_role_code, menu_code, display, edit, create_perm, delete_perm } = item;
 
-    let executeRes = await pgConn.execute(database, updateScript, config.connectionString());
-    if (!executeRes.code) {
-      res.status(200).send([{
-        status: "success",
-        invalid_code: "0",
-        message: "แก้ไขสิทธิ์การใช้งานเมนูสำเร็จ",
-        data: [{ emp_role_code: emp_role_code, menu_code: menu_code }],
-        response_time: moment().format("YYYY-MM-DD HH:mm:ss")
-      }]);
-      await xglobal.action_logs(lic_code, action[0].id, "แก้ไขสิทธิ์การใช้งานเมนู", JSON.stringify(req.body[0]), "success", action[0].value);
-    } else {
-      res.status(200).send([{
-        status: "error",
-        invalid_code: "-3",
-        message: "ไม่สามารถแก้ไขข้อมูล, กรุณาลองใหม่อีกครั้ง",
-        data: xresult,
-        response_time: moment().format("YYYY-MM-DD HH:mm:ss")
-      }]);
-      await xglobal.action_logs(lic_code, action[0].id, "แก้ไขสิทธิ์การใช้งานเมนู", JSON.stringify(req.body[0]), "ไม่สามารถแก้ไขข้อมูล", action[0].value);
+      if (emp_role_code == undefined || menu_code == undefined || display == undefined || edit == undefined || lic_code == undefined || action == undefined) {
+        hasError = true;
+        errorMessage = "ข้อมูลพารามิเตอร์ไม่ถูกต้อง";
+        continue;
+      }
+      // update main menu permission
+      let updateScript = `update tbl_menu_permission 
+                          set display = '${display || 0}', 
+                              edit = '${edit || 0}', 
+                              create_perm = '${create_perm || 0}', 
+                              delete_perm = '${delete_perm || 0}', 
+                              mdf_dt = '${moment().format("YYYY-MM-DD HH:mm:ss")}',
+                              rm_dt = null
+                          where emp_role_code = '${emp_role_code}' and menu_code = '${menu_code}'`;
+
+      let executeRes = await pgConn.execute(database, updateScript, config.connectionString());
+      if (!executeRes.code) {
+        updatedItems.push({ emp_role_code, menu_code });
+        await xglobal.action_logs(lic_code, action[0].id, "แก้ไขสิทธิ์การใช้งานเมนู", JSON.stringify(item), "success", action[0].value);
+
+        // disable main menu then children menu are disabled
+        if (display === 0 || display === '0') {
+          let disableChildrenScript = `update tbl_menu_permission 
+                                       set display = 0, 
+                                           edit = 0, 
+                                           create_perm = 0, 
+                                           delete_perm = 0, 
+                                           mdf_dt = '${moment().format("YYYY-MM-DD HH:mm:ss")}'
+                                       where emp_role_code = '${emp_role_code}' 
+                                         and menu_code in (
+                                           select menu_code from tbl_menu where menu_parent_code = '${menu_code}'
+                                         )`;
+          await pgConn.execute(database, disableChildrenScript, config.connectionString());
+          console.log(disableChildrenScript)
+        }
+
+      } else {
+        hasError = true;
+        errorMessage = "ไม่สามารถแก้ไขข้อมูลได้ทั้งหมด, กรุณาลองใหม่อีกครั้ง";
+      }
     }
+
+    if (hasError && updatedItems.length === 0) {
+      return xglobal.sendResponse(res, "error", "-3", errorMessage || "ไม่สามารถแก้ไขข้อมูล, กรุณาลองใหม่อีกครั้ง");
+    }
+
+    return xglobal.sendResponse(res, "success", "0", "แก้ไขสิทธิ์การใช้งานเมนูสำเร็จ", updatedItems);
   })().catch(async (err) => {
     console.log(err);
-    res.status(200).send([{
-      status: "error",
-      invalid_code: "-4",
-      message: "ไม่สามารถแก้ไขข้อมูล, กรุณาลองใหม่อีกครั้ง",
-      data: xresult,
-      response_time: moment().format("YYYY-MM-DD HH:mm:ss")
-    }]);
+    return xglobal.sendResponse(res, "error", "-4", "ไม่สามารถแก้ไขข้อมูล, กรุณาลองใหม่อีกครั้ง");
   });
 };
+
+
+
 
 // ลบ menu permission [Soft delete]
 exports.removeMenuPermission = async (req, res, next) => {
