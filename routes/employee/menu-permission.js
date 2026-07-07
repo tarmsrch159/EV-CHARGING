@@ -682,7 +682,7 @@ exports.getMenuPermissionCheck = async (req, res, next) => {
     }
 
     const database = dbPrefix + lic_code;
-    let script = `select tm.menu_no, tm.menu_code, tm.menu_desc, tm.menu_group, tm.menu_parent_code, tmp.display, tmp.create_perm, tmp.emp_role_code
+    let script = `select tm.menu_no, tm.menu_code, tm.menu_desc, tm.menu_group, tm.menu_parent_code, tmp.display, tmp.edit, tmp.create_perm, tmp.delete_perm, tmp.emp_role_code
                   from tbl_menu_permission tmp
                   inner join tbl_menu tm on tmp.menu_code = tm.menu_code
                   where tm.menu_flag = '1' and tmp.rm_dt is null`;
@@ -703,9 +703,9 @@ exports.getMenuPermissionCheck = async (req, res, next) => {
           menu_group: row.menu_group,
           menu_parent_code: row.menu_parent_code || null,
           display: row.display === 1 || row.display === '1',
+          edit: row.edit === 1 || row.edit === '1',
           create_perm: row.create_perm === 1 || row.create_perm === '1',
-          // edit: row.edit === 1 || row.edit === '1',
-          // delete_perm: row.delete_perm === 1 || row.delete_perm === '1'
+          delete_perm: row.delete_perm === 1 || row.delete_perm === '1'
         }));
 
         const parentMap = {};
