@@ -8812,10 +8812,10 @@ exports.addOrderInformationWithSAPV2 = async (req, res, next) => {
       // Loop ตรวจสอบทีละ Material (ที่รวมจำนวนแล้ว)
       let SumCurrentQty = 0.0;
       for (let i = 0; i < validationItems.length; i++) {
-        var item_quantity_check = validationItems[i].item_quantity;
-        var itm_material_number = validationItems[i].itm_material_number;
+        let item_quantity_check = validationItems[i].item_quantity;
+        let itm_material_number = validationItems[i].itm_material_number;
 
-        let scriptCheckItem = `SELECT itm_desc from tbl_item where itm_material_number = '${itm_material_number}' and itm_flag = '1'`;
+        let scriptCheckItem = `SELECT itm_desc from tbl_item where itm_material_number = '${itm_material_number}' and itm_flag = '1' LIMIT 1`;
         console.log("scriptCheckItem", scriptCheckItem);
         let checkItemResult = await pgConn.get(
           dbPrefix + lic_code,
@@ -8846,176 +8846,223 @@ exports.addOrderInformationWithSAPV2 = async (req, res, next) => {
         SumCurrentQty += currentQty;
 
         if (i == validationItems.length - 1) {
-          debugger;
-          var veh_type_code = "";
+          //debugger;
+          veh_type_code = "";
           //get vehicle type
-          xscript = `select level, veh_type_code, veh_type_desc, capacity_max, capacity_min
-              from 
-              ((select 0 as level,tpvt.veh_type_code, tvt.veh_type_desc ,tvt.capacity_max, tvt.capacity_min 
-              from tbl_petrol_vehicle_type tpvt 
-              left join tbl_vehicle_type tvt on tpvt.veh_type_code = tpvt.veh_type_code 
-              where tpvt.ptrl_code = '${resultPetrol.data[0].ptrl_code}'
-
-              union
-
-              select 1 as level,tvt.veh_type_code, tvt.veh_type_desc ,tvt.capacity_max, tvt.capacity_min 
-              from tbl_vehicle_type tvt where capacity_min < ${SumCurrentQty}  
-              and capacity_max >= ${SumCurrentQty}
-
-              union
-
-              select 2 as level,tvt.veh_type_code, tvt.veh_type_desc ,tvt.capacity_max, tvt.capacity_min 
-              from tbl_vehicle_type tvt where tvt.veh_type_code in 
-              (select veh_type_code from tbl_vehicle_type order by capacity_max desc limit 1))) xtable 
-              order by xtable."level" asc`;
+          xscript = `select 0 as level,tpvt.veh_type_code, tvt.veh_type_desc ,tvt.capacity_max, tvt.capacity_min, tpvt.ptrl_vehicle_type_flag
+          from tbl_petrol_vehicle_type tpvt 
+          inner join tbl_vehicle_type tvt on tpvt.veh_type_code = tvt.veh_type_code 
+          where tpvt.ptrl_code = '${resultPetrol.data[0].ptrl_code}' 
+          and tpvt.ptrl_vehicle_type_flag = '1' and tvt.veh_type_flag = '1' 
+          and ${SumCurrentQty} >= tvt.capacity_min 
+          and ${SumCurrentQty} <= tvt.capacity_max;`;
 
           let db_createorder2 = await pgConn.get(
             dbPrefix + lic_code,
             xscript,
             config.connectionString(),
           );
+
           if (!db_createorder2.code) {
-            if (db_createorder2.data.length > 0) {
-              veh_type_code = db_createorder2.data[0].veh_type_code;
-            }
-          }
+            let xpassed = false;
+            if (db_createorder2.data.length <= 0) {
+              xscript = `select level, veh_type_code, veh_type_desc, capacity_max, capacity_min
+              from 
+              ((select 0 as level,tpvt.veh_type_code, tvt.veh_type_desc ,tvt.capacity_max, tvt.capacity_min 
+              from tbl_petrol_vehicle_type tpvt 
+              left join tbl_vehicle_type tvt on tpvt.veh_type_code = tpvt.veh_type_code 
+              where tpvt.ptrl_code = '${resultPetrol.data[0].ptrl_code}' 
+              and capacity_min < ${SumCurrentQty} 
+              and capacity_max >= ${SumCurrentQty} 
 
-          if (veh_type_code != "") {
-            xscript = `select tvt.veh_type_code, tvt.veh_type_desc, tvt.veh_qty, tvt.capacity_min, tvt.capacity_max,
-                compartment_no, compartment_total, vect_compartment_level_id, veh_compartment_type_level_number, veh_compartment_type_level,
-                '' as automatic_code ,'' as ptrl_code, '' as tank_code, '' as itm_code 
-                from tbl_vehicle_type tvt
-                left join tbl_vehicle_type_compartment tvtim on tvt.veh_type_code = tvtim.veh_type_code 
-                left join tbl_vehicle_type_compartment_level tvtlev on tvtim.id = tvtlev.compartment_item_id  
-                where tvt.veh_type_code = '${veh_type_code}' and tvtlev.veh_compartment_type_level_flag = '1'
-                order by tvtim.compartment_no asc, tvtlev.veh_compartment_type_level_number asc`;
+              union
 
-            let db_createorder3 = await pgConn.get(
-              dbPrefix + lic_code,
-              xscript,
-              config.connectionString(),
-            );
+              select 1 as level,tvt.veh_type_code, tvt.veh_type_desc ,tvt.capacity_max, tvt.capacity_min 
+              from tbl_vehicle_type tvt where capacity_min < ${SumCurrentQty}  
+              and capacity_max >= ${SumCurrentQty} 
 
-            if (!db_createorder3.code) {
-              if (db_createorder3.data.length > 0) {
-                var compartments = [];
-                var xcompartment_no = "";
-                var xlevel = [];
-                for (
-                  var xcomp = 0;
-                  xcomp <= db_createorder3.data.length - 1;
-                  xcomp++
-                ) {
-                  if (
-                    xcompartment_no !=
-                    db_createorder3.data[xcomp].compartment_no
-                  ) {
-                    if (xcompartment_no == "") {
-                      xlevel = [];
-                      xcompartment_no =
-                        db_createorder3.data[xcomp].compartment_no;
-                      xlevel.push(
-                        db_createorder3.data[xcomp].veh_compartment_type_level,
-                      );
-                    } else {
-                      compartments.push({
-                        compartment_no: xcompartment_no,
-                        options: xlevel,
-                      });
+              union
 
-                      xlevel = [];
-                      xcompartment_no =
-                        db_createorder3.data[xcomp].compartment_no;
-                      xlevel.push(
-                        db_createorder3.data[xcomp].veh_compartment_type_level,
-                      );
+              select 2 as level,tvt.veh_type_code, tvt.veh_type_desc ,tvt.capacity_max, tvt.capacity_min 
+              from tbl_vehicle_type tvt where tvt.veh_type_code in 
+              (select veh_type_code from tbl_vehicle_type order by capacity_max desc limit 1)
+              and capacity_min < ${SumCurrentQty} 
+              and capacity_max >= ${SumCurrentQty})) xtable 
+              order by xtable."level" asc`
 
-                      if (xcomp == db_createorder3.data.length - 1) {
-                        compartments.push({
-                          compartment_no: xcompartment_no,
-                          options: xlevel,
-                        });
+              db_createorder2 = await pgConn.get(
+                dbPrefix + lic_code,
+                xscript,
+                config.connectionString(),
+              );
 
-                        xlevel = [];
-                      }
-                    }
-                  } else {
-                    xlevel.push(
-                      db_createorder3.data[xcomp].veh_compartment_type_level,
-                    );
-
-                    if (xcomp == db_createorder3.data.length - 1) {
-                      compartments.push({
-                        compartment_no: xcompartment_no,
-                        options: xlevel,
-                      });
-
-                      xlevel = [];
-                    }
-                  }
-                }
-
-                console.log(JSON.stringify(compartments));
-                //debugger
-                var products = [];
-                debugger;
-                order_item.forEach((item) => {
-                  products.push({
-                    product: item.ptrl_tank_code,
-                    liter: parseFloat(item.item_quantity) || 0,
-                    ref1: item.item_no,
-                    ref2: resultPetrol.data[0].ptrl_code,
-                  });
-                });
-
-                //debugger
-                var xresult = await allocateFuelDownOnly(
-                  compartments,
-                  products,
-                );
-                console.log(xresult);
-
-                if (xresult.success) {
-                  if (xresult.result.length == 0) {
-                    let response = [
-                      {
-                        status: "error",
-                        invalid_code: "-1",
-                        message: `รายการน้ำมัน (${itm_material_number}) ${item_desc} : จำนวนรวม ${currentQty} ไม่ตรงกับขนาดช่องบรรจุใดๆ ในระบบ`,
-                        data: [],
-                        response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
-                      },
-                    ];
-                    res.status(200).send(response);
-                    return;
-                  }
-                } else {
-                  let response = [
-                    {
-                      status: "error",
-                      invalid_code: "-1",
-                      message: `รายการน้ำมัน (${itm_material_number}) ${item_desc} : จำนวนรวม ${currentQty} ไม่ตรงกับขนาดช่องบรรจุใดๆ ในระบบ`,
-                      data: [],
-                      response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
-                    },
-                  ];
-                  res.status(200).send(response);
-                  return;
-                }
+              if (!db_createorder2.code) {
+                let response = [
+                  {
+                    status: "error",
+                    invalid_code: "-1",
+                    message: `ไม่มีการกำหนดประเภทรถที่เข้าปั้มได้กรุณาตรวจสอบ<br>ปริมาณของน้ำมันและการตั้งค่าประเภทรถ`,
+                    data: [],
+                    response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+                  },
+                ];
+                res.status(200).send(response);
+                return;
               }
             }
-          } else {
-            let response = [
-              {
-                status: "error",
-                invalid_code: "-1",
-                message: `รายการน้ำมัน (${itm_material_number}) ${item_desc} : จำนวนรวม ${currentQty} ไม่ตรงกับขนาดช่องบรรจุใดๆ ในระบบ`,
-                data: [],
-                response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
-              },
-            ];
-            res.status(200).send(response);
-            return;
+
+            if (db_createorder2.data.length > 0) {
+              for (
+                var xpass = 0;
+                xpass <= db_createorder2.data.length - 1;
+                xpass++
+              ) {
+                if (db_createorder2.data[xpass].veh_type_code != "") {
+                  veh_type_code = db_createorder2.data[xpass].veh_type_code;
+                  xscript = `select tvt.veh_type_code, tvt.veh_type_desc, tvt.veh_qty, tvt.capacity_min, tvt.capacity_max,
+                  compartment_no, compartment_total, vect_compartment_level_id, veh_compartment_type_level_number, veh_compartment_type_level,
+                  '' as automatic_code ,'' as ptrl_code, '' as tank_code, '' as itm_code 
+                  from tbl_vehicle_type tvt
+                  left join tbl_vehicle_type_compartment tvtim on tvt.veh_type_code = tvtim.veh_type_code 
+                  left join tbl_vehicle_type_compartment_level tvtlev on tvtim.id = tvtlev.compartment_item_id  
+                  where tvt.veh_type_code = '${veh_type_code}' and tvtlev.veh_compartment_type_level_flag = '1'
+                  order by tvtim.compartment_no asc, tvtlev.veh_compartment_type_level_number asc`;
+
+                  let db_createorder3 = await pgConn.get(
+                    dbPrefix + lic_code,
+                    xscript,
+                    config.connectionString(),
+                  );
+
+                  if (!db_createorder3.code) {
+                    if (db_createorder3.data.length > 0) {
+                      var compartments = [];
+                      var xcompartment_no = "";
+                      var xlevel = [];
+                      for (
+                        var xcomp = 0;
+                        xcomp <= db_createorder3.data.length - 1;
+                        xcomp++
+                      ) {
+                        if (
+                          xcompartment_no !=
+                          db_createorder3.data[xcomp].compartment_no
+                        ) {
+                          if (xcompartment_no == "") {
+                            xlevel = [];
+                            xcompartment_no =
+                              db_createorder3.data[xcomp].compartment_no;
+                            xlevel.push(
+                              db_createorder3.data[xcomp]
+                                .veh_compartment_type_level,
+                            );
+                          } else {
+                            compartments.push({
+                              compartment_no: xcompartment_no,
+                              options: xlevel,
+                            });
+
+                            xlevel = [];
+                            xcompartment_no =
+                              db_createorder3.data[xcomp].compartment_no;
+                            xlevel.push(
+                              db_createorder3.data[xcomp]
+                                .veh_compartment_type_level,
+                            );
+
+                            if (xcomp == db_createorder3.data.length - 1) {
+                              compartments.push({
+                                compartment_no: xcompartment_no,
+                                options: xlevel,
+                              });
+
+                              xlevel = [];
+                            }
+                          }
+                        } else {
+                          xlevel.push(
+                            db_createorder3.data[xcomp]
+                              .veh_compartment_type_level,
+                          );
+
+                          if (xcomp == db_createorder3.data.length - 1) {
+                            compartments.push({
+                              compartment_no: xcompartment_no,
+                              options: xlevel,
+                            });
+
+                            xlevel = [];
+                          }
+                        }
+                      }
+
+                      console.log(JSON.stringify(compartments));
+                      //debugger
+                      var products = [];
+                      //debugger;
+                      order_item.forEach((item) => {
+                        products.push({
+                          product: item.ptrl_tank_code,
+                          liter: parseFloat(item.item_quantity) || 0,
+                          ref1: item.item_no,
+                          ref2: resultPetrol.data[0].ptrl_code,
+                        });
+                      });
+
+                      //debugger
+                      var xresult = await allocateFuelDownOnly(
+                        compartments,
+                        products,
+                      );
+                      console.log(xresult);
+                      if (xresult.success) {
+                        if (xresult.result.length > 0) {
+                          let xSumCurrentQty = 0;
+                          for (
+                            var xcmm = 0;
+                            xcmm <= xresult.result.length - 1;
+                            xcmm++
+                          ) {
+                            xSumCurrentQty +=
+                              xresult.result[xcmm].adjusted_liter;
+                          }
+
+                          if (SumCurrentQty == xSumCurrentQty) {
+                            xpassed = true;
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+
+              if (xpassed != true) {
+                let response = [
+                  {
+                    status: "error",
+                    invalid_code: "-1",
+                    message: `รายการน้ำมันจำนวนรวม ${SumCurrentQty} ไม่สามารถจัดลงตามประเภทรถที่กำหนดได้`,
+                    data: [],
+                    response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+                  },
+                ];
+                res.status(200).send(response);
+                return;
+              }
+            } else {
+              let response = [
+                {
+                  status: "error",
+                  invalid_code: "-1",
+                  message: `ไม่มีการกำหนดประเภทรถที่เข้าปั้มได้กรุณาตรวจสอบ<br>ปริมาณของน้ำมันและการตั้งค่าประเภทรถ`,
+                  data: [],
+                  response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+                },
+              ];
+              res.status(200).send(response);
+              return;
+            }
           }
         }
       }
