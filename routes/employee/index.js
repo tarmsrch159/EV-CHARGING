@@ -33,7 +33,7 @@ router.put('/menu/permission/information', menu_permission.addMenuPermissionInfo
 router.patch('/menu/permission/information', menu_permission.setMenuPermissionInformation);
 router.delete('/menu/permission/information', menu_permission.removeMenuPermission);
 
-// permission status
+//permission status
 router.post('/menu/permission/check', menu_permission.getMenuPermissionCheck);
 
 module.exports = router;

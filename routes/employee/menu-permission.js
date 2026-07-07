@@ -525,9 +525,8 @@ exports.setMenuPermissionInformation = async (req, res, next) => {
     if (!req.body || req.body.length === 0) {
       return xglobal.sendResponse(res, "error", "-1", "ข้อมูลพารามิเตอร์ไม่ถูกต้อง");
     }
+
     const { menu, action } = req.body[0]
-
-
     const database = dbPrefix + lic_code;
     const items = Array.isArray(menu) ? menu : [menu];
     const updatedItems = [];
@@ -557,7 +556,6 @@ exports.setMenuPermissionInformation = async (req, res, next) => {
       if (!executeRes.code) {
         updatedItems.push({ emp_role_code, menu_code });
         await xglobal.action_logs(lic_code, action[0].id, "แก้ไขสิทธิ์การใช้งานเมนู", JSON.stringify(item), "success", action[0].value);
-
         // disable main menu then children menu are disabled
         if (display === 0 || display === '0') {
           let disableChildrenScript = `update tbl_menu_permission 
@@ -571,7 +569,6 @@ exports.setMenuPermissionInformation = async (req, res, next) => {
                                            select menu_code from tbl_menu where menu_parent_code = '${menu_code}'
                                          )`;
           await pgConn.execute(database, disableChildrenScript, config.connectionString());
-          console.log(disableChildrenScript)
         }
 
       } else {
@@ -587,7 +584,7 @@ exports.setMenuPermissionInformation = async (req, res, next) => {
     return xglobal.sendResponse(res, "success", "0", "แก้ไขสิทธิ์การใช้งานเมนูสำเร็จ", updatedItems);
   })().catch(async (err) => {
     console.log(err);
-    return xglobal.sendResponse(res, "error", "-4", "ไม่สามารถแก้ไขข้อมูล, กรุณาลองใหม่อีกครั้ง");
+    return xglobal.sendResponse(res, "error", "-4", xresult, "ไม่สามารถแก้ไขข้อมูล, กรุณาลองใหม่อีกครั้ง");
   });
 };
 
@@ -685,7 +682,7 @@ exports.getMenuPermissionCheck = async (req, res, next) => {
     }
 
     const database = dbPrefix + lic_code;
-    let script = `select tm.menu_no, tm.menu_code, tm.menu_desc, tm.menu_group, tm.menu_parent_code, tmp.display, tmp.edit, tmp.create_perm, tmp.delete_perm, tmp.emp_role_code
+    let script = `select tm.menu_no, tm.menu_code, tm.menu_desc, tm.menu_group, tm.menu_parent_code, tmp.display, tmp.create_perm, tmp.emp_role_code
                   from tbl_menu_permission tmp
                   inner join tbl_menu tm on tmp.menu_code = tm.menu_code
                   where tm.menu_flag = '1' and tmp.rm_dt is null`;
@@ -715,6 +712,7 @@ exports.getMenuPermissionCheck = async (req, res, next) => {
         const parents = [];
         const children = [];
 
+        // map parent code and children
         allItems.forEach(item => {
           if (!item.menu_parent_code) {
             item.children = [];
@@ -724,7 +722,7 @@ exports.getMenuPermissionCheck = async (req, res, next) => {
             children.push(item);
           }
         });
-
+        // map children code
         children.forEach(child => {
           const parent = parentMap[child.menu_parent_code];
           if (parent) {
