@@ -68,8 +68,7 @@ exports.getVehicleTypeInformationWithDetail = async (req, res, next) => {
                     cl.veh_compartment_type_level
                 from tbl_vehicle_type v
                 left join tbl_vehicle_type_compartment c on v.veh_type_code = c.veh_type_code and (c.flag = '1' or c.flag is null)
-                left join tbl_vehicle_type_compartment_level cl on c.id = cl.compartment_item_id and cl.veh_compartment_type_level_flag = '1'
-                where v.veh_type_flag = '1'`;
+                left join tbl_vehicle_type_compartment_level cl on c.id = cl.compartment_item_id and cl.veh_compartment_type_level_flag = '1'`;
 
       if (veh_type_code.toString().toUpperCase() != "ALL") {
         script += ` and v.veh_type_code = '${veh_type_code}'`;
