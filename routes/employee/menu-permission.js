@@ -558,6 +558,7 @@ exports.setMenuPermissionInformation = async (req, res, next) => {
         await xglobal.action_logs(lic_code, action[0].id, "แก้ไขสิทธิ์การใช้งานเมนู", JSON.stringify(item), "success", action[0].value);
         // disable main menu then children menu are disabled
         if (display === 0 || display === '0') {
+          // ปิดการใช้งานของเมนูย่อย
           let disableChildrenScript = `update tbl_menu_permission 
                                        set display = 0, 
                                            edit = 0, 
@@ -569,6 +570,23 @@ exports.setMenuPermissionInformation = async (req, res, next) => {
                                            select menu_code from tbl_menu where menu_parent_code = '${menu_code}'
                                          )`;
           await pgConn.execute(database, disableChildrenScript, config.connectionString());
+
+          // ปิดการใช้งานของเมนูหลัก in ('4', '5')
+          let disableParentScript = `update tbl_menu_permission 
+                                     set display = 0, 
+                                         edit = -1, 
+                                         create_perm = -1, 
+                                         delete_perm = -1, 
+                                         mdf_dt = '${moment().format("YYYY-MM-DD HH:mm:ss")}'
+                                     where emp_role_code = '${emp_role_code}' 
+                                       and menu_code in (
+                                         select menu_parent_code from tbl_menu 
+                                         where menu_code = '${menu_code}' 
+                                           and menu_parent_code in (
+                                             select menu_code from tbl_menu where menu_no in ('4', '5')
+                                           )
+                                       )`;
+          await pgConn.execute(database, disableParentScript, config.connectionString());
         }
 
       } else {
