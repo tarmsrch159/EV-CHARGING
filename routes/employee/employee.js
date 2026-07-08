@@ -11,7 +11,7 @@ exports.getEmployeeInformation = async (req, res, next) => {
 
   return (async () => {
     let lic_code = req.header("lic_code");
-    let { emp_code, off_code, ptrl_code, page_index, page_limit, action } =
+    let { emp_code, off_code, ptrl_code, page_index, emp_role_code, page_limit, action } =
       req.body[0];
     ptrl_code = ptrl_code == undefined ? "ALL" : ptrl_code;
     page_index = page_index == undefined ? 0 : page_index;
@@ -184,6 +184,10 @@ exports.getEmployeeInformation = async (req, res, next) => {
         script += ` and tbl_employee.ptrl_code = '${ptrl_code}'`;
       }
 
+      if (emp_role_code.toString().toUpperCase() != "ALL") {
+        script += ` and tbl_employee.emp_role_code = '${emp_role_code}'`;
+      }
+
       script += ` order by tbl_employee.ist_dt desc`;
       script += ` offset (${page_index}*${page_limit}) limit ${page_limit};`;
 
@@ -220,11 +224,18 @@ exports.getEmployeeInformation = async (req, res, next) => {
             scriptCount += ` and tbl_employee.ptrl_code = '${ptrl_code}'`;
           }
 
+
+          if (emp_role_code.toString().toUpperCase() != "ALL") {
+            scriptCount += ` and tbl_employee.emp_role_code = '${emp_role_code}'`;
+          }
+
           let tbl_temporary_count = await pgConn.get(
             dbPrefix + lic_code,
             scriptCount,
             config.connectionString(),
           );
+
+
 
           if (!tbl_temporary_count.code) {
             if (tbl_temporary_count.data.length > 0) {
