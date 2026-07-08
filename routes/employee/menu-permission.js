@@ -542,28 +542,92 @@ exports.setMenuPermissionInformation = async (req, res, next) => {
         errorMessage = "ข้อมูลพารามิเตอร์ไม่ถูกต้อง";
         continue;
       }
+
+      // convert edit and delete when there's editing menu 1.2 and 1.3 to -1
+      let finalEdit = edit;
+      let finalDelete = delete_perm;
+
+      let menuCheckScript = `select menu_no from tbl_menu where menu_code = '${menu_code}'`;
+      let menuCheckRes = await pgConn.get(database, menuCheckScript, config.connectionString());
+      if (!menuCheckRes.code && menuCheckRes.data.length > 0) {
+        let menuNo = menuCheckRes.data[0].menu_no;
+        if (menuNo === '1.2' || menuNo === '1.3') {
+          finalEdit = -1;
+          finalDelete = -1;
+        }
+      }
+
+      console.log(finalDelete)
+      console.log(finalEdit)
+
       // update main menu permission
       let updateScript = `update tbl_menu_permission 
                           set display = '${display || 0}', 
-                              edit = '${edit || 0}', 
+                              edit = '${finalEdit}', 
                               create_perm = '${create_perm || 0}', 
-                              delete_perm = '${delete_perm || 0}', 
+                              delete_perm = '${finalDelete}', 
                               mdf_dt = '${moment().format("YYYY-MM-DD HH:mm:ss")}',
                               rm_dt = null
                           where emp_role_code = '${emp_role_code}' and menu_code = '${menu_code}'`;
-
+      console.log(updateScript)
       let executeRes = await pgConn.execute(database, updateScript, config.connectionString());
       if (!executeRes.code) {
         updatedItems.push({ emp_role_code, menu_code });
         await xglobal.action_logs(lic_code, action[0].id, "แก้ไขสิทธิ์การใช้งานเมนู", JSON.stringify(item), "success", action[0].value);
+
+        // enable main menu then children menu are enabled
+        if (display === 1 || display === '1') {
+          // enable children menu || except 1.2 and 1.3 will go to -1 status
+          let enableChildrenScript = `update tbl_menu_permission 
+                                       set display = 1, 
+                                           edit = case 
+                                                    when menu_code in (select menu_code from tbl_menu where menu_no in ('1.2', '1.3')) then -1 
+                                                    else 0
+                                                  end, 
+                                           create_perm = 0, 
+                                           delete_perm = case 
+                                                           when menu_code in (select menu_code from tbl_menu where menu_no in ('1.2', '1.3')) then -1 
+                                                           else 0 
+                                                         end, 
+                                           mdf_dt = '${moment().format("YYYY-MM-DD HH:mm:ss")}'
+                                       where emp_role_code = '${emp_role_code}' 
+                                         and menu_code in (
+                                           select menu_code from tbl_menu where menu_parent_code = '${menu_code}'
+                                         )`;
+          await pgConn.execute(database, enableChildrenScript, config.connectionString());
+
+          // enable main menu in ('4', '5')
+          let enableParentScript = `update tbl_menu_permission 
+                                     set display = 1, 
+                                         edit = 0, 
+                                         create_perm = 0, 
+                                         delete_perm = 0, 
+                                         mdf_dt = '${moment().format("YYYY-MM-DD HH:mm:ss")}'
+                                     where emp_role_code = '${emp_role_code}' 
+                                       and menu_code in (
+                                         select menu_parent_code from tbl_menu 
+                                         where menu_code = '${menu_code}' 
+                                           and menu_parent_code in (
+                                             select menu_code from tbl_menu where menu_no in ('4', '5')
+                                           )
+                                       )`;
+          await pgConn.execute(database, enableParentScript, config.connectionString());
+        }
+
         // disable main menu then children menu are disabled
         if (display === 0 || display === '0') {
-          // ปิดการใช้งานของเมนูย่อย
+
           let disableChildrenScript = `update tbl_menu_permission 
                                        set display = 0, 
-                                           edit = 0, 
+                                           edit = case 
+                                                    when menu_code in (select menu_code from tbl_menu where menu_no in ('1.2', '1.3')) then -1 
+                                                    else 0 
+                                                  end, 
                                            create_perm = 0, 
-                                           delete_perm = 0, 
+                                           delete_perm = case 
+                                                           when menu_code in (select menu_code from tbl_menu where menu_no in ('1.2', '1.3')) then -1 
+                                                           else 0
+                                                         end, 
                                            mdf_dt = '${moment().format("YYYY-MM-DD HH:mm:ss")}'
                                        where emp_role_code = '${emp_role_code}' 
                                          and menu_code in (
@@ -571,7 +635,7 @@ exports.setMenuPermissionInformation = async (req, res, next) => {
                                          )`;
           await pgConn.execute(database, disableChildrenScript, config.connectionString());
 
-          // ปิดการใช้งานของเมนูหลัก in ('4', '5')
+          // disable main menu in ('4', '5')
           let disableParentScript = `update tbl_menu_permission 
                                      set display = 0, 
                                          edit = -1, 
