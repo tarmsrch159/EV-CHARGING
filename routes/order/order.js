@@ -6747,107 +6747,53 @@ exports.setLinkedOrderInformation = async (req, res, next) => {
   }
 };
 
+
 // ====================== ปลดออเดอร์ออกจากกลุ่มพ่วง (Unlink) ======================
 exports.unlinkOrderInformation = async (req, res, next) => {
   try {
-    const lic_code = req.header("lic_code");
+    const lic_code = req.header('lic_code');
     const { order_id, action } = req.body[0] || {};
 
     // ======= 1. ตรวจสอบพารามิเตอร์ที่จำเป็น =======
     const missing = [];
-    if (!lic_code) missing.push("lic_code");
-    if (!order_id) missing.push("order_id");
-    if (!action) missing.push("action");
+    if (!lic_code) missing.push('lic_code');
+    if (!order_id) missing.push('order_id');
+    if (!action) missing.push('action');
 
     if (missing.length > 0) {
-      return sendResponse(
-        res,
-        "error",
-        "-1",
-        `ข้อมูลพารามิเตอร์ไม่ถูกต้อง (ขาด: ${missing.join(", ")})`,
-        [],
-      );
+      return sendResponse(res, 'error', '-1', `ข้อมูลพารามิเตอร์ไม่ถูกต้อง (ขาด: ${missing.join(', ')})`, []);
     }
 
     // ======= 2. ตรวจสอบสถานะและเงื่อนไข (ต้องเป็นลูกพ่วงและยังไม่ถูกจัดส่ง) =======
-    const checkScript = `SELECT master_order_id, order_status FROM public.tbl_order WHERE id = $1 AND rm_dt IS NULL`;
-    const checkRes = await pgConn.getWithParams(
-      dbPrefix + lic_code,
-      checkScript,
-      [order_id],
-      config.connectionString(),
-    );
+    const checkScript = `SELECT order_status FROM public.tbl_order WHERE id = $1 AND rm_dt IS NULL`;
+    const checkRes = await pgConn.getWithParams(dbPrefix + lic_code, checkScript, [order_id], config.connectionString());
 
     if (checkRes.data.length === 0) {
-      return sendResponse(res, "error", "-2", "ไม่พบข้อมูลออเดอร์ในระบบ", []);
+      return sendResponse(res, 'error', '-2', 'ไม่พบข้อมูลออเดอร์ในระบบ', []);
     }
 
     const orderData = checkRes.data[0];
 
-    if (orderData.master_order_id != 2) {
-      return sendResponse(
-        res,
-        "error",
-        "-2",
-        "ออเดอร์นี้ไม่ได้เป็นออเดอร์พ่วง (Child Order) จึงไม่สามารถปลดได้",
-        [],
-      );
-    }
 
     if (orderData.order_status != 0) {
-      return sendResponse(
-        res,
-        "error",
-        "-3",
-        "ออเดอร์ถูกวางแผนหรือจัดส่งแล้ว ไม่สามารถปลดออกจากการพ่วงได้",
-        [],
-      );
+      return sendResponse(res, 'error', '-3', 'ออเดอร์ถูกวางแผนหรือจัดส่งแล้ว ไม่สามารถปลดออกจากการพ่วงได้', []);
     }
 
     // ======= 3. ดำเนินการปลดการพ่วง (Update เป็น NULL) =======
     const updateScript = `UPDATE public.tbl_order SET master_order_id = NULL, consignment_no = NULL WHERE id = $1`;
-    const updateRes = await pgConn.execute2params(
-      dbPrefix + lic_code,
-      updateScript,
-      [order_id],
-      config.connectionString(),
-    );
+    const updateRes = await pgConn.execute2params(dbPrefix + lic_code, updateScript, [order_id], config.connectionString());
 
     if (updateRes.affected_rows === 0) {
-      return sendResponse(
-        res,
-        "error",
-        "-4",
-        "ไม่สามารถปลดการพ่วงได้ เนื่องจากไม่พบข้อมูลออเดอร์ที่ตรงกับเงื่อนไข",
-        [],
-      );
+      return sendResponse(res, 'error', '-4', 'ไม่สามารถปลดการพ่วงได้ เนื่องจากไม่พบข้อมูลออเดอร์ที่ตรงกับเงื่อนไข', []);
     }
 
     // ======= 4. บันทึก Log และส่งคำตอบกลับ =======
-    await xglobal.action_logs(
-      lic_code,
-      action[0].id,
-      "ปลดออเดอร์พ่วงออกด้วยตนเอง",
-      JSON.stringify(req.body[0]),
-      "success",
-      action[0].value,
-    );
-    return sendResponse(
-      res,
-      "success",
-      "0",
-      "ปลดการพ่วงสำเร็จ ออเดอร์ของคุณกลับเป็นออเดอร์ปกติแล้ว",
-      [],
-    );
+    await xglobal.action_logs(lic_code, action[0].id, 'ปลดออเดอร์พ่วงออกด้วยตนเอง', JSON.stringify(req.body[0]), 'success', action[0].value);
+    return sendResponse(res, 'success', '0', 'ปลดการพ่วงสำเร็จ ออเดอร์ของคุณกลับเป็นออเดอร์ปกติแล้ว', []);
+
   } catch (err) {
     console.error(err);
-    return sendResponse(
-      res,
-      "error",
-      "-4",
-      "เกิดข้อผิดพลาดภายในระบบในการปลดออเดอร์พ่วง",
-      [],
-    );
+    return sendResponse(res, 'error', '-4', 'เกิดข้อผิดพลาดภายในระบบในการปลดออเดอร์พ่วง', []);
   }
 };
 
