@@ -6801,12 +6801,11 @@ exports.unlinkOrderInformation = async (req, res, next) => {
 exports.getLinkedOrderList = async (req, res, next) => {
   try {
     const lic_code = req.header("lic_code");
-    const { consignment_no, order_id, master_order_id } = req.body[0] || {};
+    const { order_id } = req.body[0] || {};
 
     // ======= 1. ตรวจสอบพารามิเตอร์ขาเข้า =======
     const missing = [];
     if (!lic_code) missing.push("lic_code");
-    if (!consignment_no) missing.push("consignment_no");
     if (!order_id) missing.push("order_id");
 
     if (missing.length > 0) {
@@ -6820,34 +6819,54 @@ exports.getLinkedOrderList = async (req, res, next) => {
     }
 
     // ======= 2. ตรวจสอบ Role ของผู้เรียก =======
-    let requesterRole = master_order_id;
-    if (requesterRole === undefined) {
-      const checkRoleScript = `SELECT master_order_id FROM public.tbl_order WHERE id = $1 AND rm_dt IS NULL`;
-      const roleRes = await pgConn.getWithParams(
-        dbPrefix + lic_code,
-        checkRoleScript,
-        [order_id],
-        config.connectionString(),
-      );
+    // let requesterRole = master_order_id;
+    // if (requesterRole === undefined) {
+    //   const checkRoleScript = `SELECT master_order_id FROM public.tbl_order WHERE id = $1 AND rm_dt IS NULL`;
+    //   const roleRes = await pgConn.getWithParams(
+    //     dbPrefix + lic_code,
+    //     checkRoleScript,
+    //     [order_id],
+    //     config.connectionString(),
+    //   );
 
-      if (roleRes.data.length === 0) {
-        return sendResponse(
-          res,
-          "error",
-          "-2",
-          "ไม่พบข้อมูลออเดอร์ของผู้เรียกในระบบ",
-          [],
-        );
-      }
-      requesterRole = roleRes.data[0].master_order_id;
+    //   if (roleRes.data.length === 0) {
+    //     return sendResponse(
+    //       res,
+    //       "error",
+    //       "-2",
+    //       "ไม่พบข้อมูลออเดอร์ของผู้เรียกในระบบ",
+    //       [],
+    //     );
+    //   }
+    //   requesterRole = roleRes.data[0].master_order_id;
+    // }
+
+    // if (requesterRole === null || requesterRole === undefined) {
+    //   return sendResponse(
+    //     res,
+    //     "error",
+    //     "-2",
+    //     "ไม่สามารถระบุสถานะ (Master/Child) ของออเดอร์นี้ได้",
+    //     [],
+    //   );
+    // }
+    let consignment_no = ''
+    let consignmentNoScript = `select consignment_no from tbl_order where id = $1`
+    let consignmentNoScriptResult = await pgConn.getWithParams(dbPrefix + lic_code,
+      consignmentNoScript,
+      [order_id],
+      config.connectionString(),)
+
+    if (consignmentNoScriptResult.data.length > 0) {
+      consignment_no = consignmentNoScriptResult.data[0].consignment_no
     }
 
-    if (requesterRole === null || requesterRole === undefined) {
+    if (consignment_no === '') {
       return sendResponse(
         res,
         "error",
         "-2",
-        "ไม่สามารถระบุสถานะ (Master/Child) ของออเดอร์นี้ได้",
+        "ไม่พบข้อมูลออเดอร์ของผู้เรียกในระบบ",
         [],
       );
     }
@@ -6896,15 +6915,15 @@ exports.getLinkedOrderList = async (req, res, next) => {
       LEFT JOIN tbl_petrol ON tbl_order.ship_to = tbl_petrol.ptrl_number
       LEFT JOIN tbl_petrol_group ON tbl_petrol_group.ptrl_group_code = tbl_petrol.ptrl_group_code
       LEFT JOIN tbl_master_time ON tbl_order.deli_time_req = tbl_master_time.time_code
-      WHERE tbl_order.consignment_no = $1 
+      WHERE tbl_order.consignment_no = $1
         AND tbl_order.order_status = 0
         AND tbl_order.rm_dt IS NULL 
     `;
 
     // ถ้าเป็น Child (2) ให้เห็นแค่ออเดอร์หลัก (1) และตัวเอง
-    if (requesterRole == 2) {
-      listScript += ` AND (tbl_order.master_order_id = 1 OR tbl_order.id = ${order_id})`;
-    }
+    // if (requesterRole == 2) {
+    //   listScript += ` AND (tbl_order.master_order_id = 1 OR tbl_order.id = ${order_id})`;
+    // }
 
     listScript += ` ORDER BY tbl_order.master_order_id ASC, tbl_order.id ASC`;
 
@@ -6915,10 +6934,10 @@ exports.getLinkedOrderList = async (req, res, next) => {
       config.connectionString(),
     );
 
-    console.log(
-      `DEBUG getLinkedOrderList Data (Count: ${listRes.data.length}):`,
-      listRes.data,
-    );
+    // console.log(
+    //   `DEBUG getLinkedOrderList Data (Count: ${listRes.data.length}):`,
+    //   listRes.data,
+    // );
 
     // ======= 4. ดึงข้อมูล Items และสต็อกสำหรับแต่ละออเดอร์ =======
     let validOrders = [];
@@ -6926,91 +6945,8 @@ exports.getLinkedOrderList = async (req, res, next) => {
 
     for (let i = 0; i < listRes.data.length; i++) {
       let order = listRes.data[i];
-      let itemScript = "";
-      if (order.master_order_id == 1) {
-        // --- กรณี Master: โชว์ทุกถังของปั๊ม เพื่อใช้วางแผนการสั่งพ่วง ---
-        itemScript = `
-          (
-            SELECT DISTINCT ON (tbl_order_item.ptrl_tank_code)
-              tbl_order_item.id, 
-              '${order.id}' as order_no, 
-              tbl_order_item.item_no,
-              tbl_order_item.ptrl_tank_code,
-              COALESCE(tbl_petrol_tank.tnk_number, '0') as tank_number,
-              COALESCE(auto_tank.tnk_capacity::text, tbl_petrol_tank.tnk_capacity::text) as tank_capacity,
-              COALESCE(auto_tank.tnk_deadstock::text, tbl_petrol_tank.tnk_deadstock::text) as un_pump,
-              tbl_item.itm_desc, tbl_item.itm_material_number,
-              COALESCE(tbl_order_item.item_qty, 0) as item_qty,
-              tbl_order_item.remark,
-              COALESCE(auto_tank.current_stock, 0) as tank_start,
-              COALESCE(auto_tank.yesterday_stock, 0) as tank_end,
-              COALESCE(auto_sales.sale_previous, 0) as day_sales,
-              (COALESCE(auto_sales.sale_previous, 0) + COALESCE(auto_tank.tnk_deadstock, tbl_petrol_tank.tnk_deadstock, 0)) as min_stock,
-              (SELECT dpo_desc FROM tbl_depot WHERE dpo_code = (SELECT dpo_code FROM tbl_petrol_depot WHERE ptrl_code = '${order.ptrl_code}' AND rm_dt IS NULL LIMIT 1)) as dpo_desc
-            FROM tbl_order_item
-            LEFT JOIN tbl_item ON tbl_order_item.item_no = tbl_item.itm_code
-            LEFT JOIN tbl_petrol_tank ON tbl_order_item.ptrl_tank_code = tbl_petrol_tank.ptrl_tank_code
-            LEFT JOIN tbl_petrol ON tbl_petrol_tank.ptrl_code = tbl_petrol.ptrl_code
-            LEFT JOIN (
-                SELECT ptrl_code, tank_code,
-                    MAX(tnk_capacity) as tnk_capacity, MAX(tnk_deadstock) as tnk_deadstock,
-                    MAX(CASE WHEN stock_at::date = '${moment(order.ist_dt).format("YYYY-MM-DD")}'::date - INTERVAL '1 day' THEN stock END) as current_stock,
-                    MAX(CASE WHEN stock_at::date = '${moment(order.ist_dt).format("YYYY-MM-DD")}'::date - INTERVAL '2 day' THEN stock END) as yesterday_stock
-                FROM tbl_automatics_tanks_information GROUP BY ptrl_code, tank_code
-            ) auto_tank ON tbl_petrol.ptrl_code = auto_tank.ptrl_code AND tbl_petrol_tank.ptrl_tank_code = auto_tank.tank_code
-            LEFT JOIN (
-                SELECT ptrl_code, tank_code, MAX(sale_previous) as sale_previous,
-                MAX(case when sale_at_previous::date = '${moment(order.ist_dt).format("YYYY-MM-DD")}'::date - INTERVAL '1 day' THEN sale_previous END),
-                MAX(case when sale_at_previous::date = '${moment(order.ist_dt).format("YYYY-MM-DD")}'::date - INTERVAL '2 day' THEN sale_previous END)
-                FROM tbl_automatics_sales_previous_information
-                GROUP BY ptrl_code, tank_code
-            ) auto_sales ON tbl_petrol.ptrl_code = auto_sales.ptrl_code AND tbl_petrol_tank.ptrl_tank_code = auto_sales.tank_code
-            WHERE tbl_order_item.order_no = '${order.id}' AND tbl_order_item.rm_dt IS NULL AND tbl_petrol_tank.ptrl_tank_flag = '1'
-            ORDER BY tbl_order_item.ptrl_tank_code, tbl_order_item.id DESC
-          )
-          UNION ALL
-          (
-            SELECT 
-              NULL as id, 
-              '${order.id}' as order_no, 
-              tpt.itm_code as item_no,
-              tpt.ptrl_tank_code,
-              tpt.tnk_number as tank_number,
-              COALESCE(auto_tank.tnk_capacity::text, tpt.tnk_capacity::text) as tank_capacity,
-              COALESCE(auto_tank.tnk_deadstock::text, tpt.tnk_deadstock::text) as un_pump,
-              itm.itm_desc, itm.itm_material_number,
-              0 as item_qty,
-              NULL as remark,
-              COALESCE(auto_tank.current_stock, 0) as tank_start,
-              COALESCE(auto_tank.yesterday_stock, 0) as tank_end,
-              COALESCE(auto_sales.sale_previous, 0) as day_sales,
-              (COALESCE(auto_sales.sale_previous, 0) + COALESCE(auto_tank.tnk_deadstock, tpt.tnk_deadstock, 0)) as min_stock,
-              (SELECT dpo_desc FROM tbl_depot WHERE dpo_code = (SELECT dpo_code FROM tbl_petrol_depot WHERE ptrl_code = '${order.ptrl_code}' AND rm_dt IS NULL LIMIT 1)) as dpo_desc
-            FROM tbl_petrol_tank tpt
-            LEFT JOIN tbl_item itm ON tpt.itm_code = itm.itm_code
-            LEFT JOIN tbl_petrol p ON tpt.ptrl_code = p.ptrl_code
-            LEFT JOIN (
-                SELECT ptrl_code, tank_code,
-                    MAX(tnk_capacity) as tnk_capacity, MAX(tnk_deadstock) as tnk_deadstock,
-                    MAX(CASE WHEN stock_at::date = '${moment(order.ist_dt).format("YYYY-MM-DD")}'::date - INTERVAL '1 day' THEN stock END) as current_stock,
-                    MAX(CASE WHEN stock_at::date = '${moment(order.ist_dt).format("YYYY-MM-DD")}'::date - INTERVAL '2 day' THEN stock END) as yesterday_stock
-                FROM tbl_automatics_tanks_information GROUP BY ptrl_code, tank_code
-            ) auto_tank ON p.ptrl_code = auto_tank.ptrl_code AND tpt.ptrl_tank_code = auto_tank.tank_code
-            LEFT JOIN (
-                SELECT ptrl_code, tank_code, MAX(sale_previous) as sale_previous,
-                MAX(case when sale_at_previous::date = '${moment(order.ist_dt).format("YYYY-MM-DD")}'::date - INTERVAL '1 day' THEN sale_previous END),
-                MAX(case when sale_at_previous::date = '${moment(order.ist_dt).format("YYYY-MM-DD")}'::date - INTERVAL '2 day' THEN sale_previous END)
-                FROM tbl_automatics_sales_previous_information
-                GROUP BY ptrl_code, tank_code
-            ) auto_sales ON p.ptrl_code = auto_sales.ptrl_code AND tpt.ptrl_tank_code = auto_sales.tank_code
-            WHERE tpt.ptrl_code = '${order.ptrl_code}' AND tpt.ptrl_tank_flag = '1'
-              AND tpt.ptrl_tank_code NOT IN (SELECT ptrl_tank_code FROM tbl_order_item WHERE order_no = '${order.id}' AND rm_dt IS NULL AND ptrl_tank_code IS NOT NULL)
-          )
-          ORDER BY tank_number ASC
-        `;
-      } else {
-        // --- กรณี Child: โชว์เฉพาะถังที่มีการสั่งจริง ---
-        itemScript = `
+      let itemScript = `
+        (
           SELECT DISTINCT ON (tbl_order_item.ptrl_tank_code)
             tbl_order_item.id, 
             '${order.id}' as order_no, 
@@ -7034,8 +6970,8 @@ exports.getLinkedOrderList = async (req, res, next) => {
           LEFT JOIN (
               SELECT ptrl_code, tank_code,
                   MAX(tnk_capacity) as tnk_capacity, MAX(tnk_deadstock) as tnk_deadstock,
-                  MAX(CASE WHEN stock_at::date = '${moment(order.ist_dt).format("YYYY-MM-DD")}'::date THEN stock END) as current_stock,
-                  MAX(CASE WHEN stock_at::date = '${moment(order.ist_dt).format("YYYY-MM-DD")}'::date - INTERVAL '1 day' THEN stock END) as yesterday_stock
+                  MAX(CASE WHEN stock_at::date = '${moment(order.ist_dt).format("YYYY-MM-DD")}'::date - INTERVAL '1 day' THEN stock END) as current_stock,
+                  MAX(CASE WHEN stock_at::date = '${moment(order.ist_dt).format("YYYY-MM-DD")}'::date - INTERVAL '2 day' THEN stock END) as yesterday_stock
               FROM tbl_automatics_tanks_information GROUP BY ptrl_code, tank_code
           ) auto_tank ON tbl_petrol.ptrl_code = auto_tank.ptrl_code AND tbl_petrol_tank.ptrl_tank_code = auto_tank.tank_code
           LEFT JOIN (
@@ -7046,9 +6982,48 @@ exports.getLinkedOrderList = async (req, res, next) => {
               GROUP BY ptrl_code, tank_code
           ) auto_sales ON tbl_petrol.ptrl_code = auto_sales.ptrl_code AND tbl_petrol_tank.ptrl_tank_code = auto_sales.tank_code
           WHERE tbl_order_item.order_no = '${order.id}' AND tbl_order_item.rm_dt IS NULL AND tbl_petrol_tank.ptrl_tank_flag = '1'
-          ORDER BY tbl_order_item.ptrl_tank_code, tbl_petrol_tank.tnk_number ASC
-        `;
-      }
+          ORDER BY tbl_order_item.ptrl_tank_code, tbl_order_item.id DESC
+        )
+        UNION ALL
+        (
+          SELECT 
+            NULL as id, 
+            '${order.id}' as order_no, 
+            tpt.itm_code as item_no,
+            tpt.ptrl_tank_code,
+            tpt.tnk_number as tank_number,
+            COALESCE(auto_tank.tnk_capacity::text, tpt.tnk_capacity::text) as tank_capacity,
+            COALESCE(auto_tank.tnk_deadstock::text, tpt.tnk_deadstock::text) as un_pump,
+            itm.itm_desc, itm.itm_material_number,
+            0 as item_qty,
+            NULL as remark,
+            COALESCE(auto_tank.current_stock, 0) as tank_start,
+            COALESCE(auto_tank.yesterday_stock, 0) as tank_end,
+            COALESCE(auto_sales.sale_previous, 0) as day_sales,
+            (COALESCE(auto_sales.sale_previous, 0) + COALESCE(auto_tank.tnk_deadstock, tpt.tnk_deadstock, 0)) as min_stock,
+            (SELECT dpo_desc FROM tbl_depot WHERE dpo_code = (SELECT dpo_code FROM tbl_petrol_depot WHERE ptrl_code = '${order.ptrl_code}' AND rm_dt IS NULL LIMIT 1)) as dpo_desc
+          FROM tbl_petrol_tank tpt
+          LEFT JOIN tbl_item itm ON tpt.itm_code = itm.itm_code
+          LEFT JOIN tbl_petrol p ON tpt.ptrl_code = p.ptrl_code
+          LEFT JOIN (
+              SELECT ptrl_code, tank_code,
+                  MAX(tnk_capacity) as tnk_capacity, MAX(tnk_deadstock) as tnk_deadstock,
+                  MAX(CASE WHEN stock_at::date = '${moment(order.ist_dt).format("YYYY-MM-DD")}'::date - INTERVAL '1 day' THEN stock END) as current_stock,
+                  MAX(CASE WHEN stock_at::date = '${moment(order.ist_dt).format("YYYY-MM-DD")}'::date - INTERVAL '2 day' THEN stock END) as yesterday_stock
+              FROM tbl_automatics_tanks_information GROUP BY ptrl_code, tank_code
+          ) auto_tank ON p.ptrl_code = auto_tank.ptrl_code AND tpt.ptrl_tank_code = auto_tank.tank_code
+          LEFT JOIN (
+              SELECT ptrl_code, tank_code, MAX(sale_previous) as sale_previous,
+              MAX(case when sale_at_previous::date = '${moment(order.ist_dt).format("YYYY-MM-DD")}'::date - INTERVAL '1 day' THEN sale_previous END),
+              MAX(case when sale_at_previous::date = '${moment(order.ist_dt).format("YYYY-MM-DD")}'::date - INTERVAL '2 day' THEN sale_previous END)
+              FROM tbl_automatics_sales_previous_information
+              GROUP BY ptrl_code, tank_code
+          ) auto_sales ON p.ptrl_code = auto_sales.ptrl_code AND tpt.ptrl_tank_code = auto_sales.tank_code
+          WHERE tpt.ptrl_code = '${order.ptrl_code}' AND tpt.ptrl_tank_flag = '1'
+            AND tpt.ptrl_tank_code NOT IN (SELECT ptrl_tank_code FROM tbl_order_item WHERE order_no = '${order.id}' AND rm_dt IS NULL AND ptrl_tank_code IS NOT NULL)
+        )
+        ORDER BY tank_number ASC
+      `;
 
       let itemResult = await pgConn.get(
         dbPrefix + lic_code,
@@ -7073,40 +7048,14 @@ exports.getLinkedOrderList = async (req, res, next) => {
       }
     }
 
-    // ======= 5. แยกชุดข้อมูลเป็น Master และ Children (แสดงทั้งหมดตามเดิม) =======
-    const master_order =
-      listRes.data.find((item) => item.master_order_id == 1) || null;
-    const child_orders = listRes.data.filter(
-      (item) => item.master_order_id != 1,
-    );
-
-    // ชุดข้อมูลสำหรับ Invalid
-    const master_order_invalid =
-      invalidOrders.find((item) => item.master_order_id == 1) || null;
-    const child_orders_invalid = invalidOrders.filter(
-      (item) => item.master_order_id != 1,
-    );
-
-    // ตรวจสอบกรณีเป็นปั๊มลูกแต่หาปั๊มหลักไม่เจอ
-    if (requesterRole == 2 && !master_order) {
-      return sendResponse(
-        res,
-        "error",
-        "-3",
-        "ไม่พบข้อมูลออเดอร์หลักที่พ่วงอยู่ กรุณาติดต่อผู้ดูแลระบบ",
-        [],
-      );
-    }
-
+    // ======= 5. ชุดข้อมูลสำหรับส่งกลับ (Flat List Response) =======
     let finalData = {
-      master_order,
-      child_orders,
+      orders: listRes.data,
     };
     let invalidData = {
       message: "ข้อมูลออเดอร์ที่ไม่มีข้อมูล Stock และ daysales",
       data: {
-        master_order: master_order_invalid,
-        child_orders: child_orders_invalid,
+        orders: invalidOrders,
       },
     };
 
@@ -7129,6 +7078,340 @@ exports.getLinkedOrderList = async (req, res, next) => {
     );
   }
 };
+
+
+// Old Api
+// exports.getLinkedOrderListV2 = async (req, res, next) => {
+//   try {
+//     const lic_code = req.header("lic_code");
+//     const { consignment_no, order_id, master_order_id } = req.body[0] || {};
+
+//     // ======= 1. ตรวจสอบพารามิเตอร์ขาเข้า =======
+//     const missing = [];
+//     if (!lic_code) missing.push("lic_code");
+//     if (!consignment_no) missing.push("consignment_no");
+//     if (!order_id) missing.push("order_id");
+
+//     if (missing.length > 0) {
+//       return sendResponse(
+//         res,
+//         "error",
+//         "-1",
+//         `ข้อมูลพารามิเตอร์ไม่ถูกต้อง (ขาด: ${missing.join(", ")})`,
+//         [],
+//       );
+//     }
+
+//     // ======= 2. ตรวจสอบ Role ของผู้เรียก =======
+//     let requesterRole = master_order_id;
+//     if (requesterRole === undefined) {
+//       const checkRoleScript = `SELECT master_order_id FROM public.tbl_order WHERE id = $1 AND rm_dt IS NULL`;
+//       const roleRes = await pgConn.getWithParams(
+//         dbPrefix + lic_code,
+//         checkRoleScript,
+//         [order_id],
+//         config.connectionString(),
+//       );
+
+//       if (roleRes.data.length === 0) {
+//         return sendResponse(
+//           res,
+//           "error",
+//           "-2",
+//           "ไม่พบข้อมูลออเดอร์ของผู้เรียกในระบบ",
+//           [],
+//         );
+//       }
+//       requesterRole = roleRes.data[0].master_order_id;
+//     }
+
+//     if (requesterRole === null || requesterRole === undefined) {
+//       return sendResponse(
+//         res,
+//         "error",
+//         "-2",
+//         "ไม่สามารถระบุสถานะ (Master/Child) ของออเดอร์นี้ได้",
+//         [],
+//       );
+//     }
+
+//     // ======= 3. ดึงข้อมูลรายการในกลุ่มพ่วง =======
+//     let listScript = `
+//       SELECT 
+//         tbl_order.id, 
+//         tbl_order.order_no, 
+//         tbl_order.sh_cus_ref as aos_order_no, 
+//         tbl_order_type.sales_order_type as order_type, 
+//         tbl_order.order_group, 
+//         tbl_order_type.ord_type_desc,
+//         tbl_petrol_group.ptrl_group_desc,
+//         tbl_order.order_status,
+//         tbl_order.chanel, 
+//         tbl_order.division, 
+//         tbl_order.sold_to, 
+//         tbl_order.ship_to, 
+//         tbl_petrol.ptrl_code, 
+//         tbl_petrol.ptrl_number, 
+//         tbl_petrol.ptrl_sitecode,
+//         tbl_petrol.ptrl_desc, 
+//         tbl_order.cus_ref, 
+//         tbl_order.cus_date_ref, 
+//         tbl_order.po_name, 
+//         tbl_order.order_by, 
+//         tbl_order.ship_cond, 
+//         tbl_order.pay_term, 
+//         tbl_order.deli_date_req, 
+//         tbl_master_time.time_value as deli_time_req, 
+//         tbl_order.description, 
+//         tbl_order.sh_cus_date_ref, 
+//         tbl_order.status_deli, 
+//         tbl_order.status_block, 
+//         tbl_order.status_sd_process, 
+//         tbl_order.status_check, tbl_order.sd_doc_reject, tbl_order.cus_group, 
+//         tbl_order.hana_created, tbl_order.hana_time, tbl_order.created_by, 
+//         tbl_order.ist_dt, tbl_order.mdf_dt, tbl_order.rm_dt,
+//         tbl_order.auto_order,
+//         tbl_petrol.ptrl_address,
+//         tbl_petrol.ptrl_zip_code,
+//         tbl_order.master_order_id, tbl_order.consignment_no
+//       FROM public.tbl_order 
+//       LEFT JOIN tbl_order_type ON tbl_order.order_type = tbl_order_type.ord_type_code
+//       LEFT JOIN tbl_petrol ON tbl_order.ship_to = tbl_petrol.ptrl_number
+//       LEFT JOIN tbl_petrol_group ON tbl_petrol_group.ptrl_group_code = tbl_petrol.ptrl_group_code
+//       LEFT JOIN tbl_master_time ON tbl_order.deli_time_req = tbl_master_time.time_code
+//       WHERE tbl_order.consignment_no = $1 
+//         AND tbl_order.order_status = 0
+//         AND tbl_order.rm_dt IS NULL 
+//     `;
+
+//     // ถ้าเป็น Child (2) ให้เห็นแค่ออเดอร์หลัก (1) และตัวเอง
+//     if (requesterRole == 2) {
+//       listScript += ` AND (tbl_order.master_order_id = 1 OR tbl_order.id = ${order_id})`;
+//     }
+
+//     listScript += ` ORDER BY tbl_order.master_order_id ASC, tbl_order.id ASC`;
+
+//     const listRes = await pgConn.getWithParams(
+//       dbPrefix + lic_code,
+//       listScript,
+//       [consignment_no],
+//       config.connectionString(),
+//     );
+
+//     console.log(
+//       `DEBUG getLinkedOrderList Data (Count: ${listRes.data.length}):`,
+//       listRes.data,
+//     );
+
+//     // ======= 4. ดึงข้อมูล Items และสต็อกสำหรับแต่ละออเดอร์ =======
+//     let validOrders = [];
+//     let invalidOrders = [];
+
+//     for (let i = 0; i < listRes.data.length; i++) {
+//       let order = listRes.data[i];
+//       let itemScript = "";
+//       if (order.master_order_id == 1) {
+//         // --- กรณี Master: โชว์ทุกถังของปั๊ม เพื่อใช้วางแผนการสั่งพ่วง ---
+//         itemScript = `
+//           (
+//             SELECT DISTINCT ON (tbl_order_item.ptrl_tank_code)
+//               tbl_order_item.id, 
+//               '${order.id}' as order_no, 
+//               tbl_order_item.item_no,
+//               tbl_order_item.ptrl_tank_code,
+//               COALESCE(tbl_petrol_tank.tnk_number, '0') as tank_number,
+//               COALESCE(auto_tank.tnk_capacity::text, tbl_petrol_tank.tnk_capacity::text) as tank_capacity,
+//               COALESCE(auto_tank.tnk_deadstock::text, tbl_petrol_tank.tnk_deadstock::text) as un_pump,
+//               tbl_item.itm_desc, tbl_item.itm_material_number,
+//               COALESCE(tbl_order_item.item_qty, 0) as item_qty,
+//               tbl_order_item.remark,
+//               COALESCE(auto_tank.current_stock, 0) as tank_start,
+//               COALESCE(auto_tank.yesterday_stock, 0) as tank_end,
+//               COALESCE(auto_sales.sale_previous, 0) as day_sales,
+//               (COALESCE(auto_sales.sale_previous, 0) + COALESCE(auto_tank.tnk_deadstock, tbl_petrol_tank.tnk_deadstock, 0)) as min_stock,
+//               (SELECT dpo_desc FROM tbl_depot WHERE dpo_code = (SELECT dpo_code FROM tbl_petrol_depot WHERE ptrl_code = '${order.ptrl_code}' AND rm_dt IS NULL LIMIT 1)) as dpo_desc
+//             FROM tbl_order_item
+//             LEFT JOIN tbl_item ON tbl_order_item.item_no = tbl_item.itm_code
+//             LEFT JOIN tbl_petrol_tank ON tbl_order_item.ptrl_tank_code = tbl_petrol_tank.ptrl_tank_code
+//             LEFT JOIN tbl_petrol ON tbl_petrol_tank.ptrl_code = tbl_petrol.ptrl_code
+//             LEFT JOIN (
+//                 SELECT ptrl_code, tank_code,
+//                     MAX(tnk_capacity) as tnk_capacity, MAX(tnk_deadstock) as tnk_deadstock,
+//                     MAX(CASE WHEN stock_at::date = '${moment(order.ist_dt).format("YYYY-MM-DD")}'::date - INTERVAL '1 day' THEN stock END) as current_stock,
+//                     MAX(CASE WHEN stock_at::date = '${moment(order.ist_dt).format("YYYY-MM-DD")}'::date - INTERVAL '2 day' THEN stock END) as yesterday_stock
+//                 FROM tbl_automatics_tanks_information GROUP BY ptrl_code, tank_code
+//             ) auto_tank ON tbl_petrol.ptrl_code = auto_tank.ptrl_code AND tbl_petrol_tank.ptrl_tank_code = auto_tank.tank_code
+//             LEFT JOIN (
+//                 SELECT ptrl_code, tank_code, MAX(sale_previous) as sale_previous,
+//                 MAX(case when sale_at_previous::date = '${moment(order.ist_dt).format("YYYY-MM-DD")}'::date - INTERVAL '1 day' THEN sale_previous END),
+//                 MAX(case when sale_at_previous::date = '${moment(order.ist_dt).format("YYYY-MM-DD")}'::date - INTERVAL '2 day' THEN sale_previous END)
+//                 FROM tbl_automatics_sales_previous_information
+//                 GROUP BY ptrl_code, tank_code
+//             ) auto_sales ON tbl_petrol.ptrl_code = auto_sales.ptrl_code AND tbl_petrol_tank.ptrl_tank_code = auto_sales.tank_code
+//             WHERE tbl_order_item.order_no = '${order.id}' AND tbl_order_item.rm_dt IS NULL AND tbl_petrol_tank.ptrl_tank_flag = '1'
+//             ORDER BY tbl_order_item.ptrl_tank_code, tbl_order_item.id DESC
+//           )
+//           UNION ALL
+//           (
+//             SELECT 
+//               NULL as id, 
+//               '${order.id}' as order_no, 
+//               tpt.itm_code as item_no,
+//               tpt.ptrl_tank_code,
+//               tpt.tnk_number as tank_number,
+//               COALESCE(auto_tank.tnk_capacity::text, tpt.tnk_capacity::text) as tank_capacity,
+//               COALESCE(auto_tank.tnk_deadstock::text, tpt.tnk_deadstock::text) as un_pump,
+//               itm.itm_desc, itm.itm_material_number,
+//               0 as item_qty,
+//               NULL as remark,
+//               COALESCE(auto_tank.current_stock, 0) as tank_start,
+//               COALESCE(auto_tank.yesterday_stock, 0) as tank_end,
+//               COALESCE(auto_sales.sale_previous, 0) as day_sales,
+//               (COALESCE(auto_sales.sale_previous, 0) + COALESCE(auto_tank.tnk_deadstock, tpt.tnk_deadstock, 0)) as min_stock,
+//               (SELECT dpo_desc FROM tbl_depot WHERE dpo_code = (SELECT dpo_code FROM tbl_petrol_depot WHERE ptrl_code = '${order.ptrl_code}' AND rm_dt IS NULL LIMIT 1)) as dpo_desc
+//             FROM tbl_petrol_tank tpt
+//             LEFT JOIN tbl_item itm ON tpt.itm_code = itm.itm_code
+//             LEFT JOIN tbl_petrol p ON tpt.ptrl_code = p.ptrl_code
+//             LEFT JOIN (
+//                 SELECT ptrl_code, tank_code,
+//                     MAX(tnk_capacity) as tnk_capacity, MAX(tnk_deadstock) as tnk_deadstock,
+//                     MAX(CASE WHEN stock_at::date = '${moment(order.ist_dt).format("YYYY-MM-DD")}'::date - INTERVAL '1 day' THEN stock END) as current_stock,
+//                     MAX(CASE WHEN stock_at::date = '${moment(order.ist_dt).format("YYYY-MM-DD")}'::date - INTERVAL '2 day' THEN stock END) as yesterday_stock
+//                 FROM tbl_automatics_tanks_information GROUP BY ptrl_code, tank_code
+//             ) auto_tank ON p.ptrl_code = auto_tank.ptrl_code AND tpt.ptrl_tank_code = auto_tank.tank_code
+//             LEFT JOIN (
+//                 SELECT ptrl_code, tank_code, MAX(sale_previous) as sale_previous,
+//                 MAX(case when sale_at_previous::date = '${moment(order.ist_dt).format("YYYY-MM-DD")}'::date - INTERVAL '1 day' THEN sale_previous END),
+//                 MAX(case when sale_at_previous::date = '${moment(order.ist_dt).format("YYYY-MM-DD")}'::date - INTERVAL '2 day' THEN sale_previous END)
+//                 FROM tbl_automatics_sales_previous_information
+//                 GROUP BY ptrl_code, tank_code
+//             ) auto_sales ON p.ptrl_code = auto_sales.ptrl_code AND tpt.ptrl_tank_code = auto_sales.tank_code
+//             WHERE tpt.ptrl_code = '${order.ptrl_code}' AND tpt.ptrl_tank_flag = '1'
+//               AND tpt.ptrl_tank_code NOT IN (SELECT ptrl_tank_code FROM tbl_order_item WHERE order_no = '${order.id}' AND rm_dt IS NULL AND ptrl_tank_code IS NOT NULL)
+//           )
+//           ORDER BY tank_number ASC
+//         `;
+//       } else {
+//         // --- กรณี Child: โชว์เฉพาะถังที่มีการสั่งจริง ---
+//         itemScript = `
+//           SELECT DISTINCT ON (tbl_order_item.ptrl_tank_code)
+//             tbl_order_item.id, 
+//             '${order.id}' as order_no, 
+//             tbl_order_item.item_no,
+//             tbl_order_item.ptrl_tank_code,
+//             COALESCE(tbl_petrol_tank.tnk_number, '0') as tank_number,
+//             COALESCE(auto_tank.tnk_capacity::text, tbl_petrol_tank.tnk_capacity::text) as tank_capacity,
+//             COALESCE(auto_tank.tnk_deadstock::text, tbl_petrol_tank.tnk_deadstock::text) as un_pump,
+//             tbl_item.itm_desc, tbl_item.itm_material_number,
+//             COALESCE(tbl_order_item.item_qty, 0) as item_qty,
+//             tbl_order_item.remark,
+//             COALESCE(auto_tank.current_stock, 0) as tank_start,
+//             COALESCE(auto_tank.yesterday_stock, 0) as tank_end,
+//             COALESCE(auto_sales.sale_previous, 0) as day_sales,
+//             (COALESCE(auto_sales.sale_previous, 0) + COALESCE(auto_tank.tnk_deadstock, tbl_petrol_tank.tnk_deadstock, 0)) as min_stock,
+//             (SELECT dpo_desc FROM tbl_depot WHERE dpo_code = (SELECT dpo_code FROM tbl_petrol_depot WHERE ptrl_code = '${order.ptrl_code}' AND rm_dt IS NULL LIMIT 1)) as dpo_desc
+//           FROM tbl_order_item
+//           LEFT JOIN tbl_item ON tbl_order_item.item_no = tbl_item.itm_code
+//           LEFT JOIN tbl_petrol_tank ON tbl_order_item.ptrl_tank_code = tbl_petrol_tank.ptrl_tank_code
+//           LEFT JOIN tbl_petrol ON tbl_petrol_tank.ptrl_code = tbl_petrol.ptrl_code
+//           LEFT JOIN (
+//               SELECT ptrl_code, tank_code,
+//                   MAX(tnk_capacity) as tnk_capacity, MAX(tnk_deadstock) as tnk_deadstock,
+//                   MAX(CASE WHEN stock_at::date = '${moment(order.ist_dt).format("YYYY-MM-DD")}'::date THEN stock END) as current_stock,
+//                   MAX(CASE WHEN stock_at::date = '${moment(order.ist_dt).format("YYYY-MM-DD")}'::date - INTERVAL '1 day' THEN stock END) as yesterday_stock
+//               FROM tbl_automatics_tanks_information GROUP BY ptrl_code, tank_code
+//           ) auto_tank ON tbl_petrol.ptrl_code = auto_tank.ptrl_code AND tbl_petrol_tank.ptrl_tank_code = auto_tank.tank_code
+//           LEFT JOIN (
+//               SELECT ptrl_code, tank_code, MAX(sale_previous) as sale_previous,
+//               MAX(case when sale_at_previous::date = '${moment(order.ist_dt).format("YYYY-MM-DD")}'::date - INTERVAL '1 day' THEN sale_previous END),
+//               MAX(case when sale_at_previous::date = '${moment(order.ist_dt).format("YYYY-MM-DD")}'::date - INTERVAL '2 day' THEN sale_previous END)
+//               FROM tbl_automatics_sales_previous_information
+//               GROUP BY ptrl_code, tank_code
+//           ) auto_sales ON tbl_petrol.ptrl_code = auto_sales.ptrl_code AND tbl_petrol_tank.ptrl_tank_code = auto_sales.tank_code
+//           WHERE tbl_order_item.order_no = '${order.id}' AND tbl_order_item.rm_dt IS NULL AND tbl_petrol_tank.ptrl_tank_flag = '1'
+//           ORDER BY tbl_order_item.ptrl_tank_code, tbl_petrol_tank.tnk_number ASC
+//         `;
+//       }
+
+//       let itemResult = await pgConn.get(
+//         dbPrefix + lic_code,
+//         itemScript,
+//         config.connectionString(),
+//       );
+
+//       // Check data availability
+//       let hasData = false;
+//       if (itemResult.data && itemResult.data.length > 0) {
+//         hasData = itemResult.data.some(
+//           (item) =>
+//             parseFloat(item.tank_start) > 0 || parseFloat(item.day_sales) > 0,
+//         );
+//       }
+
+//       order.items = itemResult.code ? [] : itemResult.data;
+//       if (hasData) {
+//         validOrders.push(order);
+//       } else {
+//         invalidOrders.push(order);
+//       }
+//     }
+
+//     // ======= 5. แยกชุดข้อมูลเป็น Master และ Children (แสดงทั้งหมดตามเดิม) =======
+//     const master_order =
+//       listRes.data.find((item) => item.master_order_id == 1) || null;
+//     const child_orders = listRes.data.filter(
+//       (item) => item.master_order_id != 1,
+//     );
+
+//     // ชุดข้อมูลสำหรับ Invalid
+//     const master_order_invalid =
+//       invalidOrders.find((item) => item.master_order_id == 1) || null;
+//     const child_orders_invalid = invalidOrders.filter(
+//       (item) => item.master_order_id != 1,
+//     );
+
+//     // ตรวจสอบกรณีเป็นปั๊มลูกแต่หาปั๊มหลักไม่เจอ
+//     // if (requesterRole == 2 && !master_order) {
+//     //   return sendResponse(
+//     //     res,
+//     //     "error",
+//     //     "-3",
+//     //     "ไม่พบข้อมูลออเดอร์หลักที่พ่วงอยู่ กรุณาติดต่อผู้ดูแลระบบ",
+//     //     [],
+//     //   );
+//     // }
+
+//     let finalData = {
+//       master_order,
+//       child_orders,
+//     };
+//     let invalidData = {
+//       message: "ข้อมูลออเดอร์ที่ไม่มีข้อมูล Stock และ daysales",
+//       data: {
+//         master_order: master_order_invalid,
+//         child_orders: child_orders_invalid,
+//       },
+//     };
+
+//     return res.json({
+//       status: "success",
+//       invalid_code: "0",
+//       message: "ดึงข้อมูลออเดอร์พ่วงสำเร็จ",
+//       data: finalData,
+//       invalidData: invalidData,
+//       response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+//     });
+//   } catch (err) {
+//     console.error(err);
+//     return sendResponse(
+//       res,
+//       "error",
+//       "-4",
+//       "เกิดข้อผิดพลาดภายในระบบในการดึงข้อมูลออเดอร์พ่วง",
+//       [],
+//     );
+//   }
+// };
 
 exports.getChildOrderInformation = async (req, res, next) => {
   var xresult = [];
