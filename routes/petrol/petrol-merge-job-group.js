@@ -206,46 +206,46 @@ exports.removePetrolMergeJob = async (req, res, next) => {
       let groupCodeIn = groupCodeArr.map((c) => `'${c.replace(/'/g, "''")}'`).join(", ");
 
       // ตรวจสอบว่ามีออเดอร์ในกลุ่มนี้กำลังดำเนินการพ่วงจัดส่งอยู่หรือไม่
-      let checkActiveOrdersScript = `
-        SELECT o.id, o.order_no 
-        FROM tbl_order o
-        JOIN tbl_petrol p ON o.ship_to = p.ptrl_number
-        JOIN tbl_petrol_merge_job_details d ON p.ptrl_code = d.ptrl_code
-        WHERE d.ptrl_merge_group_code IN (${groupCodeIn})
-          AND d.merge_job_group_details_flag = 1
-          AND o.order_flag = '1'
-          AND o.order_status = 0
-          AND o.consignment_no IS NOT NULL
-        LIMIT 1;
-      `;
-      let activeCheckResult = await pgConn.get(
-        dbPrefix + lic_code,
-        checkActiveOrdersScript,
-        config.connectionString()
-      );
+      // let checkActiveOrdersScript = `
+      //   SELECT o.id, o.order_no 
+      //   FROM tbl_order o
+      //   JOIN tbl_petrol p ON o.ship_to = p.ptrl_number
+      //   JOIN tbl_petrol_merge_job_details d ON p.ptrl_code = d.ptrl_code
+      //   WHERE d.ptrl_merge_group_code IN (${groupCodeIn})
+      //     AND d.merge_job_group_details_flag = 1
+      //     AND o.order_flag = '1'
+      //     AND o.order_status = 0
+      //     AND o.consignment_no IS NOT NULL
+      //   LIMIT 1;
+      // `;
+      // let activeCheckResult = await pgConn.get(
+      //   dbPrefix + lic_code,
+      //   checkActiveOrdersScript,
+      //   config.connectionString()
+      // );
 
-      if (!activeCheckResult.code && activeCheckResult.data.length > 0) {
-        let response = [
-          {
-            status: "error",
-            invalid_code: "-5",
-            message: "ไม่สามารถลบกลุ่มพ่วงได้ เนื่องจากมีออเดอร์ในกลุ่มกำลังดำเนินการพ่วงจัดส่งอยู่",
-            data: [],
-            response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
-          },
-        ];
-        res.status(200).send(response);
+      // if (!activeCheckResult.code && activeCheckResult.data.length > 0) {
+      //   let response = [
+      //     {
+      //       status: "error",
+      //       invalid_code: "-5",
+      //       message: "ไม่สามารถลบกลุ่มพ่วงได้ เนื่องจากมีออเดอร์ในกลุ่มกำลังดำเนินการพ่วงจัดส่งอยู่",
+      //       data: [],
+      //       response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+      //     },
+      //   ];
+      //   res.status(200).send(response);
 
-        await xglobal.action_logs(
-          lic_code,
-          action[0].id,
-          "ลบข้อมูลกลุ่มปั๊มที่พ่วงงานกันได้",
-          JSON.stringify(req.body[0]),
-          "ไม่สามารถลบกลุ่มพ่วงได้ เนื่องจากมีออเดอร์ในกลุ่มกำลังดำเนินการพ่วงจัดส่งอยู่",
-          action[0].value,
-        );
-        return;
-      }
+      //   await xglobal.action_logs(
+      //     lic_code,
+      //     action[0].id,
+      //     "ลบข้อมูลกลุ่มปั๊มที่พ่วงงานกันได้",
+      //     JSON.stringify(req.body[0]),
+      //     "ไม่สามารถลบกลุ่มพ่วงได้ เนื่องจากมีออเดอร์ในกลุ่มกำลังดำเนินการพ่วงจัดส่งอยู่",
+      //     action[0].value,
+      //   );
+      //   return;
+      // }
 
       const transaction = await pgConn.executeTransaction(dbPrefix + lic_code, async (client) => {
         let script = `update tbl_petrol_merge_job_group set merge_job_group_flag = 0, rm_dt = '${moment().format("YYYY-MM-DD HH:mm:ss")}' where ptrl_merge_group_code in (${groupCodeIn});`;
