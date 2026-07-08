@@ -7,274 +7,12 @@ const dbPrefix = config.dbPrefix();
 
 //example https://stackoverflow.com/questions/6182315/how-can-i-do-base64-encoding-in-node-js
 //Success
-// exports.getVehicleTypeInformationWithDetail = async (req, res, next) => {
-//   var xresult = [];
-
-//   return (async () => {
-//     let lic_code = req.header("lic_code");
-//     let { veh_type_code, action, page_index, page_limit } = req.body[0];
-//     page_limit = page_limit == undefined ? 10 : page_limit;
-//     page_index = page_index == undefined ? 1 : page_index;
-
-//     if (page_index > 0) {
-//       page_index -= 1;
-//     }
-
-//     //เช็คเฉพาะส่วนที่สำคัญ
-//     if (
-//       veh_type_code == undefined ||
-//       lic_code == undefined ||
-//       action == undefined
-//     ) {
-//       let response = [
-//         {
-//           status: "error",
-//           invalid_code: "-1",
-//           message:
-//             "ไม่สามารถดึงข้อมูลได้, เนื่องจากข้อมูลพารามิเตอร์ไม่ถูกต้อง",
-//           data: xresult,
-//           response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
-//         },
-//       ];
-
-//       res.status(200).send(response);
-//       return;
-//     } else {
-//       let script = `select 
-//                     v.veh_type_code, 
-//                     v.veh_type_desc, 
-//                     v.veh_type_flag, 
-//                     v.veh_qty,
-//                     v.veh_qty as veh_qty_remaining,
-//                     v.veh_unavailable, 
-//                     v.max_merg,
-//                     (v.veh_qty - v.veh_unavailable) as veh_available,
-//                     v.capacity_total,
-//                     v.capacity_max,
-//                     v.capacity_min,
-//                     v.compartment_qty,
-//                     v.ist_dt, 
-//                     v.mdf_dt, 
-//                     v.rm_dt,
-//                     case when v.unloading_minute is null then 0 else v.unloading_minute end as unloading_minute,
-//                     case when v.loading_minute is null then 0 else v.loading_minute end as loading_minute,
-//                     c.id as compartment_id,
-//                     c.compartment_no,
-//                     c.compartment_total,
-//                     c.compartment_max,
-//                     c.compartment_min,
-//                     cl.veh_compartment_level_type_code,
-//                     cl.veh_compartment_type_level_number,
-//                     cl.veh_compartment_type_level
-//                 from tbl_vehicle_type v
-//                 left join tbl_vehicle_type_compartment c on v.veh_type_code = c.veh_type_code and (c.flag = '1' or c.flag is null)
-//                 left join tbl_vehicle_type_compartment_level cl on c.id = cl.compartment_item_id and cl.veh_compartment_type_level_flag = '1'
-//                 `;
-
-//       if (veh_type_code.toString().toUpperCase() != "ALL") {
-//         script += ` and v.veh_type_code = '${veh_type_code}'`;
-//       }
-
-//       script += ` order by v.ist_dt desc, c.compartment_no asc, cl.veh_compartment_type_level_number asc`;
-//       script += ` limit ${page_limit} offset ${page_index * page_limit}`;
-//       let tbl_temporary = await pgConn.get(
-//         dbPrefix + lic_code,
-//         script,
-//         config.connectionString(),
-//       );
-//       if (!tbl_temporary.code) {
-//         if (tbl_temporary.data.length > 0) {
-//           tbl_temporary.data = JSON.parse(
-//             JSON.stringify(tbl_temporary.data).replace(/\:null/gi, '\:""'),
-//           );
-//           let page_total = 0;
-//           let rows_total = 0;
-
-//           if (veh_type_code.toString().toUpperCase() != "ALL") {
-//             script = `select 
-//                         count(*) as rows_total,
-//                         ceil(count(v.veh_type_code) / ${page_limit}) as page_total
-//                         from tbl_vehicle_type v
-//                         left join tbl_vehicle_type_compartment c on v.veh_type_code = c.veh_type_code and (c.flag = '1' or c.flag is null)
-//                         where v.veh_type_flag = '1' and v.veh_type_code = '${veh_type_code}'`;
-//           } else {
-//             script = `select 
-//                         count(*) as rows_total,
-//                         ceil(count(v.veh_type_code) / ${page_limit}) as page_total
-//                         from tbl_vehicle_type v
-//                         left join tbl_vehicle_type_compartment c on v.veh_type_code = c.veh_type_code and (c.flag = '1' or c.flag is null)
-//                         where v.veh_type_flag = '1'`;
-//           }
-
-//           let tbl_temporary_count = await pgConn.get(
-//             dbPrefix + lic_code,
-//             script,
-//             config.connectionString(),
-//           );
-//           if (!tbl_temporary_count.code) {
-//             if (tbl_temporary_count.data.length > 0) {
-//               tbl_temporary_count.data = JSON.parse(
-//                 JSON.stringify(tbl_temporary_count.data).replace(
-//                   /\:null/gi,
-//                   '\:""',
-//                 ),
-//               );
-//               page_total = parseInt(tbl_temporary_count.data[0].page_total);
-//               rows_total = parseInt(tbl_temporary_count.data[0].rows_total);
-//             }
-//           }
-//           // จัดกลุ่มข้อมูล
-//           let groupedData = Object.values(
-//             tbl_temporary.data.reduce((acc, curr) => {
-//               let key = curr.veh_type_code;
-
-//               // ถ้ายังไม่มีกลุ่มรถนี้ ให้สร้าง object หลักขึ้นมา
-//               if (!acc[key]) {
-//                 acc[key] = {
-//                   veh_type_code: curr.veh_type_code,
-//                   veh_type_desc: curr.veh_type_desc,
-//                   veh_type_flag: curr.veh_type_flag,
-//                   veh_qty: curr.veh_qty,
-//                   veh_qty_remaining: curr.veh_qty_remaining,
-//                   max_merg: curr.max_merg,
-//                   veh_unavailable: curr.veh_unavailable,
-//                   veh_available: curr.veh_available,
-//                   capacity_total: curr.capacity_total,
-//                   capacity_max: curr.capacity_max,
-//                   capacity_min: curr.capacity_min,
-//                   compartment_qty: curr.compartment_qty,
-//                   unloading_minute: curr.unloading_minute,
-//                   loading_minute: curr.loading_minute,
-//                   ist_dt: curr.ist_dt,
-//                   mdf_dt: curr.mdf_dt,
-//                   rm_dt: curr.rm_dt,
-//                   compartment_list: [],
-//                 };
-//               }
-
-//               // ถ้ามีข้อมูลช่องรถ
-//               if (curr.compartment_no !== "" && curr.compartment_no !== null) {
-//                 let currCompItem = acc[key].compartment_list.find(
-//                   (c) => c.compartment_no === curr.compartment_no,
-//                 );
-//                 if (!currCompItem) {
-//                   acc[key].compartment_list.push({
-//                     compartment_id: curr.compartment_id,
-//                     compartment_no: curr.compartment_no,
-//                     compartment_total: curr.compartment_total,
-//                     compartment_max: curr.compartment_max,
-//                     compartment_min: curr.compartment_min,
-//                     level_data: [],
-//                   });
-//                   currCompItem =
-//                     acc[key].compartment_list[
-//                     acc[key].compartment_list.length - 1
-//                     ];
-//                 }
-
-//                 if (
-//                   curr.veh_compartment_level_type_code !== "" &&
-//                   curr.veh_compartment_level_type_code !== null
-//                 ) {
-//                   currCompItem.level_data.push({
-//                     level_code: curr.veh_compartment_level_type_code,
-//                     level_number: curr.veh_compartment_type_level_number,
-//                     level_capacity: curr.veh_compartment_type_level,
-//                   });
-//                 }
-//               }
-
-//               return acc;
-//             }, {}),
-//           );
-
-//           let response = [
-//             {
-//               status: "success",
-//               invalid_code: "0",
-//               message: "",
-//               data: groupedData, // <--- เปลี่ยนให้ส่ง groupedData แทน tbl_temporary.data
-//               page_total: page_total < 1 ? 1 : page_total,
-//               rows_total: rows_total,
-//               response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
-//             },
-//           ];
-
-//           res.status(200).send(response);
-//           return;
-//         } else {
-//           let response = [
-//             {
-//               status: "success",
-//               invalid_code: "0",
-//               message: "",
-//               data: xresult,
-//               page_total: 0,
-//               rows_total: 0,
-//               response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
-//             },
-//           ];
-
-//           res.status(200).send(response);
-//           return;
-//         }
-//       } else {
-//         let response = [
-//           {
-//             status: "error",
-//             invalid_code: "-3",
-//             message: `ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ`,
-//             data: xresult,
-//             response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
-//           },
-//         ];
-//         res.status(200).send(response);
-//         await xglobal.action_logs(
-//           lic_code,
-//           action[0].id,
-//           "ดึงข้อมูลประเภทรถ",
-//           JSON.stringify(req.body[0]),
-//           "ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ",
-//           action[0].value,
-//         );
-//         return;
-//       }
-//     }
-//   })().catch(async (err) => {
-//     console.log(err);
-//     let response = [
-//       {
-//         status: "error",
-//         invalid_code: "-4",
-//         message: `ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ`,
-//         data: xresult,
-//         response_time: moment().format("YYYY-MM-DD HH:mm:ss").toString(),
-//       },
-//     ];
-//     res.status(200).send(response);
-//     const _lic = req.header("lic_code");
-//     const _act = req.body?.[0]?.action?.[0] || {};
-//     if (_lic && _act.id) {
-//       await xglobal.action_logs(
-//         _lic,
-//         _act.id,
-//         "ดึงข้อมูลประเภทรถ",
-//         JSON.stringify(req.body?.[0] || {}),
-//         "ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ",
-//         _act.value,
-//       );
-//     }
-//     return;
-//   });
-// };
-
-
 exports.getVehicleTypeInformationWithDetail = async (req, res, next) => {
   var xresult = [];
 
   return (async () => {
     let lic_code = req.header("lic_code");
-    let { veh_type_code, veh_type_status, action, page_index, page_limit } = req.body[0];
+    let { veh_type_code, action, page_index, page_limit } = req.body[0];
     page_limit = page_limit == undefined ? 10 : page_limit;
     page_index = page_index == undefined ? 1 : page_index;
 
@@ -302,22 +40,6 @@ exports.getVehicleTypeInformationWithDetail = async (req, res, next) => {
       res.status(200).send(response);
       return;
     } else {
-      let conditions = [];
-      if (veh_type_status != undefined && veh_type_status.toString().toUpperCase() === "ALL") {
-        conditions.push(`v.rm_dt is null`);
-      }
-      if (veh_type_code != undefined && veh_type_code.toString().toUpperCase() != "ALL") {
-        conditions.push(`v.veh_type_code = '${veh_type_code}'`);
-      }
-      if (veh_type_status != undefined && veh_type_status.toString().toUpperCase() != "ALL") {
-        conditions.push(`v.veh_type_flag = '${veh_type_status}'`);
-      }
-
-      let whereClause = "";
-      if (conditions.length > 0) {
-        whereClause = "WHERE " + conditions.join(" AND ");
-      }
-
       let script = `select 
                     v.veh_type_code, 
                     v.veh_type_desc, 
@@ -346,8 +68,12 @@ exports.getVehicleTypeInformationWithDetail = async (req, res, next) => {
                     cl.veh_compartment_type_level
                 from tbl_vehicle_type v
                 left join tbl_vehicle_type_compartment c on v.veh_type_code = c.veh_type_code and (c.flag = '1' or c.flag is null)
-                left join tbl_vehicle_type_compartment_level cl on c.id = cl.compartment_item_id
-                ${whereClause}`;
+                left join tbl_vehicle_type_compartment_level cl on c.id = cl.compartment_item_id and cl.veh_compartment_type_level_flag = '1'
+                `;
+
+      if (veh_type_code.toString().toUpperCase() != "ALL") {
+        script += ` and v.veh_type_code = '${veh_type_code}'`;
+      }
 
       script += ` order by v.ist_dt desc, c.compartment_no asc, cl.veh_compartment_type_level_number asc`;
       script += ` limit ${page_limit} offset ${page_index * page_limit}`;
@@ -364,35 +90,25 @@ exports.getVehicleTypeInformationWithDetail = async (req, res, next) => {
           let page_total = 0;
           let rows_total = 0;
 
-          let countConditions = [];
-          if (veh_type_code != undefined && veh_type_code.toString().toUpperCase() != "ALL") {
-            countConditions.push(`v.veh_type_code = '${veh_type_code}'`);
-          }
-          if (veh_type_status != undefined && veh_type_status.toString().toUpperCase() === "ALL") {
-            countConditions.push(`v.rm_dt is null`);
-          }
-          if (veh_type_status != undefined && veh_type_status.toString().toUpperCase() != "ALL") {
-            countConditions.push(`v.veh_type_flag = '${veh_type_status}'`);
-          }
-
-          let countWhereClause = "";
-          if (countConditions.length > 0) {
-            countWhereClause = "WHERE " + countConditions.join(" AND ");
-          }
-
-          countScript = `select 
+          if (veh_type_code.toString().toUpperCase() != "ALL") {
+            script = `select 
                         count(*) as rows_total,
                         ceil(count(v.veh_type_code) / ${page_limit}) as page_total
                         from tbl_vehicle_type v
                         left join tbl_vehicle_type_compartment c on v.veh_type_code = c.veh_type_code and (c.flag = '1' or c.flag is null)
-                        ${countWhereClause}`;
-
-          console.log(countScript)
-
+                        where v.veh_type_flag = '1' and v.veh_type_code = '${veh_type_code}'`;
+          } else {
+            script = `select 
+                        count(*) as rows_total,
+                        ceil(count(v.veh_type_code) / ${page_limit}) as page_total
+                        from tbl_vehicle_type v
+                        left join tbl_vehicle_type_compartment c on v.veh_type_code = c.veh_type_code and (c.flag = '1' or c.flag is null)
+                        where v.veh_type_flag = '1'`;
+          }
 
           let tbl_temporary_count = await pgConn.get(
             dbPrefix + lic_code,
-            countScript,
+            script,
             config.connectionString(),
           );
           if (!tbl_temporary_count.code) {
@@ -551,6 +267,290 @@ exports.getVehicleTypeInformationWithDetail = async (req, res, next) => {
     return;
   });
 };
+
+
+// exports.getVehicleTypeInformationWithDetail = async (req, res, next) => {
+//   var xresult = [];
+
+//   return (async () => {
+//     let lic_code = req.header("lic_code");
+//     let { veh_type_code, veh_type_status, action, page_index, page_limit } = req.body[0];
+//     page_limit = page_limit == undefined ? 10 : page_limit;
+//     page_index = page_index == undefined ? 1 : page_index;
+
+//     if (page_index > 0) {
+//       page_index -= 1;
+//     }
+
+//     //เช็คเฉพาะส่วนที่สำคัญ
+//     if (
+//       veh_type_code == undefined ||
+//       lic_code == undefined ||
+//       action == undefined
+//     ) {
+//       let response = [
+//         {
+//           status: "error",
+//           invalid_code: "-1",
+//           message:
+//             "ไม่สามารถดึงข้อมูลได้, เนื่องจากข้อมูลพารามิเตอร์ไม่ถูกต้อง",
+//           data: xresult,
+//           response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+//         },
+//       ];
+
+//       res.status(200).send(response);
+//       return;
+//     } else {
+//       let conditions = [];
+//       if (veh_type_status != undefined && veh_type_status.toString().toUpperCase() === "ALL") {
+//         conditions.push(`v.rm_dt is null`);
+//       }
+//       if (veh_type_code != undefined && veh_type_code.toString().toUpperCase() != "ALL") {
+//         conditions.push(`v.veh_type_code = '${veh_type_code}'`); 2
+//       }
+//       if (veh_type_status != undefined && veh_type_status.toString().toUpperCase() != "ALL") {
+//         conditions.push(`v.veh_type_flag = '${veh_type_status}'`);
+//       }
+
+//       let whereClause = "";
+//       if (conditions.length > 0) {
+//         whereClause = "WHERE " + conditions.join(" AND ");
+//       }
+
+//       let script = `select 
+//                     v.veh_type_code, 
+//                     v.veh_type_desc, 
+//                     v.veh_type_flag, 
+//                     v.veh_qty,
+//                     v.veh_qty as veh_qty_remaining,
+//                     v.veh_unavailable, 
+//                     v.max_merg,
+//                     (v.veh_qty - v.veh_unavailable) as veh_available,
+//                     v.capacity_total,
+//                     v.capacity_max,
+//                     v.capacity_min,
+//                     v.compartment_qty,
+//                     v.ist_dt, 
+//                     v.mdf_dt, 
+//                     v.rm_dt,
+//                     case when v.unloading_minute is null then 0 else v.unloading_minute end as unloading_minute,
+//                     case when v.loading_minute is null then 0 else v.loading_minute end as loading_minute,
+//                     c.id as compartment_id,
+//                     c.compartment_no,
+//                     c.compartment_total,
+//                     c.compartment_max,
+//                     c.compartment_min,
+//                     cl.veh_compartment_level_type_code,
+//                     cl.veh_compartment_type_level_number,
+//                     cl.veh_compartment_type_level
+//                 from tbl_vehicle_type v
+//                 left join tbl_vehicle_type_compartment c on v.veh_type_code = c.veh_type_code and (c.flag = '1' or c.flag is null)
+//                 left join tbl_vehicle_type_compartment_level cl on c.id = cl.compartment_item_id
+//                 ${whereClause}`;
+
+//       script += ` order by v.ist_dt desc, c.compartment_no asc, cl.veh_compartment_type_level_number asc`;
+//       script += ` limit ${page_limit} offset ${page_index * page_limit}`;
+//       let tbl_temporary = await pgConn.get(
+//         dbPrefix + lic_code,
+//         script,
+//         config.connectionString(),
+//       );
+//       if (!tbl_temporary.code) {
+//         if (tbl_temporary.data.length > 0) {
+//           tbl_temporary.data = JSON.parse(
+//             JSON.stringify(tbl_temporary.data).replace(/\:null/gi, '\:""'),
+//           );
+//           let page_total = 0;
+//           let rows_total = 0;
+
+//           let countConditions = [];
+//           if (veh_type_code != undefined && veh_type_code.toString().toUpperCase() != "ALL") {
+//             countConditions.push(`v.veh_type_code = '${veh_type_code}'`);
+//           }
+//           if (veh_type_status != undefined && veh_type_status.toString().toUpperCase() === "ALL") {
+//             countConditions.push(`v.rm_dt is null`);
+//           }
+//           if (veh_type_status != undefined && veh_type_status.toString().toUpperCase() != "ALL") {
+//             countConditions.push(`v.veh_type_flag = '${veh_type_status}'`);
+//           }
+
+//           let countWhereClause = "";
+//           if (countConditions.length > 0) {
+//             countWhereClause = "WHERE " + countConditions.join(" AND ");
+//           }
+
+//           countScript = `select 
+//                         count(*) as rows_total,
+//                         ceil(count(v.veh_type_code) / ${page_limit}) as page_total
+//                         from tbl_vehicle_type v
+//                         left join tbl_vehicle_type_compartment c on v.veh_type_code = c.veh_type_code and (c.flag = '1' or c.flag is null)
+//                         ${countWhereClause}`;
+
+//           console.log(countScript)
+
+
+//           let tbl_temporary_count = await pgConn.get(
+//             dbPrefix + lic_code,
+//             countScript,
+//             config.connectionString(),
+//           );
+//           if (!tbl_temporary_count.code) {
+//             if (tbl_temporary_count.data.length > 0) {
+//               tbl_temporary_count.data = JSON.parse(
+//                 JSON.stringify(tbl_temporary_count.data).replace(
+//                   /\:null/gi,
+//                   '\:""',
+//                 ),
+//               );
+//               page_total = parseInt(tbl_temporary_count.data[0].page_total);
+//               rows_total = parseInt(tbl_temporary_count.data[0].rows_total);
+//             }
+//           }
+//           // จัดกลุ่มข้อมูล
+//           let groupedData = Object.values(
+//             tbl_temporary.data.reduce((acc, curr) => {
+//               let key = curr.veh_type_code;
+
+//               // ถ้ายังไม่มีกลุ่มรถนี้ ให้สร้าง object หลักขึ้นมา
+//               if (!acc[key]) {
+//                 acc[key] = {
+//                   veh_type_code: curr.veh_type_code,
+//                   veh_type_desc: curr.veh_type_desc,
+//                   veh_type_flag: curr.veh_type_flag,
+//                   veh_qty: curr.veh_qty,
+//                   veh_qty_remaining: curr.veh_qty_remaining,
+//                   max_merg: curr.max_merg,
+//                   veh_unavailable: curr.veh_unavailable,
+//                   veh_available: curr.veh_available,
+//                   capacity_total: curr.capacity_total,
+//                   capacity_max: curr.capacity_max,
+//                   capacity_min: curr.capacity_min,
+//                   compartment_qty: curr.compartment_qty,
+//                   unloading_minute: curr.unloading_minute,
+//                   loading_minute: curr.loading_minute,
+//                   ist_dt: curr.ist_dt,
+//                   mdf_dt: curr.mdf_dt,
+//                   rm_dt: curr.rm_dt,
+//                   compartment_list: [],
+//                 };
+//               }
+
+//               // ถ้ามีข้อมูลช่องรถ
+//               if (curr.compartment_no !== "" && curr.compartment_no !== null) {
+//                 let currCompItem = acc[key].compartment_list.find(
+//                   (c) => c.compartment_no === curr.compartment_no,
+//                 );
+//                 if (!currCompItem) {
+//                   acc[key].compartment_list.push({
+//                     compartment_id: curr.compartment_id,
+//                     compartment_no: curr.compartment_no,
+//                     compartment_total: curr.compartment_total,
+//                     compartment_max: curr.compartment_max,
+//                     compartment_min: curr.compartment_min,
+//                     level_data: [],
+//                   });
+//                   currCompItem =
+//                     acc[key].compartment_list[
+//                     acc[key].compartment_list.length - 1
+//                     ];
+//                 }
+
+//                 if (
+//                   curr.veh_compartment_level_type_code !== "" &&
+//                   curr.veh_compartment_level_type_code !== null
+//                 ) {
+//                   currCompItem.level_data.push({
+//                     level_code: curr.veh_compartment_level_type_code,
+//                     level_number: curr.veh_compartment_type_level_number,
+//                     level_capacity: curr.veh_compartment_type_level,
+//                   });
+//                 }
+//               }
+
+//               return acc;
+//             }, {}),
+//           );
+
+//           let response = [
+//             {
+//               status: "success",
+//               invalid_code: "0",
+//               message: "",
+//               data: groupedData, // <--- เปลี่ยนให้ส่ง groupedData แทน tbl_temporary.data
+//               page_total: page_total < 1 ? 1 : page_total,
+//               rows_total: rows_total,
+//               response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+//             },
+//           ];
+
+//           res.status(200).send(response);
+//           return;
+//         } else {
+//           let response = [
+//             {
+//               status: "success",
+//               invalid_code: "0",
+//               message: "",
+//               data: xresult,
+//               page_total: 0,
+//               rows_total: 0,
+//               response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+//             },
+//           ];
+
+//           res.status(200).send(response);
+//           return;
+//         }
+//       } else {
+//         let response = [
+//           {
+//             status: "error",
+//             invalid_code: "-3",
+//             message: `ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ`,
+//             data: xresult,
+//             response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+//           },
+//         ];
+//         res.status(200).send(response);
+//         await xglobal.action_logs(
+//           lic_code,
+//           action[0].id,
+//           "ดึงข้อมูลประเภทรถ",
+//           JSON.stringify(req.body[0]),
+//           "ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ",
+//           action[0].value,
+//         );
+//         return;
+//       }
+//     }
+//   })().catch(async (err) => {
+//     console.log(err);
+//     let response = [
+//       {
+//         status: "error",
+//         invalid_code: "-4",
+//         message: `ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ`,
+//         data: xresult,
+//         response_time: moment().format("YYYY-MM-DD HH:mm:ss").toString(),
+//       },
+//     ];
+//     res.status(200).send(response);
+//     const _lic = req.header("lic_code");
+//     const _act = req.body?.[0]?.action?.[0] || {};
+//     if (_lic && _act.id) {
+//       await xglobal.action_logs(
+//         _lic,
+//         _act.id,
+//         "ดึงข้อมูลประเภทรถ",
+//         JSON.stringify(req.body?.[0] || {}),
+//         "ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ",
+//         _act.value,
+//       );
+//     }
+//     return;
+//   });
+// };
 
 exports.getVehicleTypeCompartmentInformationWithDetail = async (
   req,
