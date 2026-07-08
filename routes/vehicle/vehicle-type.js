@@ -12,7 +12,7 @@ exports.getVehicleTypeInformationWithDetail = async (req, res, next) => {
 
   return (async () => {
     let lic_code = req.header("lic_code");
-    let { veh_type_code, action, page_index, page_limit } = req.body[0];
+    let { veh_type_code, veh_type_status, action, page_index, page_limit } = req.body[0];
     page_limit = page_limit == undefined ? 10 : page_limit;
     page_index = page_index == undefined ? 1 : page_index;
 
@@ -74,6 +74,10 @@ exports.getVehicleTypeInformationWithDetail = async (req, res, next) => {
         script += ` and v.veh_type_code = '${veh_type_code}'`;
       }
 
+      if (veh_type_status.toString().toUpperCase() != "ALL") {
+        script += ` and v.veh_type_flag = '${veh_type_status}'`;
+      }
+
       script += ` order by v.ist_dt desc, c.compartment_no asc, cl.veh_compartment_type_level_number asc`;
       script += ` limit ${page_limit} offset ${page_index * page_limit}`;
       let tbl_temporary = await pgConn.get(
@@ -90,24 +94,36 @@ exports.getVehicleTypeInformationWithDetail = async (req, res, next) => {
           let rows_total = 0;
 
           if (veh_type_code.toString().toUpperCase() != "ALL") {
-            script = `select 
+            countScript = `select 
                         count(*) as rows_total,
                         ceil(count(v.veh_type_code) / ${page_limit}) as page_total
                         from tbl_vehicle_type v
                         left join tbl_vehicle_type_compartment c on v.veh_type_code = c.veh_type_code and (c.flag = '1' or c.flag is null)
-                        where v.veh_type_flag = '1' and v.veh_type_code = '${veh_type_code}'`;
+                         and v.veh_type_code = '${veh_type_code}'`;
           } else {
-            script = `select 
+            countScript = `select 
                         count(*) as rows_total,
                         ceil(count(v.veh_type_code) / ${page_limit}) as page_total
                         from tbl_vehicle_type v
                         left join tbl_vehicle_type_compartment c on v.veh_type_code = c.veh_type_code and (c.flag = '1' or c.flag is null)
-                        where v.veh_type_flag = '1'`;
+                        `;
           }
+
+
+          if (veh_type_code.toString().toUpperCase() != "ALL") {
+            countScript += ` and v.veh_type_code = '${veh_type_code}'`;
+          }
+
+          if (veh_type_status.toString().toUpperCase() != "ALL") {
+            countScript += ` and v.veh_type_flag = '${veh_type_status}'`;
+          }
+
+          console.log(countScript)
+
 
           let tbl_temporary_count = await pgConn.get(
             dbPrefix + lic_code,
-            script,
+            countScript,
             config.connectionString(),
           );
           if (!tbl_temporary_count.code) {
