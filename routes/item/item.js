@@ -408,9 +408,8 @@ exports.setItemInformation = async (req, res, next) => {
                 itm_order_type = checkOrderType.data[0].ord_type_code;
             }
 
-            let scriptCheck = `select itm_code from tbl_item where 
-            (itm_desc = '${itm_desc}' or itm_short_desc = '${itm_short_desc}' 
-            or itm_material_number = '${itm_material_number}') and itm_code != '${itm_code}' and itm_flag = '1';`
+            let scriptCheck = ``;
+            scriptCheck = `select itm_code from tbl_item where itm_desc = '${itm_desc}' and itm_material_number = '${itm_material_number}' and itm_short_desc = '${itm_short_desc}' and itm_flag = '1';`
 
             let tbl_temporary0 = await pgConn.get(dbPrefix + lic_code, scriptCheck, config.connectionString());
             if (!tbl_temporary0.code) {
@@ -424,7 +423,7 @@ exports.setItemInformation = async (req, res, next) => {
                     }]
 
                     res.status(200).send(response);
-                    await xglobal.action_logs(lic_code, action[0].id, 'แก้ไขข้อมูลสินค้า', JSON.stringify(req.body[0]), 'ไม่สามารถบันทึกข้อมูลได้, เนื่องจากข้อมูลสินค้าซ้ำ', action[0].value);
+                    await xglobal.action_logs(lic_code, action[0].id, 'เพิ่มข้อมูลสินค้า', JSON.stringify(req.body[0]), 'ไม่สามารถบันทึกข้อมูลได้, เนื่องจากข้อมูลสินค้าซ้ำ', action[0].value);
                     return;
                 }
             }
@@ -533,10 +532,12 @@ exports.addItemInformation = async (req, res, next) => {
         } else {
 
 
+            // let scriptV2 = ``;
+            // script = `select itm_code from tbl_item where 
+            // (itm_desc = '${itm_desc}' or itm_short_desc = '${itm_short_desc}' 
+            // or itm_material_number = '${itm_material_number}') and itm_flag = '1';`
             let script = ``;
-            script = `select itm_code from tbl_item where 
-            (itm_desc = '${itm_desc}' or itm_short_desc = '${itm_short_desc}' 
-            or itm_material_number = '${itm_material_number}') and itm_flag = '1';`
+            script = `select itm_code from tbl_item where itm_desc = '${itm_desc}' and itm_material_number = '${itm_material_number}' and itm_short_desc = '${itm_short_desc}' and itm_flag = '1';`
 
             let tbl_temporary0 = await pgConn.get(dbPrefix + lic_code, script, config.connectionString());
             if (!tbl_temporary0.code) {
