@@ -408,6 +408,27 @@ exports.setItemInformation = async (req, res, next) => {
                 itm_order_type = checkOrderType.data[0].ord_type_code;
             }
 
+            let scriptCheck = `select itm_code from tbl_item where 
+            (itm_desc = '${itm_desc}' or itm_short_desc = '${itm_short_desc}' 
+            or itm_material_number = '${itm_material_number}') and itm_code != '${itm_code}' and itm_flag = '1';`
+
+            let tbl_temporary0 = await pgConn.get(dbPrefix + lic_code, scriptCheck, config.connectionString());
+            if (!tbl_temporary0.code) {
+                if (tbl_temporary0.data.length > 0) {
+                    let response = [{
+                        status: 'error',
+                        invalid_code: '-4',
+                        message: `ไม่สามารถบันทึกข้อมูล, เนื่องจากข้อมูลสินค้าซ้ำ`,
+                        data: [],
+                        response_time: moment().format('YYYY-MM-DD HH:mm:ss')
+                    }]
+
+                    res.status(200).send(response);
+                    await xglobal.action_logs(lic_code, action[0].id, 'แก้ไขข้อมูลสินค้า', JSON.stringify(req.body[0]), 'ไม่สามารถบันทึกข้อมูลได้, เนื่องจากข้อมูลสินค้าซ้ำ', action[0].value);
+                    return;
+                }
+            }
+
             let script = ``;
             script = `update tbl_item set
             itm_desc = '${itm_desc}',
@@ -515,8 +536,7 @@ exports.addItemInformation = async (req, res, next) => {
             let script = ``;
             script = `select itm_code from tbl_item where 
             (itm_desc = '${itm_desc}' or itm_short_desc = '${itm_short_desc}' 
-            or itm_material_number = '${itm_material_number}') and itm_flag = '1' and itm_sales_org = '${itm_sales_org}' 
-            and itm_order_type = '${itm_order_type}';`
+            or itm_material_number = '${itm_material_number}') and itm_flag = '1';`
 
             let tbl_temporary0 = await pgConn.get(dbPrefix + lic_code, script, config.connectionString());
             if (!tbl_temporary0.code) {
