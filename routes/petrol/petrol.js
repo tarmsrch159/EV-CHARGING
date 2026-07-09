@@ -1064,12 +1064,16 @@ exports.addPetrolInformation = async (req, res, next) => {
       }
 
       let script = ``;
-      script = `select ptrl_code from tbl_petrol where (ptrl_desc = '${ptrl_desc}' or ptrl_number = '${ptrl_number}' or ptrl_sitecode = '${ptrl_sitecode}') and ptrl_flag = '1';`;
+      // old script for checking petrol duplicate
+      //script = `select ptrl_code from tbl_petrol where (ptrl_desc = '${ptrl_desc}' or ptrl_number = '${ptrl_number}' or ptrl_sitecode = '${ptrl_sitecode}') and ptrl_flag = '1';`;
+
+      script = `select ptrl_code from tbl_petrol where ptrl_desc = '${ptrl_desc}' and ptrl_number = '${ptrl_number}' and ptrl_sitecode = '${ptrl_sitecode}' and ptrl_flag = '1';`;
       let tbl_temporary0 = await pgConn.get(
         dbPrefix + lic_code,
         script,
         config.connectionString(),
       );
+
       if (!tbl_temporary0.code) {
         if (tbl_temporary0.data.length > 0) {
           let response = [
