@@ -9130,7 +9130,7 @@ exports.addOrderInformationWithSAPV2 = async (req, res, next) => {
                   {
                     status: "error",
                     invalid_code: "-1",
-                    message: `ไม่มีการกำหนดประเภทรถที่เข้าปั้มได้กรุณาตรวจสอบ<br>ปริมาณของน้ำมันและการตั้งค่าประเภทรถ`,
+                    message: `ไม่มีการกำหนดประเภทรถที่เข้าปั้มได้กรุณาตรวจสอบ ปริมาณของน้ำมันและการตั้งค่าประเภทรถ`,
                     data: [],
                     response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
                   },
@@ -9284,7 +9284,7 @@ exports.addOrderInformationWithSAPV2 = async (req, res, next) => {
                 {
                   status: "error",
                   invalid_code: "-1",
-                  message: `ไม่มีการกำหนดประเภทรถที่เข้าปั้มได้กรุณาตรวจสอบ<br>ปริมาณของน้ำมันและการตั้งค่าประเภทรถ`,
+                  message: `ไม่มีการกำหนดประเภทรถที่เข้าปั้มได้กรุณาตรวจสอบ ปริมาณของน้ำมันและการตั้งค่าประเภทรถ`,
                   data: [],
                   response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
                 },
@@ -9875,7 +9875,7 @@ exports.addOrderInformationV2 = async (req, res, next) => {
                   {
                     status: "error",
                     invalid_code: "-1",
-                    message: `ไม่มีการกำหนดประเภทรถที่เข้าปั้มได้กรุณาตรวจสอบ<br>ปริมาณของน้ำมันและการตั้งค่าประเภทรถ`,
+                    message: `ไม่มีการกำหนดประเภทรถที่เข้าปั้มได้กรุณาตรวจสอบ ปริมาณของน้ำมันและการตั้งค่าประเภทรถ`,
                     data: [],
                     response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
                   },
@@ -10029,7 +10029,7 @@ exports.addOrderInformationV2 = async (req, res, next) => {
                 {
                   status: "error",
                   invalid_code: "-1",
-                  message: `ไม่มีการกำหนดประเภทรถที่เข้าปั้มได้กรุณาตรวจสอบ<br>ปริมาณของน้ำมันและการตั้งค่าประเภทรถ`,
+                  message: `ไม่มีการกำหนดประเภทรถที่เข้าปั้มได้กรุณาตรวจสอบ ปริมาณของน้ำมันและการตั้งค่าประเภทรถ`,
                   data: [],
                   response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
                 },
