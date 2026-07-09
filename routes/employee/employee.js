@@ -418,7 +418,7 @@ exports.setEmployeeInformation = async (req, res, next) => {
     let lic_code = req.header("lic_code");
     let { emp_code } = req.query;
     let {
-      emp_ref_code,
+      emp_ref_code = "",
       emp_name,
       emp_surname,
       emp_mobile_number,
@@ -427,7 +427,7 @@ exports.setEmployeeInformation = async (req, res, next) => {
       emp_dep_code,
       emp_pos_code,
       emp_group_code,
-      emp_gender,
+      emp_gender = "",
       emp_role_code,
       emp_image_profile,
       off_code,
@@ -442,12 +442,10 @@ exports.setEmployeeInformation = async (req, res, next) => {
     if (
       emp_code == undefined ||
       off_code == undefined ||
-      emp_ref_code == undefined ||
       emp_name == undefined ||
       emp_surname == undefined ||
       emp_mobile_number == undefined ||
       emp_email == undefined ||
-      emp_gender == undefined ||
       emp_role_code == undefined ||
       emp_image_profile == undefined ||
       action == undefined ||
@@ -738,7 +736,7 @@ exports.addEmployeeInformation = async (req, res, next) => {
     let {
       emp_username,
       emp_userpassword,
-      emp_ref_code,
+      emp_ref_code = "",
       emp_name,
       emp_surname,
       emp_mobile_number,
@@ -747,7 +745,7 @@ exports.addEmployeeInformation = async (req, res, next) => {
       emp_dep_code,
       emp_pos_code,
       emp_group_code,
-      emp_gender,
+      emp_gender = "",
       emp_role_code,
       emp_image_profile,
       off_code,
@@ -763,12 +761,10 @@ exports.addEmployeeInformation = async (req, res, next) => {
       emp_username == undefined ||
       off_code == undefined ||
       emp_userpassword == undefined ||
-      emp_ref_code == undefined ||
       emp_name == undefined ||
       emp_surname == undefined ||
       emp_mobile_number == undefined ||
       emp_email == undefined ||
-      emp_gender == undefined ||
       emp_role_code == undefined ||
       emp_image_profile == undefined ||
       action == undefined
