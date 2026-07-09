@@ -599,9 +599,9 @@ exports.setMenuPermissionInformation = async (req, res, next) => {
           // enable main menu in ('4', '5')
           let enableParentScript = `update tbl_menu_permission 
                                      set display = 1, 
-                                         edit = 0, 
-                                         create_perm = 0, 
-                                         delete_perm = 0, 
+                                         edit = -1, 
+                                         create_perm = -1, 
+                                         delete_perm = -1, 
                                          mdf_dt = '${moment().format("YYYY-MM-DD HH:mm:ss")}'
                                      where emp_role_code = '${emp_role_code}' 
                                        and menu_code in (
