@@ -1540,8 +1540,7 @@ exports.getLoggingOrderInformation = async (req, res, next) => {
     // =========================================================
     //      จัดการเงื่อนไข WHERE แบบรวมศูนย์ (Dynamic Conditions)
     // =========================================================
-    // นิยามตัวแปรช่วยในการดึงข้อมูลจาก JSON
-    const safeJson = `(CASE WHEN tbl_action_logs.action_body ~ '^\\s*\\{.*\\}\\s*$' THEN tbl_action_logs.action_body::json ELSE NULL END)`;
+    const safeJson = `(CASE WHEN tbl_action_logs.action_body ~ '^\\s*\\{.*\\}\\s*$' THEN tbl_action_logs.action_body::jsonb ELSE NULL END)`;
     const safeShipTo = `COALESCE(${safeJson}->'body'->>'ship_to', ${safeJson}->>'ship_to')`;
     const safeOrderId = `COALESCE(${safeJson}->>'order_id', ${safeJson}->'body'->>'order_id', ${safeJson}->>'id')`;
 
@@ -1597,6 +1596,10 @@ exports.getLoggingOrderInformation = async (req, res, next) => {
       total_logs: 0,
     };
 
+    // Optimize left join when user selected specific role and spechific petrol then left join emp and petrol
+    let optionalJoinEmployee = (role && role !== "ALL") ? "LEFT JOIN tbl_employee ON tbl_action_logs.action_code = tbl_employee.emp_code" : "";
+    let optionalJoinPetrol = (ptrl_group_code && ptrl_group_code !== "ALL") ? `LEFT JOIN tbl_petrol ON ${safeShipTo} = tbl_petrol.ptrl_number` : "";
+
     // =========================================================
     //      คำนวณสรุปแยกประเภทตามเงื่อนไข (Summary Aggregation)
     // =========================================================
@@ -1607,8 +1610,8 @@ exports.getLoggingOrderInformation = async (req, res, next) => {
                 COUNT(*) FILTER (WHERE LOWER(tbl_action_logs.action_desc) IN ('cancel', 'cancel_order_sap')) as cancel_count,
                 COUNT(*) FILTER (WHERE LOWER(tbl_action_logs.action_desc) IN ('manual', 'override', 'cancel', 'cancel_order_sap')) as total_count
             FROM tbl_action_logs 
-            LEFT JOIN tbl_employee ON tbl_action_logs.action_code = tbl_employee.emp_code
-            LEFT JOIN tbl_petrol ON ${safeShipTo} = tbl_petrol.ptrl_number
+            ${optionalJoinEmployee}
+            ${optionalJoinPetrol}
             ${summaryWhereClause} ;
         `;
     let tbl_summary = await pgConn.get(
@@ -1705,8 +1708,8 @@ exports.getLoggingOrderInformation = async (req, res, next) => {
                         CEIL(COUNT(*)::float / ${page_limit}) as page_total, 
                         COUNT(*) as rows_total  
                     FROM tbl_action_logs 
-                    LEFT JOIN tbl_employee ON tbl_action_logs.action_code = tbl_employee.emp_code
-                    LEFT JOIN tbl_petrol ON ${safeShipTo} = tbl_petrol.ptrl_number
+                    ${optionalJoinEmployee}
+                    ${optionalJoinPetrol}
                     ${whereClause}
                 `;
 
@@ -1804,6 +1807,323 @@ exports.getLoggingOrderInformation = async (req, res, next) => {
     res.status(200).send(response);
   });
 };
+// // =========== ดึงข้อมูลรายการสั่งซื้อ Order Log ===========
+// exports.getLoggingOrderInformation = async (req, res, next) => {
+//   var xresult = [];
+
+//   return (async () => {
+//     let lic_code = req.header("lic_code");
+//     let {
+//       action_desc,
+//       page_index,
+//       page_limit,
+//       start_date,
+//       end_date,
+//       search,
+//       role,
+//       ptrl_group_code,
+//       action,
+//     } = req.body[0];
+
+//     page_index = page_index == undefined ? 1 : page_index;
+//     page_limit = page_limit == undefined ? 10 : page_limit;
+
+//     // =========================================================
+//     //          ตรวจสอบความถูกต้องของพารามิเตอร์เบื้องต้น
+//     // =========================================================
+//     if (action_desc == undefined || action == undefined) {
+//       let response = [
+//         {
+//           status: "error",
+//           invalid_code: "-1",
+//           message:
+//             "ไม่สามารถดึงข้อมูลได้, เนื่องจากข้อมูลพารามิเตอร์ไม่ถูกต้อง",
+//           data: xresult,
+//           response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+//         },
+//       ];
+//       res.status(200).send(response);
+//       return;
+//     }
+
+//     let script = ``;
+//     if (page_index > 0) {
+//       page_index -= 1;
+//     }
+
+//     // =========================================================
+//     //             จัดการรูปแบบวันที่ (Date Formatting)
+//     // =========================================================
+//     if (start_date && start_date.length === 10) start_date += " 00:00:00";
+//     if (end_date && end_date.length === 10) end_date += " 23:59:59";
+
+//     // =========================================================
+//     //      จัดการเงื่อนไข WHERE แบบรวมศูนย์ (Dynamic Conditions)
+//     // =========================================================
+//     // นิยามตัวแปรช่วยในการดึงข้อมูลจาก JSON
+//     const safeJson = `(CASE WHEN tbl_action_logs.action_body ~ '^\\s*\\{.*\\}\\s*$' THEN tbl_action_logs.action_body::json ELSE NULL END)`;
+//     const safeShipTo = `COALESCE(${safeJson}->'body'->>'ship_to', ${safeJson}->>'ship_to')`;
+//     const safeOrderId = `COALESCE(${safeJson}->>'order_id', ${safeJson}->'body'->>'order_id', ${safeJson}->>'id')`;
+
+//     let baseConditions = ["tbl_action_logs.rm_dt IS NULL"];
+
+//     if (start_date)
+//       baseConditions.push(`tbl_action_logs.ist_dt >= '${start_date}'`);
+//     if (end_date)
+//       baseConditions.push(`tbl_action_logs.ist_dt <= '${end_date}'`);
+
+//     // ระบบกรองตาม Role (Role Filter)
+//     if (role && role !== "ALL") {
+//       baseConditions.push(`tbl_employee.emp_role_code = '${role}'`);
+//     }
+
+//     // ระบบกรองตามกลุ่มปั๊ม (Station Group)
+//     if (ptrl_group_code && ptrl_group_code !== "ALL") {
+//       baseConditions.push(`tbl_petrol.ptrl_group_code = '${ptrl_group_code}'`);
+//     }
+
+//     // ระบบค้นหา (Search Engine Logic)
+//     if (search) {
+//       baseConditions.push(`(
+//                 tbl_action_logs.action_body::text ILIKE '%${search}%'
+//                 OR EXISTS (
+//                     SELECT 1 FROM tbl_petrol 
+//                     WHERE ptrl_number = ${safeShipTo}
+//                     AND ptrl_desc ILIKE '%${search}%'
+//                 )
+//             )`);
+//     }
+
+//     // เงื่อนไขเฉพาะของ Action Type
+//     let actionConditions = [];
+//     if (action_desc && action_desc.toString().toLowerCase() != "all") {
+//       actionConditions.push(
+//         `tbl_action_logs.action_desc = '${action_desc.toLowerCase()}'`,
+//       );
+//     } else {
+//       actionConditions.push(
+//         `tbl_action_logs.action_desc IN ('override', 'manual', 'cancel', 'cancel_order_sap')`,
+//       );
+//     }
+
+//     let whereClause =
+//       "WHERE " + [...baseConditions, ...actionConditions].join(" AND ");
+//     let summaryWhereClause = "WHERE " + baseConditions.join(" AND ");
+
+//     let summary = {
+//       manual: 0,
+//       override: 0,
+//       cancel: 0,
+//       total_logs: 0,
+//     };
+
+//     // =========================================================
+//     //      คำนวณสรุปแยกประเภทตามเงื่อนไข (Summary Aggregation)
+//     // =========================================================
+//     let summaryScript = `
+//             SELECT 
+//                 COUNT(*) FILTER (WHERE LOWER(tbl_action_logs.action_desc) = 'manual') as manual_count,
+//                 COUNT(*) FILTER (WHERE LOWER(tbl_action_logs.action_desc) = 'override') as override_count,
+//                 COUNT(*) FILTER (WHERE LOWER(tbl_action_logs.action_desc) IN ('cancel', 'cancel_order_sap')) as cancel_count,
+//                 COUNT(*) FILTER (WHERE LOWER(tbl_action_logs.action_desc) IN ('manual', 'override', 'cancel', 'cancel_order_sap')) as total_count
+//             FROM tbl_action_logs 
+//             LEFT JOIN tbl_employee ON tbl_action_logs.action_code = tbl_employee.emp_code
+//             LEFT JOIN tbl_petrol ON ${safeShipTo} = tbl_petrol.ptrl_number
+//             ${summaryWhereClause} ;
+//         `;
+//     let tbl_summary = await pgConn.get(
+//       dbPrefix + lic_code,
+//       summaryScript,
+//       config.connectionString(),
+//     );
+//     if (!tbl_summary.code && tbl_summary.data && tbl_summary.data.length > 0) {
+//       summary.manual = parseInt(tbl_summary.data[0].manual_count) || 0;
+//       summary.override = parseInt(tbl_summary.data[0].override_count) || 0;
+//       summary.cancel = parseInt(tbl_summary.data[0].cancel_count) || 0;
+//       summary.total_logs = parseInt(tbl_summary.data[0].total_count) || 0;
+//     }
+
+//     // =========================================================
+//     //             ดึงข้อมูล Audit Logs หลัก (Main Query)
+//     // =========================================================
+//     script = `SELECT 
+//             case 
+//               when tbl_action_logs.action_code = 'Auto Calculator' then 'Auto Calculator'
+//               when tbl_action_logs.action_code = 'Auto Sync Order' then 'Auto Sync Order'
+//               else tbl_employee.emp_name || ' / ' || tbl_employee_role.emp_role_desc
+//             end as action_by,
+//             tbl_action_logs.action_desc as event_type,
+//             tbl_action_logs.action_body,
+//             tbl_action_logs.ist_dt as action_date,
+//             tbl_petrol_group.ptrl_group_desc as station_group,
+//             tbl_order.order_no,
+//             tbl_order.sh_cus_ref as aos_order_no
+//             FROM tbl_action_logs 
+//             LEFT JOIN tbl_employee ON tbl_action_logs.action_code = tbl_employee.emp_code
+//             LEFT JOIN tbl_employee_role ON tbl_employee.emp_role_code = tbl_employee_role.emp_role_code
+//             LEFT JOIN tbl_petrol ON ${safeShipTo} = tbl_petrol.ptrl_number
+//             LEFT JOIN tbl_petrol_group ON tbl_petrol.ptrl_group_code = tbl_petrol_group.ptrl_group_code
+//             LEFT JOIN tbl_order ON tbl_order.id::text = ${safeOrderId}
+
+//             ${whereClause}
+//             ORDER BY tbl_action_logs.ist_dt DESC 
+//             OFFSET (${page_index}*${page_limit}) LIMIT ${page_limit};`;
+
+//     let mainLogResult = await pgConn.get(
+//       dbPrefix + lic_code,
+//       script,
+//       config.connectionString(),
+//     );
+//     if (!mainLogResult.code && mainLogResult.data) {
+//       if (mainLogResult.data.length > 0) {
+//         // =========================================================
+//         //      จัดฟอร์แมตข้อมูลและดึงรายชื่อ Ship-To ทั้งหมด
+//         // =========================================================
+//         let { processedData, allShipTos } = xglobal.formatAuditLogs(
+//           mainLogResult.data,
+//         );
+
+//         // =========================================================
+//         //         ดึงชื่อปั๊มทั้งหมดแบบรวมศูนย์ (Batch Station Query)
+//         // =========================================================
+//         if (allShipTos.size > 0) {
+//           let shipToArr = Array.from(allShipTos)
+//             .map((s) => `'${s}'`)
+//             .join(", ");
+//           let stationScript = `SELECT ptrl_number, ptrl_desc FROM tbl_petrol WHERE ptrl_number IN (${shipToArr})`;
+//           let stationTemp = await pgConn.get(
+//             dbPrefix + lic_code,
+//             stationScript,
+//             config.connectionString(),
+//           );
+
+//           if (!stationTemp.code && stationTemp.data.length > 0) {
+//             let stationDataMap = {};
+//             stationTemp.data.forEach((row) => {
+//               stationDataMap[row.ptrl_number] = row.ptrl_desc;
+//             });
+
+//             // จับคู่ชื่อสถานีกลับเข้ากับรายการข้อมูล
+//             processedData.forEach((item) => {
+//               if (item.ship_to && stationDataMap[item.ship_to]) {
+//                 item.station_name = stationDataMap[item.ship_to];
+//               }
+//             });
+//           }
+//         }
+
+//         mainLogResult.data = processedData;
+
+//         // =========================================================
+//         //     นับจำนวนแถวและหน้าทั้งหมด (Pagination Calculation)
+//         // =========================================================
+//         let page_total = 1;
+//         let rows_total = 0;
+
+//         let countScript = `
+//                     SELECT 
+//                         CEIL(COUNT(*)::float / ${page_limit}) as page_total, 
+//                         COUNT(*) as rows_total  
+//                     FROM tbl_action_logs 
+//                     LEFT JOIN tbl_employee ON tbl_action_logs.action_code = tbl_employee.emp_code
+//                     LEFT JOIN tbl_petrol ON ${safeShipTo} = tbl_petrol.ptrl_number
+//                     ${whereClause}
+//                 `;
+
+//         let countResult = await pgConn.get(
+//           dbPrefix + lic_code,
+//           countScript,
+//           config.connectionString(),
+//         );
+
+//         if (
+//           !countResult.code &&
+//           countResult.data &&
+//           countResult.data.length > 0
+//         ) {
+//           page_total = parseInt(countResult.data[0].page_total) || 1;
+//           rows_total = parseInt(countResult.data[0].rows_total) || 0;
+//         }
+
+//         // =========================================================
+//         //               ส่งข้อมูลตอบกลับ (Success Response)
+//         // =========================================================
+//         let response = [
+//           {
+//             status: "success",
+//             invalid_code: "0",
+//             message: "",
+//             data: mainLogResult.data,
+//             summary: summary,
+//             response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+//             page_total: page_total <= 0 ? 1 : page_total,
+//             rows_total: rows_total,
+//           },
+//         ];
+
+//         res.status(200).send(response);
+//         return;
+//       } else {
+//         // =========================================================
+//         //            กรณีไม่พบข้อมูล (No Data Found)
+//         // =========================================================
+//         let response = [
+//           {
+//             status: "success",
+//             invalid_code: "0",
+//             message: "",
+//             data: xresult,
+//             summary: summary,
+//             response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+//             page_total: 1,
+//             rows_total: 0,
+//           },
+//         ];
+
+//         res.status(200).send(response);
+//         return;
+//       }
+//     } else {
+//       // =========================================================
+//       //            จัดการข้อผิดพลาดจาก DB (DB Error Handling)
+//       // =========================================================
+//       let response = [
+//         {
+//           status: "error",
+//           invalid_code: "-3",
+//           message: `ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ`,
+//           data: xresult,
+//           response_time: moment().format("YYYY-MM-DD HH:mm:ss"),
+//         },
+//       ];
+//       res.status(200).send(response);
+//       await xglobal.action_logs(
+//         lic_code,
+//         action[0].id,
+//         "ดึงข้อมูล Order",
+//         JSON.stringify(req.body[0]),
+//         "ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ",
+//         action[0].value,
+//       );
+//       return;
+//     }
+//   })().catch(async (err) => {
+//     // =========================================================
+//     //         จัดการข้อผิดพลาดที่ไม่คาดคิด (Exception Handling)
+//     // =========================================================
+//     console.log(err);
+//     let response = [
+//       {
+//         status: "error",
+//         invalid_code: "-4",
+//         message: `ไม่สามารถดึงข้อมูล, กรุณาติดต่อเจ้าหน้าที่ผู้ดูแลระบบ`,
+//         data: xresult,
+//         response_time: moment().format("YYYY-MM-DD HH:mm:ss").toString(),
+//       },
+//     ];
+//     res.status(200).send(response);
+//   });
+// };
 // =========================================================
 //  Helper Functions
 // =========================================================
