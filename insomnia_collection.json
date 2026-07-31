@@ -1,0 +1,1930 @@
+{
+  "_type": "export",
+  "__export_format": 4,
+  "__export_date": "2026-07-30T10:56:00.000Z",
+  "__export_source": "insomnia.desktop.app:v2023.5.8",
+  "resources": [
+    {
+      "_id": "wrk_ev_charging",
+      "_type": "workspace",
+      "parentId": null,
+      "modified": 1785383804016,
+      "created": 1785383804016,
+      "name": "EVC - V1",
+      "description": "Insomnia API Collection for EV Charging Reservation System",
+      "scope": "collection"
+    },
+    {
+      "_id": "env_ev_charging_base",
+      "_type": "environment",
+      "parentId": "wrk_ev_charging",
+      "modified": 1785383804016,
+      "created": 1785383804016,
+      "name": "Base Environment",
+      "data": {
+        "base_url": "http://localhost:3000",
+        "license": "LIC001",
+        "lic_code": "LIC001",
+        "auth_username": "tmsv2.website",
+        "auth_password": "reP@ssw0rd778900"
+      },
+      "dataPropertyOrder": {
+        "&": [
+          "base_url",
+          "license",
+          "lic_code",
+          "auth_username",
+          "auth_password"
+        ]
+      },
+      "color": null,
+      "isPrivate": false,
+      "metaSortKey": 1785383804016
+    },
+    {
+      "_id": "fld_station_main",
+      "_type": "request_group",
+      "parentId": "wrk_ev_charging",
+      "modified": 1785383804016,
+      "created": 1785383804016,
+      "name": "ข้อมูลสถานี – Station",
+      "description": "",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": 100,
+      "authentication": {
+        "type": "basic",
+        "username": "tmsv2.website",
+        "password": "reP@ssw0rd778900"
+      }
+    },
+    {
+      "_id": "fld_station_charger_main",
+      "_type": "request_group",
+      "parentId": "wrk_ev_charging",
+      "modified": 1785383804016,
+      "created": 1785383804016,
+      "name": "ข้อมูลสถานีที่สำหรับจ่ายไฟ",
+      "description": "",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": 200,
+      "authentication": {
+        "type": "basic",
+        "username": "tmsv2.website",
+        "password": "reP@ssw0rd778900"
+      }
+    },
+    {
+      "_id": "fld_charger_main",
+      "_type": "request_group",
+      "parentId": "wrk_ev_charging",
+      "modified": 1785383804016,
+      "created": 1785383804016,
+      "name": "ข้อมูลตู้ชาร์จ – Charger",
+      "description": "",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": 300,
+      "authentication": {
+        "type": "basic",
+        "username": "tmsv2.website",
+        "password": "reP@ssw0rd778900"
+      }
+    },
+    {
+      "_id": "fld_connector_main",
+      "_type": "request_group",
+      "parentId": "wrk_ev_charging",
+      "modified": 1785383804016,
+      "created": 1785383804016,
+      "name": "ข้อมูลหัวชาร์จ – Connector",
+      "description": "",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": 400,
+      "authentication": {
+        "type": "basic",
+        "username": "tmsv2.website",
+        "password": "reP@ssw0rd778900"
+      }
+    },
+    {
+      "_id": "fld_authority_main",
+      "_type": "request_group",
+      "parentId": "wrk_ev_charging",
+      "modified": 1785383804016,
+      "created": 1785383804016,
+      "name": "ข้อมูลสิทธิ์การใช้งาน – Authority",
+      "description": "",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": 500,
+      "authentication": {
+        "type": "basic",
+        "username": "tmsv2.website",
+        "password": "reP@ssw0rd778900"
+      }
+    },
+    {
+      "_id": "fld_users_main",
+      "_type": "request_group",
+      "parentId": "wrk_ev_charging",
+      "modified": 1785383804016,
+      "created": 1785383804016,
+      "name": "ข้อมูลผู้ใช้งาน – Users",
+      "description": "",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": 600,
+      "authentication": {
+        "type": "basic",
+        "username": "tmsv2.website",
+        "password": "reP@ssw0rd778900"
+      }
+    },
+    {
+      "_id": "fld_vehicle_main",
+      "_type": "request_group",
+      "parentId": "wrk_ev_charging",
+      "modified": 1785383804016,
+      "created": 1785383804016,
+      "name": "ข้อมูลรถ – Vehicle",
+      "description": "",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": 700,
+      "authentication": {
+        "type": "basic",
+        "username": "tmsv2.website",
+        "password": "reP@ssw0rd778900"
+      }
+    },
+    {
+      "_id": "fld_vehicle_info",
+      "_type": "request_group",
+      "parentId": "fld_vehicle_main",
+      "modified": 1785383804016,
+      "created": 1785383804016,
+      "name": "ข้อมูลรถ – Vehicle",
+      "description": "",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": 710,
+      "authentication": {}
+    },
+    {
+      "_id": "fld_vehicle_brand",
+      "_type": "request_group",
+      "parentId": "fld_vehicle_main",
+      "modified": 1785383804016,
+      "created": 1785383804016,
+      "name": "ข้อมูลแบรนด์รถ – Brand Vehicle",
+      "description": "",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": 720,
+      "authentication": {}
+    },
+    {
+      "_id": "fld_vehicle_model",
+      "_type": "request_group",
+      "parentId": "fld_vehicle_main",
+      "modified": 1785383804016,
+      "created": 1785383804016,
+      "name": "ข้อมูลโมเดลรถ – Model Vehicle",
+      "description": "",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": 730,
+      "authentication": {}
+    },
+    {
+      "_id": "fld_vehicle_type",
+      "_type": "request_group",
+      "parentId": "fld_vehicle_main",
+      "modified": 1785383804016,
+      "created": 1785383804016,
+      "name": "ข้อมูลประเภทรถ – Type Vehicle",
+      "description": "",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": 740,
+      "authentication": {}
+    },
+    {
+      "_id": "fld_reservation_main",
+      "_type": "request_group",
+      "parentId": "wrk_ev_charging",
+      "modified": 1785383804016,
+      "created": 1785383804016,
+      "name": "ข้อมูลการจอง – Reservation",
+      "description": "",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": 800,
+      "authentication": {
+        "type": "basic",
+        "username": "tmsv2.website",
+        "password": "reP@ssw0rd778900"
+      }
+    },
+    {
+      "_id": "fld_auth_main",
+      "_type": "request_group",
+      "parentId": "wrk_ev_charging",
+      "modified": 1785383804016,
+      "created": 1785383804016,
+      "name": "การยืนยันตัวตน – Auth",
+      "description": "",
+      "environment": {},
+      "environmentPropertyOrder": null,
+      "metaSortKey": 900,
+      "authentication": {
+        "type": "basic",
+        "username": "tmsv2.website",
+        "password": "reP@ssw0rd778900"
+      }
+    },
+    {
+      "_id": "req_stn_get",
+      "_type": "request",
+      "parentId": "fld_station_main",
+      "modified": 1785383804016,
+      "created": 1785383804016,
+      "url": "{{ _.base_url }}/api-evc-v1/station/information",
+      "name": "ดึงข้อมูล – สถานี",
+      "description": "",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "[\n  {\n    \"station_code\": \"ALL\",\n    \"action\": [\n      {\n        \"id\": \"act-01\",\n        \"value\": \"ดึงข้อมูลสถานี\"\n      }\n    ]\n  }\n]"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "lic_code",
+          "value": "{{ _.license }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 1,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_stn_add",
+      "_type": "request",
+      "parentId": "fld_station_main",
+      "modified": 1785383804016,
+      "created": 1785383804016,
+      "url": "{{ _.base_url }}/api-evc-v1/station/information",
+      "name": "เพิ่มข้อมูล – สถานี",
+      "description": "",
+      "method": "PUT",
+      "body": {
+        "mimeType": "application/json",
+        "text": "[\n  {\n    \"station_name\": \"สถานีหลัก 01\",\n    \"action\": [\n      {\n        \"id\": \"act-02\",\n        \"value\": \"เพิ่มสถานี\"\n      }\n    ]\n  }\n]"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "lic_code",
+          "value": "{{ _.license }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 2,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_stn_set",
+      "_type": "request",
+      "parentId": "fld_station_main",
+      "modified": 1785383804016,
+      "created": 1785383804016,
+      "url": "{{ _.base_url }}/api-evc-v1/station/information?station_code=stn-001",
+      "name": "แก้ไขข้อมูล – สถานี",
+      "description": "",
+      "method": "PATCH",
+      "body": {
+        "mimeType": "application/json",
+        "text": "[\n  {\n    \"station_name\": \"สถานีหลัก 01 (แก้ไข)\",\n    \"action\": [\n      {\n        \"id\": \"act-03\",\n        \"value\": \"แก้ไขสถานี\"\n      }\n    ]\n  }\n]"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "lic_code",
+          "value": "{{ _.license }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 3,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_stn_del",
+      "_type": "request",
+      "parentId": "fld_station_main",
+      "modified": 1785383804016,
+      "created": 1785383804016,
+      "url": "{{ _.base_url }}/api-evc-v1/station/information",
+      "name": "ลบข้อมูล – สถานี",
+      "description": "",
+      "method": "DELETE",
+      "body": {
+        "mimeType": "application/json",
+        "text": "[\n  {\n    \"station_code\": [\n      \"stn-001\"\n    ],\n    \"action\": [\n      {\n        \"id\": \"act-04\",\n        \"value\": \"ลบสถานี\"\n      }\n    ]\n  }\n]"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "lic_code",
+          "value": "{{ _.license }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 4,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_stn_chg_get",
+      "_type": "request",
+      "parentId": "fld_station_charger_main",
+      "modified": 1785383804016,
+      "created": 1785383804016,
+      "url": "{{ _.base_url }}/api-evc-v1/station-charger/station-charger",
+      "name": "ดึงข้อมูล – สถานีที่สำหรับจ่ายไฟ",
+      "description": "",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "[\n  {\n    \"search\": \"\",\n    \"action\": [\n      {\n        \"id\": \"act-01\",\n        \"value\": \"ดึงข้อมูลสถานีที่สำหรับจ่ายไฟ\"\n      }\n    ]\n  }\n]"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "lic_code",
+          "value": "{{ _.license }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 1,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_stn_chg_add",
+      "_type": "request",
+      "parentId": "fld_station_charger_main",
+      "modified": 1785383804016,
+      "created": 1785383804016,
+      "url": "{{ _.base_url }}/api-evc-v1/station-charger/station-charger",
+      "name": "เพิ่มข้อมูล – สถานีที่สำหรับจ่ายไฟ",
+      "description": "",
+      "method": "PUT",
+      "body": {
+        "mimeType": "application/json",
+        "text": "[\n  {\n    \"station_code\": \"stn-001\",\n    \"charger_code\": \"chg-001\",\n    \"action\": [\n      {\n        \"id\": \"act-02\",\n        \"value\": \"ผูกสถานีกับตู้ชาร์จ\"\n      }\n    ]\n  }\n]"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "lic_code",
+          "value": "{{ _.license }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 2,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_stn_chg_set",
+      "_type": "request",
+      "parentId": "fld_station_charger_main",
+      "modified": 1785383804016,
+      "created": 1785383804016,
+      "url": "{{ _.base_url }}/api-evc-v1/station-charger/station-charger?id=sc-001",
+      "name": "แก้ไขข้อมูล – สถานีที่สำหรับจ่ายไฟ",
+      "description": "",
+      "method": "PATCH",
+      "body": {
+        "mimeType": "application/json",
+        "text": "[\n  {\n    \"station_code\": \"stn-001\",\n    \"charger_code\": \"chg-002\",\n    \"action\": [\n      {\n        \"id\": \"act-03\",\n        \"value\": \"แก้ไขสถานีกับตู้ชาร์จ\"\n      }\n    ]\n  }\n]"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "lic_code",
+          "value": "{{ _.license }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 3,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_stn_chg_del",
+      "_type": "request",
+      "parentId": "fld_station_charger_main",
+      "modified": 1785383804016,
+      "created": 1785383804016,
+      "url": "{{ _.base_url }}/api-evc-v1/station-charger/station-charger",
+      "name": "ลบข้อมูล – สถานีที่สำหรับจ่ายไฟ",
+      "description": "",
+      "method": "DELETE",
+      "body": {
+        "mimeType": "application/json",
+        "text": "[\n  {\n    \"id\": [\n      \"sc-001\"\n    ],\n    \"action\": [\n      {\n        \"id\": \"act-04\",\n        \"value\": \"ลบสถานีกับตู้ชาร์จ\"\n      }\n    ]\n  }\n]"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "lic_code",
+          "value": "{{ _.license }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 4,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_chg_get",
+      "_type": "request",
+      "parentId": "fld_charger_main",
+      "modified": 1785383804016,
+      "created": 1785383804016,
+      "url": "{{ _.base_url }}/api-evc-v1/charger/information",
+      "name": "ดึงข้อมูล – ตู้ชาร์จ",
+      "description": "",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "[\n  {\n    \"charger_code\": \"ALL\",\n    \"action\": [\n      {\n        \"id\": \"act-01\",\n        \"value\": \"ดึงข้อมูลตู้ชาร์จ\"\n      }\n    ]\n  }\n]"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "lic_code",
+          "value": "{{ _.license }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 1,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_chg_add",
+      "_type": "request",
+      "parentId": "fld_charger_main",
+      "modified": 1785383804016,
+      "created": 1785383804016,
+      "url": "{{ _.base_url }}/api-evc-v1/charger/information",
+      "name": "เพิ่มข้อมูล – ตู้ชาร์จ",
+      "description": "",
+      "method": "PUT",
+      "body": {
+        "mimeType": "application/json",
+        "text": "[\n  {\n    \"charger_name\": \"ตู้ชาร์จ DC 120kW\",\n    \"station_code\": \"stn-001\",\n    \"action\": [\n      {\n        \"id\": \"act-02\",\n        \"value\": \"เพิ่มตู้ชาร์จ\"\n      }\n    ]\n  }\n]"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "lic_code",
+          "value": "{{ _.license }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 2,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_chg_set",
+      "_type": "request",
+      "parentId": "fld_charger_main",
+      "modified": 1785383804016,
+      "created": 1785383804016,
+      "url": "{{ _.base_url }}/api-evc-v1/charger/information?charger_code=chg-001",
+      "name": "แก้ไขข้อมูล – ตู้ชาร์จ",
+      "description": "",
+      "method": "PATCH",
+      "body": {
+        "mimeType": "application/json",
+        "text": "[\n  {\n    \"charger_name\": \"ตู้ชาร์จ DC 120kW (แก้ไข)\",\n    \"max_total_power_kw\": 120,\n    \"action\": [\n      {\n        \"id\": \"act-03\",\n        \"value\": \"แก้ไขตู้ชาร์จ\"\n      }\n    ]\n  }\n]"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "lic_code",
+          "value": "{{ _.license }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 3,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_chg_del",
+      "_type": "request",
+      "parentId": "fld_charger_main",
+      "modified": 1785383804016,
+      "created": 1785383804016,
+      "url": "{{ _.base_url }}/api-evc-v1/charger/information",
+      "name": "ลบข้อมูล – ตู้ชาร์จ",
+      "description": "",
+      "method": "DELETE",
+      "body": {
+        "mimeType": "application/json",
+        "text": "[\n  {\n    \"charger_code\": [\n      \"chg-001\"\n    ],\n    \"action\": [\n      {\n        \"id\": \"act-04\",\n        \"value\": \"ลบตู้ชาร์จ\"\n      }\n    ]\n  }\n]"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "lic_code",
+          "value": "{{ _.license }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 4,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_con_get",
+      "_type": "request",
+      "parentId": "fld_connector_main",
+      "modified": 1785383804016,
+      "created": 1785383804016,
+      "url": "{{ _.base_url }}/api-evc-v1/connector/get-connector",
+      "name": "ดึงข้อมูล – หัวชาร์จ",
+      "description": "",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "[\n  {\n    \"connector_code\": \"ALL\",\n    \"action\": [\n      {\n        \"id\": \"act-01\",\n        \"value\": \"ดึงข้อมูลหัวชาร์จ\"\n      }\n    ]\n  }\n]"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "lic_code",
+          "value": "{{ _.license }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 1,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_con_add",
+      "_type": "request",
+      "parentId": "fld_connector_main",
+      "modified": 1785383804016,
+      "created": 1785383804016,
+      "url": "{{ _.base_url }}/api-evc-v1/connector/add-connector",
+      "name": "เพิ่มข้อมูล – หัวชาร์จ",
+      "description": "",
+      "method": "PUT",
+      "body": {
+        "mimeType": "application/json",
+        "text": "[\n  {\n    \"connector_name\": \"CCS2 #1\",\n    \"connector_type\": \"CCS2\",\n    \"power_type\": \"DC\",\n    \"max_connector_power_kw\": 120,\n    \"action\": [\n      {\n        \"id\": \"act-02\",\n        \"value\": \"เพิ่มหัวชาร์จ\"\n      }\n    ]\n  }\n]"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "lic_code",
+          "value": "{{ _.license }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 2,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_con_set",
+      "_type": "request",
+      "parentId": "fld_connector_main",
+      "modified": 1785383804016,
+      "created": 1785383804016,
+      "url": "{{ _.base_url }}/api-evc-v1/connector/set-connector?connector_code=con-001",
+      "name": "แก้ไขข้อมูล – หัวชาร์จ",
+      "description": "",
+      "method": "PATCH",
+      "body": {
+        "mimeType": "application/json",
+        "text": "[\n  {\n    \"connector_name\": \"CCS2 #1 (แก้ไข)\",\n    \"action\": [\n      {\n        \"id\": \"act-03\",\n        \"value\": \"แก้ไขหัวชาร์จ\"\n      }\n    ]\n  }\n]"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "lic_code",
+          "value": "{{ _.license }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 3,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_con_del",
+      "_type": "request",
+      "parentId": "fld_connector_main",
+      "modified": 1785383804016,
+      "created": 1785383804016,
+      "url": "{{ _.base_url }}/api-evc-v1/connector/remove-connector",
+      "name": "ลบข้อมูล – หัวชาร์จ",
+      "description": "",
+      "method": "DELETE",
+      "body": {
+        "mimeType": "application/json",
+        "text": "[\n  {\n    \"connector_code\": [\n      \"con-001\"\n    ],\n    \"action\": [\n      {\n        \"id\": \"act-04\",\n        \"value\": \"ลบหัวชาร์จ\"\n      }\n    ]\n  }\n]"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "lic_code",
+          "value": "{{ _.license }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 4,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_aut_get",
+      "_type": "request",
+      "parentId": "fld_authority_main",
+      "modified": 1785383804016,
+      "created": 1785383804016,
+      "url": "{{ _.base_url }}/api-evc-v1/authority/information",
+      "name": "ดึงข้อมูล – สิทธิ์การใช้งาน",
+      "description": "",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "[\n  {\n    \"authority_code\": \"ALL\",\n    \"action\": [\n      {\n        \"id\": \"act-01\",\n        \"value\": \"ดึงข้อมูลสิทธิ์การใช้งาน\"\n      }\n    ]\n  }\n]"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "lic_code",
+          "value": "{{ _.license }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 1,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_aut_add",
+      "_type": "request",
+      "parentId": "fld_authority_main",
+      "modified": 1785383804016,
+      "created": 1785383804016,
+      "url": "{{ _.base_url }}/api-evc-v1/authority/information",
+      "name": "เพิ่มข้อมูล – สิทธิ์การใช้งาน",
+      "description": "",
+      "method": "PUT",
+      "body": {
+        "mimeType": "application/json",
+        "text": "[\n  {\n    \"authority_name\": \"Admin\",\n    \"action\": [\n      {\n        \"id\": \"act-02\",\n        \"value\": \"เพิ่มสิทธิ์การใช้งาน\"\n      }\n    ]\n  }\n]"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "lic_code",
+          "value": "{{ _.license }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 2,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_aut_set",
+      "_type": "request",
+      "parentId": "fld_authority_main",
+      "modified": 1785383804016,
+      "created": 1785383804016,
+      "url": "{{ _.base_url }}/api-evc-v1/authority/information?authority_code=aut-001",
+      "name": "แก้ไขข้อมูล – สิทธิ์การใช้งาน",
+      "description": "",
+      "method": "PATCH",
+      "body": {
+        "mimeType": "application/json",
+        "text": "[\n  {\n    \"authority_name\": \"Super Admin\",\n    \"action\": [\n      {\n        \"id\": \"act-03\",\n        \"value\": \"แก้ไขสิทธิ์การใช้งาน\"\n      }\n    ]\n  }\n]"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "lic_code",
+          "value": "{{ _.license }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 3,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_aut_del",
+      "_type": "request",
+      "parentId": "fld_authority_main",
+      "modified": 1785383804016,
+      "created": 1785383804016,
+      "url": "{{ _.base_url }}/api-evc-v1/authority/information",
+      "name": "ลบข้อมูล – สิทธิ์การใช้งาน",
+      "description": "",
+      "method": "DELETE",
+      "body": {
+        "mimeType": "application/json",
+        "text": "[\n  {\n    \"authority_code\": [\n      \"aut-001\"\n    ],\n    \"action\": [\n      {\n        \"id\": \"act-04\",\n        \"value\": \"ลบสิทธิ์การใช้งาน\"\n      }\n    ]\n  }\n]"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "lic_code",
+          "value": "{{ _.license }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 4,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_usr_get",
+      "_type": "request",
+      "parentId": "fld_users_main",
+      "modified": 1785383804016,
+      "created": 1785383804016,
+      "url": "{{ _.base_url }}/api-evc-v1/users/information",
+      "name": "ดึงข้อมูล – ผู้ใช้งาน",
+      "description": "",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "[\n  {\n    \"user_code\": \"ALL\",\n    \"action\": [\n      {\n        \"id\": \"act-01\",\n        \"value\": \"ดึงข้อมูลผู้ใช้งาน\"\n      }\n    ]\n  }\n]"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "lic_code",
+          "value": "{{ _.license }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 1,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_usr_add",
+      "_type": "request",
+      "parentId": "fld_users_main",
+      "modified": 1785383804016,
+      "created": 1785383804016,
+      "url": "{{ _.base_url }}/api-evc-v1/users/information",
+      "name": "เพิ่มข้อมูล – ผู้ใช้งาน",
+      "description": "",
+      "method": "PUT",
+      "body": {
+        "mimeType": "application/json",
+        "text": "[\n  {\n    \"user_name\": \"somchai\",\n    \"user_password\": \"password123\",\n    \"name\": \"สมชาย\",\n    \"lastname\": \"ใจดี\",\n    \"email\": \"somchai@example.com\",\n    \"action\": [\n      {\n        \"id\": \"act-02\",\n        \"value\": \"เพิ่มผู้ใช้งาน\"\n      }\n    ]\n  }\n]"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "lic_code",
+          "value": "{{ _.license }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 2,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_usr_set",
+      "_type": "request",
+      "parentId": "fld_users_main",
+      "modified": 1785383804016,
+      "created": 1785383804016,
+      "url": "{{ _.base_url }}/api-evc-v1/users/information?user_code=usr-001",
+      "name": "แก้ไขข้อมูล – ผู้ใช้งาน",
+      "description": "",
+      "method": "PATCH",
+      "body": {
+        "mimeType": "application/json",
+        "text": "[\n  {\n    \"name\": \"สมชาย (แก้ไข)\",\n    \"lastname\": \"ใจดีมาก\",\n    \"action\": [\n      {\n        \"id\": \"act-03\",\n        \"value\": \"แก้ไขผู้ใช้งาน\"\n      }\n    ]\n  }\n]"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "lic_code",
+          "value": "{{ _.license }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 3,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_usr_del",
+      "_type": "request",
+      "parentId": "fld_users_main",
+      "modified": 1785383804016,
+      "created": 1785383804016,
+      "url": "{{ _.base_url }}/api-evc-v1/users/information",
+      "name": "ลบข้อมูล – ผู้ใช้งาน",
+      "description": "",
+      "method": "DELETE",
+      "body": {
+        "mimeType": "application/json",
+        "text": "[\n  {\n    \"user_code\": [\n      \"usr-001\"\n    ],\n    \"action\": [\n      {\n        \"id\": \"act-04\",\n        \"value\": \"ลบผู้ใช้งาน\"\n      }\n    ]\n  }\n]"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "lic_code",
+          "value": "{{ _.license }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 4,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_veh_info_get",
+      "_type": "request",
+      "parentId": "fld_vehicle_info",
+      "modified": 1785383804016,
+      "created": 1785383804016,
+      "url": "{{ _.base_url }}/api-evc-v1/vehicle/information",
+      "name": "ดึงข้อมูล – รถ",
+      "description": "",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "[\n  {\n    \"vehicle_code\": \"ALL\",\n    \"search\": \"\",\n    \"page_index\": 1,\n    \"page_limit\": 10,\n    \"action\": [\n      {\n        \"id\": \"act-01\",\n        \"value\": \"ดึงข้อมูลรถยนต์\"\n      }\n    ]\n  }\n]"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "lic_code",
+          "value": "{{ _.license }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 1,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_veh_info_add",
+      "_type": "request",
+      "parentId": "fld_vehicle_info",
+      "modified": 1785383804016,
+      "created": 1785383804016,
+      "url": "{{ _.base_url }}/api-evc-v1/vehicle/information",
+      "name": "เพิ่มข้อมูล – รถ",
+      "description": "",
+      "method": "PUT",
+      "body": {
+        "mimeType": "application/json",
+        "text": "[\n  {\n    \"vehicle_name\": \"Tesla Model 3 Performance\",\n    \"vehicle_license\": \"กก 1234\",\n    \"model_code\": \"mdl-20260730000001\",\n    \"battery_capacity_kwh\": 78.1,\n    \"max_ac_charge_rate_kw\": 11,\n    \"max_dc_charge_rate_kw\": 250,\n    \"supported_connectors\": [\n      \"Type 2\",\n      \"CCS2\"\n    ],\n    \"action\": [\n      {\n        \"id\": \"act-02\",\n        \"value\": \"เพิ่มรถยนต์\"\n      }\n    ]\n  }\n]"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "lic_code",
+          "value": "{{ _.license }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 2,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_veh_info_set",
+      "_type": "request",
+      "parentId": "fld_vehicle_info",
+      "modified": 1785383804016,
+      "created": 1785383804016,
+      "url": "{{ _.base_url }}/api-evc-v1/vehicle/information?vehicle_code=veh-20260730000001",
+      "name": "แก้ไขข้อมูล – รถ",
+      "description": "",
+      "method": "PATCH",
+      "body": {
+        "mimeType": "application/json",
+        "text": "[\n  {\n    \"vehicle_name\": \"Tesla Model 3 Long Range\",\n    \"vehicle_license\": \"ขข 5678\",\n    \"battery_capacity_kwh\": 82,\n    \"action\": [\n      {\n        \"id\": \"act-03\",\n        \"value\": \"แก้ไขรถยนต์\"\n      }\n    ]\n  }\n]"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "lic_code",
+          "value": "{{ _.license }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 3,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_veh_info_del",
+      "_type": "request",
+      "parentId": "fld_vehicle_info",
+      "modified": 1785383804016,
+      "created": 1785383804016,
+      "url": "{{ _.base_url }}/api-evc-v1/vehicle/information",
+      "name": "ลบข้อมูล – รถ",
+      "description": "",
+      "method": "DELETE",
+      "body": {
+        "mimeType": "application/json",
+        "text": "[\n  {\n    \"vehicle_code\": [\n      \"veh-20260730000001\"\n    ],\n    \"action\": [\n      {\n        \"id\": \"act-04\",\n        \"value\": \"ลบรถยนต์\"\n      }\n    ]\n  }\n]"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "lic_code",
+          "value": "{{ _.license }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 4,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_veh_brand_get",
+      "_type": "request",
+      "parentId": "fld_vehicle_brand",
+      "modified": 1785383804016,
+      "created": 1785383804016,
+      "url": "{{ _.base_url }}/api-evc-v1/vehicle/brand",
+      "name": "ดึงข้อมูล – แบรนด์รถ",
+      "description": "",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "[\n  {\n    \"brand_code\": \"ALL\",\n    \"search\": \"\",\n    \"page_index\": 1,\n    \"page_limit\": 10,\n    \"action\": [\n      {\n        \"id\": \"act-01\",\n        \"value\": \"ดึงข้อมูลแบรนด์รถ\"\n      }\n    ]\n  }\n]"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "lic_code",
+          "value": "{{ _.license }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 1,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_veh_brand_add",
+      "_type": "request",
+      "parentId": "fld_vehicle_brand",
+      "modified": 1785383804016,
+      "created": 1785383804016,
+      "url": "{{ _.base_url }}/api-evc-v1/vehicle/brand",
+      "name": "เพิ่มข้อมูล – แบรนด์รถ",
+      "description": "",
+      "method": "PUT",
+      "body": {
+        "mimeType": "application/json",
+        "text": "[\n  {\n    \"brand_name\": \"Tesla\",\n    \"action\": [\n      {\n        \"id\": \"act-02\",\n        \"value\": \"เพิ่มแบรนด์รถ\"\n      }\n    ]\n  }\n]"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "lic_code",
+          "value": "{{ _.license }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 2,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_veh_brand_set",
+      "_type": "request",
+      "parentId": "fld_vehicle_brand",
+      "modified": 1785383804016,
+      "created": 1785383804016,
+      "url": "{{ _.base_url }}/api-evc-v1/vehicle/brand?brand_code=brd-20260730000001",
+      "name": "แก้ไขข้อมูล – แบรนด์รถ",
+      "description": "",
+      "method": "PATCH",
+      "body": {
+        "mimeType": "application/json",
+        "text": "[\n  {\n    \"brand_name\": \"Tesla Motors\",\n    \"action\": [\n      {\n        \"id\": \"act-03\",\n        \"value\": \"แก้ไขแบรนด์รถ\"\n      }\n    ]\n  }\n]"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "lic_code",
+          "value": "{{ _.license }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 3,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_veh_brand_del",
+      "_type": "request",
+      "parentId": "fld_vehicle_brand",
+      "modified": 1785383804016,
+      "created": 1785383804016,
+      "url": "{{ _.base_url }}/api-evc-v1/vehicle/brand",
+      "name": "ลบข้อมูล – แบรนด์รถ",
+      "description": "",
+      "method": "DELETE",
+      "body": {
+        "mimeType": "application/json",
+        "text": "[\n  {\n    \"brand_code\": [\n      \"brd-20260730000001\"\n    ],\n    \"action\": [\n      {\n        \"id\": \"act-04\",\n        \"value\": \"ลบแบรนด์รถ\"\n      }\n    ]\n  }\n]"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "lic_code",
+          "value": "{{ _.license }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 4,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_veh_model_get",
+      "_type": "request",
+      "parentId": "fld_vehicle_model",
+      "modified": 1785383804016,
+      "created": 1785383804016,
+      "url": "{{ _.base_url }}/api-evc-v1/vehicle/model",
+      "name": "ดึงข้อมูล – โมเดลรถ",
+      "description": "",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "[\n  {\n    \"model_code\": \"ALL\",\n    \"search\": \"\",\n    \"page_index\": 1,\n    \"page_limit\": 10,\n    \"action\": [\n      {\n        \"id\": \"act-01\",\n        \"value\": \"ดึงข้อมูลโมเดลรถ\"\n      }\n    ]\n  }\n]"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "lic_code",
+          "value": "{{ _.license }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 1,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_veh_model_add",
+      "_type": "request",
+      "parentId": "fld_vehicle_model",
+      "modified": 1785383804016,
+      "created": 1785383804016,
+      "url": "{{ _.base_url }}/api-evc-v1/vehicle/model",
+      "name": "เพิ่มข้อมูล – โมเดลรถ",
+      "description": "",
+      "method": "PUT",
+      "body": {
+        "mimeType": "application/json",
+        "text": "[\n  {\n    \"brand_code\": \"brd-20260730000001\",\n    \"model_name\": \"Model Y\",\n    \"action\": [\n      {\n        \"id\": \"act-02\",\n        \"value\": \"เพิ่มโมเดลรถ\"\n      }\n    ]\n  }\n]"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "lic_code",
+          "value": "{{ _.license }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 2,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_veh_model_set",
+      "_type": "request",
+      "parentId": "fld_vehicle_model",
+      "modified": 1785383804016,
+      "created": 1785383804016,
+      "url": "{{ _.base_url }}/api-evc-v1/vehicle/model?model_code=mdl-20260730000001",
+      "name": "แก้ไขข้อมูล – โมเดลรถ",
+      "description": "",
+      "method": "PATCH",
+      "body": {
+        "mimeType": "application/json",
+        "text": "[\n  {\n    \"brand_code\": \"brd-20260730000001\",\n    \"model_name\": \"Model Y Long Range\",\n    \"action\": [\n      {\n        \"id\": \"act-03\",\n        \"value\": \"แก้ไขโมเดลรถ\"\n      }\n    ]\n  }\n]"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "lic_code",
+          "value": "{{ _.license }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 3,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_veh_model_del",
+      "_type": "request",
+      "parentId": "fld_vehicle_model",
+      "modified": 1785383804016,
+      "created": 1785383804016,
+      "url": "{{ _.base_url }}/api-evc-v1/vehicle/model",
+      "name": "ลบข้อมูล – โมเดลรถ",
+      "description": "",
+      "method": "DELETE",
+      "body": {
+        "mimeType": "application/json",
+        "text": "[\n  {\n    \"model_code\": [\n      \"mdl-20260730000001\"\n    ],\n    \"action\": [\n      {\n        \"id\": \"act-04\",\n        \"value\": \"ลบโมเดลรถ\"\n      }\n    ]\n  }\n]"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "lic_code",
+          "value": "{{ _.license }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 4,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_veh_type_get",
+      "_type": "request",
+      "parentId": "fld_vehicle_type",
+      "modified": 1785383804016,
+      "created": 1785383804016,
+      "url": "{{ _.base_url }}/api-evc-v1/vehicle/type",
+      "name": "ดึงข้อมูล – ประเภทรถ",
+      "description": "",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "[\n  {\n    \"veh_type_code\": \"ALL\",\n    \"search\": \"\",\n    \"page_index\": 1,\n    \"page_limit\": 10,\n    \"action\": [\n      {\n        \"id\": \"act-01\",\n        \"value\": \"ดึงข้อมูลประเภทรถ\"\n      }\n    ]\n  }\n]"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "lic_code",
+          "value": "{{ _.license }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 1,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_veh_type_add",
+      "_type": "request",
+      "parentId": "fld_vehicle_type",
+      "modified": 1785383804016,
+      "created": 1785383804016,
+      "url": "{{ _.base_url }}/api-evc-v1/vehicle/type",
+      "name": "เพิ่มข้อมูล – ประเภทรถ",
+      "description": "",
+      "method": "PUT",
+      "body": {
+        "mimeType": "application/json",
+        "text": "[\n  {\n    \"veh_type_name\": \"รถยนต์นั่งส่วนบุคคล EV\",\n    \"width\": 1.85,\n    \"height\": 1.45,\n    \"length\": 4.7,\n    \"speed_limit\": 120,\n    \"passenger_limit\": 5,\n    \"action\": [\n      {\n        \"id\": \"act-02\",\n        \"value\": \"เพิ่มประเภทรถ\"\n      }\n    ]\n  }\n]"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "lic_code",
+          "value": "{{ _.license }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 2,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_veh_type_set",
+      "_type": "request",
+      "parentId": "fld_vehicle_type",
+      "modified": 1785383804016,
+      "created": 1785383804016,
+      "url": "{{ _.base_url }}/api-evc-v1/vehicle/type?veh_type_code=typ-20260730000001",
+      "name": "แก้ไขข้อมูล – ประเภทรถ",
+      "description": "",
+      "method": "PATCH",
+      "body": {
+        "mimeType": "application/json",
+        "text": "[\n  {\n    \"veh_type_name\": \"รถยนต์นั่งส่วนบุคคล EV High Speed\",\n    \"action\": [\n      {\n        \"id\": \"act-03\",\n        \"value\": \"แก้ไขประเภทรถ\"\n      }\n    ]\n  }\n]"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "lic_code",
+          "value": "{{ _.license }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 3,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_veh_type_del",
+      "_type": "request",
+      "parentId": "fld_vehicle_type",
+      "modified": 1785383804016,
+      "created": 1785383804016,
+      "url": "{{ _.base_url }}/api-evc-v1/vehicle/type",
+      "name": "ลบข้อมูล – ประเภทรถ",
+      "description": "",
+      "method": "DELETE",
+      "body": {
+        "mimeType": "application/json",
+        "text": "[\n  {\n    \"veh_type_code\": [\n      \"typ-20260730000001\"\n    ],\n    \"action\": [\n      {\n        \"id\": \"act-04\",\n        \"value\": \"ลบประเภทรถ\"\n      }\n    ]\n  }\n]"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "lic_code",
+          "value": "{{ _.license }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 4,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_res_get",
+      "_type": "request",
+      "parentId": "fld_reservation_main",
+      "modified": 1785383804016,
+      "created": 1785383804016,
+      "url": "{{ _.base_url }}/api-evc-v1/reservation/information",
+      "name": "ดึงข้อมูล – การจอง",
+      "description": "",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "[\n  {\n    \"reservation_code\": \"ALL\",\n    \"action\": [\n      {\n        \"id\": \"act-01\",\n        \"value\": \"ดึงข้อมูลการจอง\"\n      }\n    ]\n  }\n]"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "lic_code",
+          "value": "{{ _.license }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 1,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_res_add",
+      "_type": "request",
+      "parentId": "fld_reservation_main",
+      "modified": 1785383804016,
+      "created": 1785383804016,
+      "url": "{{ _.base_url }}/api-evc-v1/reservation/information",
+      "name": "เพิ่มข้อมูล – การจอง",
+      "description": "",
+      "method": "PUT",
+      "body": {
+        "mimeType": "application/json",
+        "text": "[\n  {\n    \"connector_code\": \"con-001\",\n    \"vehicle_code\": \"veh-001\",\n    \"action\": [\n      {\n        \"id\": \"act-02\",\n        \"value\": \"จองคิวชาร์จ\"\n      }\n    ]\n  }\n]"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "lic_code",
+          "value": "{{ _.license }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 2,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_res_set",
+      "_type": "request",
+      "parentId": "fld_reservation_main",
+      "modified": 1785383804016,
+      "created": 1785383804016,
+      "url": "{{ _.base_url }}/api-evc-v1/reservation/information?reservation_code=res-001",
+      "name": "แก้ไขข้อมูล – การจอง",
+      "description": "",
+      "method": "PATCH",
+      "body": {
+        "mimeType": "application/json",
+        "text": "[\n  {\n    \"reservation_status\": \"CANCELLED\",\n    \"action\": [\n      {\n        \"id\": \"act-03\",\n        \"value\": \"ยกเลิกการจอง\"\n      }\n    ]\n  }\n]"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "lic_code",
+          "value": "{{ _.license }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 3,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_res_del",
+      "_type": "request",
+      "parentId": "fld_reservation_main",
+      "modified": 1785383804016,
+      "created": 1785383804016,
+      "url": "{{ _.base_url }}/api-evc-v1/reservation/information",
+      "name": "ลบข้อมูล – การจอง",
+      "description": "",
+      "method": "DELETE",
+      "body": {
+        "mimeType": "application/json",
+        "text": "[\n  {\n    \"reservation_code\": [\n      \"res-001\"\n    ],\n    \"action\": [\n      {\n        \"id\": \"act-04\",\n        \"value\": \"ลบการจอง\"\n      }\n    ]\n  }\n]"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "lic_code",
+          "value": "{{ _.license }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 4,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_res_start",
+      "_type": "request",
+      "parentId": "fld_reservation_main",
+      "modified": 1785383804016,
+      "created": 1785383804016,
+      "url": "{{ _.base_url }}/api-evc-v1/reservation/start",
+      "name": "เริ่มการชาร์จ – Start Charging",
+      "description": "",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "[\n  {\n    \"reservation_code\": \"res-001\",\n    \"action\": [\n      {\n        \"id\": \"act-05\",\n        \"value\": \"เริ่มชาร์จ\"\n      }\n    ]\n  }\n]"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "lic_code",
+          "value": "{{ _.license }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 5,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_res_end",
+      "_type": "request",
+      "parentId": "fld_reservation_main",
+      "modified": 1785383804016,
+      "created": 1785383804016,
+      "url": "{{ _.base_url }}/api-evc-v1/reservation/end",
+      "name": "สิ้นสุดการชาร์จ – End Charging",
+      "description": "",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "[\n  {\n    \"reservation_code\": \"res-001\",\n    \"energy_delivered_kwh\": 45.5,\n    \"action\": [\n      {\n        \"id\": \"act-06\",\n        \"value\": \"จบชาร์จ\"\n      }\n    ]\n  }\n]"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "lic_code",
+          "value": "{{ _.license }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 6,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_auth_get",
+      "_type": "request",
+      "parentId": "fld_auth_main",
+      "modified": 1785383804016,
+      "created": 1785383804016,
+      "url": "{{ _.base_url }}/api-evc-v1/auth/information",
+      "name": "เข้าสู่ระบบ",
+      "description": "",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "[\n  {\n    \"user_name\": \"somchai\",\n    \"user_password\": \"password123\",\n    \"action\": [\n      {\n        \"id\": \"act-01\",\n        \"value\": \"เข้าสู่ระบบ\"\n      }\n    ]\n  }\n]"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "lic_code",
+          "value": "{{ _.license }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 1,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    },
+    {
+      "_id": "req_auth_reset",
+      "_type": "request",
+      "parentId": "fld_auth_main",
+      "modified": 1785383804016,
+      "created": 1785383804016,
+      "url": "{{ _.base_url }}/api-evc-v1/auth/reset/information",
+      "name": "เปลี่ยนรหัสผ่าน",
+      "description": "",
+      "method": "PATCH",
+      "body": {
+        "mimeType": "application/json",
+        "text": "[\n  {\n    \"user_code\": \"usr-001\",\n    \"new_password\": \"newpassword123\",\n    \"action\": [\n      {\n        \"id\": \"act-02\",\n        \"value\": \"เปลี่ยนรหัสผ่าน\"\n      }\n    ]\n  }\n]"
+      },
+      "parameters": [],
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "lic_code",
+          "value": "{{ _.license }}"
+        }
+      ],
+      "authentication": {},
+      "metaSortKey": 2,
+      "isPrivate": false,
+      "settingStoreCookies": true,
+      "settingSendCookies": true,
+      "settingDisableRenderRequestBody": false,
+      "settingEncodeUrl": true,
+      "settingRebuildPath": true,
+      "settingFollowRedirects": "global"
+    }
+  ]
+}

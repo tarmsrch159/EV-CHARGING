@@ -12,38 +12,17 @@ const moment = require('moment');
 const cron = require('node-cron');
 const axios = require('axios');
 
-var employeeRouter = require('./routes/employee/index');
-var divisionRouter = require('./routes/division/index');
-var departmentRouter = require('./routes/department/index');
-var positionRouter = require('./routes/position/index');
-var driverRouter = require('./routes/driver/index');
 var authRouter = require('./routes/auth/index');
-var officeRouter = require('./routes/office/index');
-var locationRouter = require('./routes/location/index');
+var usersRouter = require('./routes/users/index');
+var authorityRouter = require('./routes/authority/index');
+var stationRouter = require('./routes/station/index');
+var chargerRouter = require('./routes/charger/index');
+var connectorRouter = require('./routes/connector/index');
 var vehicleRouter = require('./routes/vehicle/index');
-var orderRouter = require('./routes/order/index');
-var itemRouter = require('./routes/item/index');
-var transporeonRouter = require('./routes/transporeon/index');
-var petrolRouter = require('./routes/petrol/index');
-var depotRouter = require('./routes/depot/index');
+var reservationRouter = require('./routes/reservation/index');
+var transactionLogRouter = require('./routes/transaction-log/index');
+var stationChargerRouter = require('./routes/station-charger-connector/index');
 var utilityRouter = require('./routes/utility/index');
-var centerRouter = require('./routes/center/index');
-var jobRouter = require('./routes/job/index');
-var trackingRouter = require('./routes/tracking/index');
-var reportRouter = require('./routes/report/index');
-var masterTimeRouter = require('./routes/master-time/index');
-var reasonRouter = require('./routes/reason/index');
-var runoutConfigRouter = require('./routes/runout-config/index');
-var sapAlertConfigRouter = require('./routes/sap-alert-config/index');
-var autoOrderMailsRouter = require('./routes/auto-order-mails/index');
-var manualStockRouter = require('./routes/manual-stock/index');
-var salesOrgConfigRouter = require('./routes/sales-org-config/index');
-const autoOrderMailsController = require('./routes/auto-order-mails/auto-order-mails');
-const autoOrderMailsScheduler = require('./routes/auto-order-mails/auto-order-mail-scheduler');
-const orderController = require('./routes/order/order');
-var lowStockAlertRouter = require('./routes/low-stock/index');
-const lowStockAlertScheduler = require('./routes/low-stock/low-stock-scheduler');
-const orderScheduler = require('./routes/order/order-sap-scheduler');
 var app = express();
 var cors = require('cors');
 var config = require('./configuration/connection');
@@ -294,103 +273,28 @@ exports.xAuthorization = async (req, res) => {
     }
 }
 
-//auth
-app.use('/api-tms-v2/auth', authRouter);
-//employee
-app.use('/api-tms-v2/employee', employeeRouter);
-//division
-app.use('/api-tms-v2/division', divisionRouter);
-//department
-app.use('/api-tms-v2/department', departmentRouter);
-//position
-app.use('/api-tms-v2/position', positionRouter);
-//driver
-app.use('/api-tms-v2/driver', driverRouter);
-//office
-app.use('/api-tms-v2/office', officeRouter);
-//location
-app.use('/api-tms-v2/location', locationRouter);
-//vehicle
-app.use('/api-tms-v2/vehicle', vehicleRouter);
-//order
-app.use('/api-tms-v2/order', orderRouter);
-//item
-app.use('/api-tms-v2/item', itemRouter);
-//transporeon
-app.use('/api-tms-v2/transporeon', transporeonRouter);
-//Petrol
-app.use('/api-tms-v2/petrol', petrolRouter);
-//Depot
-app.use('/api-tms-v2/depot', depotRouter);
-//Utility
-app.use('/api-tms-v2/utility', utilityRouter);
-//Center
-app.use('/api-tms-v2/center', centerRouter);
-//Job
-app.use('/api-tms-v2/job', jobRouter);
-//Tracking
-app.use('/api-tms-v2/tracking', trackingRouter);
-//Report
-app.use('/api-tms-v2/report', reportRouter);
-//MasterTime
-app.use('/api-tms-v2/master-time', masterTimeRouter);
-//Reason
-app.use('/api-tms-v2/reason', reasonRouter);
-//Runout Config
-app.use('/api-tms-v2/runout-config', runoutConfigRouter);
-//SAP Alert Config
-app.use('/api-tms-v2/sap-alert-config', sapAlertConfigRouter);
-//Auto Order Mails
-app.use('/api-tms-v2/auto-order-mails', autoOrderMailsRouter);
-//Low Stock Alert
-app.use('/api-tms-v2/low-stock-alert', lowStockAlertRouter);
-//Manual Stock
-app.use('/api-tms-v2/manual-stock', manualStockRouter);
-//Sales Org Config
-app.use('/api-tms-v2/sales-org-config', salesOrgConfigRouter);
-
-
-// ตั้งเวลาทำงานทุก 1 ชั่วโมง
-// cron.schedule('0 * * * *', async () => {
-//     console.log('--- Start Hourly Cron Job: SAP Order Sync ---');
-//     let toDay = moment().format('YYYYMMDD');
-//     let toDayPlusOne = moment().add(1, 'days').format('YYYYMMDD');
-
-//     const options = {
-//         method: 'POST',
-//         url: 'http://localhost:9100/api-tms-v2/order/order-hana/information',
-//         headers: {
-//             'Content-Type': 'application/json',
-//             lic_code: 'aos01',
-//             Authorization: 'Basic dG1zdjIud2Vic2l0ZTpyZVBAc3N3MHJkNzc4OTAw'
-//         },
-//         data: [
-//             {
-//                 SOInputParameter: {
-//                     SalesOrderList: [],
-//                     SalesOrderTypeList: [],
-//                     ShipToPartyList: [],
-//                     CreationDate: toDay,
-//                     CreationTime: '',
-//                     CreationDateTo: toDayPlusOne,
-//                     CreationTimeTo: '',
-//                     CustomerPurchaseOrderType: '',
-//                     CustomerGroup1List: [],
-//                     NameofOrdererList: [],
-//                     action: [{ id: 'empl-1747190398748', value: '00001' }]
-//                 }
-//             }
-//         ]
-//     };
-
-//     axios.request(options).then(function (response) {
-//         console.log(response.data);
-//     }).catch(function (error) {
-//         console.error(error);
-//     });
-// }, {
-//     timezone: "Asia/Bangkok"
-// });
+// auth
+app.use('/api-evc-v1/auth', authRouter);
+// users
+app.use('/api-evc-v1/users', usersRouter);
+// authority
+app.use('/api-evc-v1/authority', authorityRouter);
+// station
+app.use('/api-evc-v1/station', stationRouter);
+// charger
+app.use('/api-evc-v1/charger', chargerRouter);
+// connector
+app.use('/api-evc-v1/connector', connectorRouter);
+// vehicle
+app.use('/api-evc-v1/vehicle', vehicleRouter);
+// reservation
+app.use('/api-evc-v1/reservation', reservationRouter);
+// transaction-log
+app.use('/api-evc-v1/transaction-log', transactionLogRouter);
+// Station Charger
+app.use('/api-evc-v1/station-charger', stationChargerRouter);
+// utility
+app.use('/api-evc-v1/utility', utilityRouter);
 
 // catch 404 and forward to error handler
 app.use(function (req, res, next) {
@@ -407,12 +311,5 @@ app.use(function (err, req, res, next) {
     res.status(err.status || 500);
     res.render('error');
 });
-
-// Background Scheduler สำหรับ Auto Order Mail
-autoOrderMailsScheduler.startAutoOrderMailLoop(); // Production รันทุกๆ 10 นาที
-// Background Scheduler สำหรับแจ้งเตือน Low Stock
-lowStockAlertScheduler.startLowStockLoop();
-// Background Scheduler สำหรับดึงข้อมูลออเดอร์จาก SAP
-orderScheduler.startOrderSapScheduler();
 
 module.exports = app;
