@@ -6,6 +6,7 @@ const xglobal = new require('../../middleware/global');
 const dbPrefix = config.dbPrefix();
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 // API เข้าสู่ระบบผู้ใช้งาน (User Authentication)
 exports.authUserInformation = async (req, res, next) => {
     try {
@@ -16,12 +17,17 @@ exports.authUserInformation = async (req, res, next) => {
             action
         } = req.body[0] || {};
 =======
+=======
+>>>>>>> parent of 7fbf438 (Update Backend)
 //example https://stackoverflow.com/questions/6182315/how-can-i-do-base64-encoding-in-node-js
 //example https://stackoverflow.com/questions/6182315/how-can-i-do-base64-encoding-in-node-js
 exports.authEmployeeInformation = async (req, res, next) => {
     // console.log(dbPrefix);
     var xresult = [];
+<<<<<<< HEAD
 >>>>>>> parent of e952446 (first commit)
+=======
+>>>>>>> parent of 7fbf438 (Update Backend)
 
     return (async () => {
         let lic_code = req.header('lic_code');
@@ -36,6 +42,7 @@ exports.authEmployeeInformation = async (req, res, next) => {
                 response_time: moment().format('YYYY-MM-DD HH:mm:ss')
             }]
 
+<<<<<<< HEAD
 <<<<<<< HEAD
         if (!lic_code || !username || !password) {
             return sendResponse(
@@ -95,6 +102,12 @@ exports.authEmployeeInformation = async (req, res, next) => {
             return
         } else {
 
+=======
+            res.status(200).send(response);
+            return
+        } else {
+
+>>>>>>> parent of 7fbf438 (Update Backend)
             let script = ``;
             if (emp_userpassword != '' && emp_userpassword != '') {
                 let emp_encode = xglobal.Base64.encode(emp_userpassword);
@@ -115,7 +128,10 @@ exports.authEmployeeInformation = async (req, res, next) => {
                     left join tbl_petrol on tbl_employee.ptrl_code = tbl_petrol.ptrl_code 
                     where emp_flag = '1' and emp_username = '${emp_username}' and emp_userpassword = '${emp_encode}'`;
                 script += ` order by emp_name asc;`
+<<<<<<< HEAD
 >>>>>>> parent of e952446 (first commit)
+=======
+>>>>>>> parent of 7fbf438 (Update Backend)
             }
             else {
                 let response = [{

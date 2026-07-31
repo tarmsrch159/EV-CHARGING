@@ -9,7 +9,7 @@ const connectionStringOnProd = {
   password: process.env.DB_PASSWORD_PROD || "$!Zy2tTP^3",
   host: process.env.DB_HOST_PROD || "10.100.1.103",
   port: parseInt(process.env.DB_PORT_PROD || "5432", 10),
-  database: process.env.DB_DATABASE_PROD || "evc_01"
+  database: process.env.DB_DATABASE_PROD || "tms_aos_qa"
 }
 
 const connectionStringOnSit = {

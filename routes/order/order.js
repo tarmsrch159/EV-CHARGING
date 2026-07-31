@@ -1540,7 +1540,12 @@ exports.getLoggingOrderInformation = async (req, res, next) => {
     // =========================================================
     //      จัดการเงื่อนไข WHERE แบบรวมศูนย์ (Dynamic Conditions)
     // =========================================================
+<<<<<<< HEAD
     const safeJson = `(CASE WHEN tbl_action_logs.action_body ~ '^\\s*\\{.*\\}\\s*$' THEN tbl_action_logs.action_body::jsonb ELSE NULL END)`;
+=======
+    // นิยามตัวแปรช่วยในการดึงข้อมูลจาก JSON
+    const safeJson = `(CASE WHEN tbl_action_logs.action_body ~ '^\\s*\\{.*\\}\\s*$' THEN tbl_action_logs.action_body::json ELSE NULL END)`;
+>>>>>>> parent of 7fbf438 (Update Backend)
     const safeShipTo = `COALESCE(${safeJson}->'body'->>'ship_to', ${safeJson}->>'ship_to')`;
     const safeOrderId = `COALESCE(${safeJson}->>'order_id', ${safeJson}->'body'->>'order_id', ${safeJson}->>'id')`;
 
@@ -1596,10 +1601,13 @@ exports.getLoggingOrderInformation = async (req, res, next) => {
       total_logs: 0,
     };
 
+<<<<<<< HEAD
     // Optimize left join when user selected specific role and spechific petrol then left join emp and petrol
     let optionalJoinEmployee = (role && role !== "ALL") ? "LEFT JOIN tbl_employee ON tbl_action_logs.action_code = tbl_employee.emp_code" : "";
     let optionalJoinPetrol = (ptrl_group_code && ptrl_group_code !== "ALL") ? `LEFT JOIN tbl_petrol ON ${safeShipTo} = tbl_petrol.ptrl_number` : "";
 
+=======
+>>>>>>> parent of 7fbf438 (Update Backend)
     // =========================================================
     //      คำนวณสรุปแยกประเภทตามเงื่อนไข (Summary Aggregation)
     // =========================================================
@@ -1610,8 +1618,13 @@ exports.getLoggingOrderInformation = async (req, res, next) => {
                 COUNT(*) FILTER (WHERE LOWER(tbl_action_logs.action_desc) IN ('cancel', 'cancel_order_sap')) as cancel_count,
                 COUNT(*) FILTER (WHERE LOWER(tbl_action_logs.action_desc) IN ('manual', 'override', 'cancel', 'cancel_order_sap')) as total_count
             FROM tbl_action_logs 
+<<<<<<< HEAD
             ${optionalJoinEmployee}
             ${optionalJoinPetrol}
+=======
+            LEFT JOIN tbl_employee ON tbl_action_logs.action_code = tbl_employee.emp_code
+            LEFT JOIN tbl_petrol ON ${safeShipTo} = tbl_petrol.ptrl_number
+>>>>>>> parent of 7fbf438 (Update Backend)
             ${summaryWhereClause} ;
         `;
     let tbl_summary = await pgConn.get(
@@ -1708,8 +1721,13 @@ exports.getLoggingOrderInformation = async (req, res, next) => {
                         CEIL(COUNT(*)::float / ${page_limit}) as page_total, 
                         COUNT(*) as rows_total  
                     FROM tbl_action_logs 
+<<<<<<< HEAD
                     ${optionalJoinEmployee}
                     ${optionalJoinPetrol}
+=======
+                    LEFT JOIN tbl_employee ON tbl_action_logs.action_code = tbl_employee.emp_code
+                    LEFT JOIN tbl_petrol ON ${safeShipTo} = tbl_petrol.ptrl_number
+>>>>>>> parent of 7fbf438 (Update Backend)
                     ${whereClause}
                 `;
 
@@ -1807,6 +1825,7 @@ exports.getLoggingOrderInformation = async (req, res, next) => {
     res.status(200).send(response);
   });
 };
+<<<<<<< HEAD
 // // =========== ดึงข้อมูลรายการสั่งซื้อ Order Log ===========
 // exports.getLoggingOrderInformation = async (req, res, next) => {
 //   var xresult = [];
@@ -2124,6 +2143,8 @@ exports.getLoggingOrderInformation = async (req, res, next) => {
 //     res.status(200).send(response);
 //   });
 // };
+=======
+>>>>>>> parent of 7fbf438 (Update Backend)
 // =========================================================
 //  Helper Functions
 // =========================================================
