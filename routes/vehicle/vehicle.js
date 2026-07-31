@@ -8,7 +8,11 @@ const dbPrefix = config.dbPrefix();
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 // Get Brand
+=======
+// 1. BRAND CRUD (tbl_vehicle_brand)
+>>>>>>> parent of 2056d7e (Update Backend)
 exports.getBrand = async (req, res, next) => {
     try {
         const lic_code = req.header('lic_code');
@@ -21,7 +25,7 @@ exports.getBrand = async (req, res, next) => {
         if (search && search.trim() !== "") conditions.push(`LOWER(brand_name) LIKE '%${search.trim().toLowerCase()}%'`);
 
         const whereClause = "WHERE " + conditions.join(" AND ");
-        const dataScript = `SELECT brand_code, brand_name, brand_flag FROM tbl_vehicle_brand ${whereClause} ORDER BY ist_dt DESC OFFSET (${offset} * ${page_limit}) LIMIT ${page_limit};`;
+        const dataScript = `SELECT brand_code, brand_name, brand_flag, ist_dt, mdf_dt FROM tbl_vehicle_brand ${whereClause} ORDER BY ist_dt DESC OFFSET (${offset} * ${page_limit}) LIMIT ${page_limit};`;
 
         const result = await pgConn.get(dbPrefix + lic_code, dataScript, config.connectionString());
         if (result.code) return sendResponse(res, 'error', '-3', "ไม่สามารถดึงข้อมูลได้");
@@ -42,7 +46,7 @@ exports.getBrand = async (req, res, next) => {
         return sendResponse(res, 'error', '-4', "เกิดข้อผิดพลาดภายในระบบ");
     }
 };
-// Add Brand
+
 exports.addBrand = async (req, res, next) => {
     try {
         const lic_code = req.header('lic_code');
@@ -67,25 +71,21 @@ exports.addBrand = async (req, res, next) => {
         return sendResponse(res, 'error', '-4', "เกิดข้อผิดพลาดภายในระบบ");
     }
 };
-// Edit Brand
+
 exports.setBrand = async (req, res, next) => {
     try {
         const lic_code = req.header('lic_code');
         const { brand_code } = req.query;
-        const { brand_name, action } = req.body[0] || {};
+        const { brand_name, brand_flag, action } = req.body[0] || {};
         if (!lic_code || !brand_code || !action) return sendResponse(res, 'error', '-1', 'ข้อมูลพารามิเตอร์ไม่ถูกต้อง');
-
-        //Validate Brand Name
-        const checkScript = `SELECT brand_code FROM tbl_vehicle_brand WHERE brand_name = $1 AND rm_dt IS NULL AND brand_code != $2 LIMIT 1;`;
-        const checkBrand = await pgConn.getWithParams(dbPrefix + lic_code, checkScript, [brand_name, brand_code], config.connectionString());
-        if (!checkBrand.code && checkBrand.data.length > 0) return sendResponse(res, 'error', '-1', `ยี่ห้อรถยนต์ '${brand_name}' นี้มีอยู่ในระบบแล้ว`);
 
         const nowStr = moment().format("YYYY-MM-DD HH:mm:ss");
         let updateFields = [];
         let params = [];
         let index = 1;
 
-        if (brand_name !== undefined && brand_name.trim() !== "") { updateFields.push(`brand_name = $${index++}`); params.push(brand_name); }
+        if (brand_name !== undefined) { updateFields.push(`brand_name = $${index++}`); params.push(brand_name); }
+        if (brand_flag !== undefined) { updateFields.push(`brand_flag = $${index++}`); params.push(brand_flag); }
 
         if (updateFields.length === 0) return sendResponse(res, 'error', '-1', "ไม่มีข้อมูลที่จะแก้ไข");
         updateFields.push(`mdf_dt = $${index++}::timestamp`); params.push(nowStr);
@@ -102,7 +102,7 @@ exports.setBrand = async (req, res, next) => {
         return sendResponse(res, 'error', '-4', "เกิดข้อผิดพลาดภายในระบบ");
     }
 };
-// Remove Brand
+
 exports.removeBrand = async (req, res, next) => {
     try {
         const lic_code = req.header('lic_code');
@@ -125,7 +125,7 @@ exports.removeBrand = async (req, res, next) => {
     }
 };
 
-// Get Model
+// 2. MODEL CRUD (tbl_vehicle_model)
 exports.getModel = async (req, res, next) => {
     try {
         const lic_code = req.header('lic_code');
@@ -139,7 +139,7 @@ exports.getModel = async (req, res, next) => {
 
         const whereClause = "WHERE " + conditions.join(" AND ");
         const dataScript = `
-            SELECT  m.brand_code,b.brand_name, m.model_code, m.model_name,  m.model_flag
+            SELECT m.model_code, m.model_name, m.brand_code, m.model_flag, m.ist_dt, m.mdf_dt, b.brand_name 
             FROM tbl_vehicle_model m 
             LEFT JOIN tbl_vehicle_brand b ON m.brand_code = b.brand_code 
             ${whereClause} 
@@ -166,7 +166,7 @@ exports.getModel = async (req, res, next) => {
         return sendResponse(res, 'error', '-4', "เกิดข้อผิดพลาดภายในระบบ");
     }
 };
-// Add Model
+
 exports.addModel = async (req, res, next) => {
     try {
         const lic_code = req.header('lic_code');
@@ -176,7 +176,7 @@ exports.addModel = async (req, res, next) => {
         const newCode = "mdl-" + moment().format("YYYYMMDDHHmmss") + Math.floor(Math.random() * 100);
         const nowStr = moment().format("YYYY-MM-DD HH:mm:ss");
 
-        const checkScript = `SELECT model_code FROM tbl_vehicle_model WHERE model_name = $1 AND brand_code = $2 AND model_flag = 1 AND rm_dt IS NULL LIMIT 1;`;
+        const checkScript = `SELECT model_code FROM tbl_vehicle_model WHERE model_name = $1 AND brand_code = $2 AND rm_dt IS NULL LIMIT 1;`;
         const checkModel = await pgConn.getWithParams(dbPrefix + lic_code, checkScript, [model_name, brand_code], config.connectionString());
         if (!checkModel.code && checkModel.data.length > 0) return sendResponse(res, 'error', '-1', `รุ่นรถยนต์ '${model_name}' ภายใต้ยี่ห้อที่ระบุมีอยู่ในระบบแล้ว`);
 
@@ -191,30 +191,24 @@ exports.addModel = async (req, res, next) => {
         return sendResponse(res, 'error', '-4', "เกิดข้อผิดพลาดภายในระบบ");
     }
 };
-// Set Model
+
 exports.setModel = async (req, res, next) => {
     try {
         const lic_code = req.header('lic_code');
         const { model_code } = req.query;
-        const { brand_code, model_name, action } = req.body[0] || {};
+        const { brand_code, model_name, model_flag, action } = req.body[0] || {};
         if (!lic_code || !model_code || !action) return sendResponse(res, 'error', '-1', 'ข้อมูลพารามิเตอร์ไม่ถูกต้อง');
-
-        const checkScript = `SELECT model_code FROM tbl_vehicle_model WHERE model_name = $1 AND brand_code = $2 AND model_code != $3 AND model_flag = 1 AND rm_dt IS NULL LIMIT 1;`;
-        const checkModel = await pgConn.getWithParams(dbPrefix + lic_code, checkScript, [model_name, brand_code, model_code], config.connectionString());
-        if (!checkModel.code && checkModel.data.length > 0) return sendResponse(res, 'error', '-1', `รุ่นรถยนต์ '${model_name}' ภายใต้ยี่ห้อที่ระบุมีอยู่ในระบบแล้ว`);
 
         const nowStr = moment().format("YYYY-MM-DD HH:mm:ss");
         let updateFields = [];
         let params = [];
         let index = 1;
 
-        // Push Field And Params
         if (brand_code !== undefined) { updateFields.push(`brand_code = $${index++}`); params.push(brand_code); }
         if (model_name !== undefined) { updateFields.push(`model_name = $${index++}`); params.push(model_name); }
+        if (model_flag !== undefined) { updateFields.push(`model_flag = $${index++}`); params.push(model_flag); }
 
         if (updateFields.length === 0) return sendResponse(res, 'error', '-1', "ไม่มีข้อมูลที่จะแก้ไข");
-
-        // Push End Params
         updateFields.push(`mdf_dt = $${index++}::timestamp`); params.push(nowStr);
         params.push(model_code);
 
@@ -229,7 +223,7 @@ exports.setModel = async (req, res, next) => {
         return sendResponse(res, 'error', '-4', "เกิดข้อผิดพลาดภายในระบบ");
     }
 };
-// Remove Model
+
 exports.removeModel = async (req, res, next) => {
     try {
         const lic_code = req.header('lic_code');
@@ -251,7 +245,8 @@ exports.removeModel = async (req, res, next) => {
         return sendResponse(res, 'error', '-4', "เกิดข้อผิดพลาดภายในระบบ");
     }
 };
-// Get Vehicle Type
+
+// 3. VEHICLE TYPE CRUD (tbl_vehicle_type)
 exports.getType = async (req, res, next) => {
     try {
         const lic_code = req.header('lic_code');
@@ -293,7 +288,7 @@ exports.getType = async (req, res, next) => {
         return sendResponse(res, 'error', '-4', "เกิดข้อผิดพลาดภายในระบบ");
     }
 };
-// Add Vehicle Type
+
 exports.addType = async (req, res, next) => {
     try {
         const lic_code = req.header('lic_code');
@@ -322,7 +317,7 @@ exports.addType = async (req, res, next) => {
         return sendResponse(res, 'error', '-4', "เกิดข้อผิดพลาดภายในระบบ");
     }
 };
-// Set Vehicle Type
+
 exports.setType = async (req, res, next) => {
     try {
         const lic_code = req.header('lic_code');
@@ -360,7 +355,7 @@ exports.setType = async (req, res, next) => {
         return sendResponse(res, 'error', '-4', "เกิดข้อผิดพลาดภายในระบบ");
     }
 };
-// Remove Vehicle Type
+
 exports.removeType = async (req, res, next) => {
     try {
         const lic_code = req.header('lic_code');
@@ -383,6 +378,7 @@ exports.removeType = async (req, res, next) => {
     }
 };
 
+<<<<<<< HEAD
 // Get Vehicle & Spec
 =======
 //example https://stackoverflow.com/questions/6182315/how-can-i-do-base64-encoding-in-node-js
@@ -393,6 +389,9 @@ exports.removeType = async (req, res, next) => {
 =======
 //example https://stackoverflow.com/questions/6182315/how-can-i-do-base64-encoding-in-node-js
 >>>>>>> parent of 7fbf438 (Update Backend)
+=======
+// 4. VEHICLE & SPEC CRUD (tbl_vehicle & tbl_vehicle_ev_spec)
+>>>>>>> parent of 2056d7e (Update Backend)
 exports.getVehicleInformation = async (req, res, next) => {
 
     var xresult = [];
@@ -443,6 +442,7 @@ exports.getVehicleInformation = async (req, res, next) => {
         // Parse supported connectors JSON if stringified
         data.forEach(item => {
             if (typeof item.supported_connectors === 'string') {
+<<<<<<< HEAD
                 try { item.supported_connectors = JSON.parse(item.supported_connectors); } catch (e) { }
 =======
 =======
@@ -460,6 +460,9 @@ exports.getVehicleInformation = async (req, res, next) => {
 >>>>>>> parent of 7fbf438 (Update Backend)
 =======
 >>>>>>> parent of 7fbf438 (Update Backend)
+=======
+                try { item.supported_connectors = JSON.parse(item.supported_connectors); } catch(e) {}
+>>>>>>> parent of 2056d7e (Update Backend)
             }
             else {
                 script = `select veh_code, veh_number, veh_license_number, veh_license_province, tbl_vehicle.veh_type_code, tbl_vehicle_type.veh_type_code, veh_status, 
@@ -484,7 +487,10 @@ exports.getVehicleInformation = async (req, res, next) => {
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 // Add Vehicle & Spec
+=======
+>>>>>>> parent of 2056d7e (Update Backend)
 exports.addVehicle = async (req, res, next) => {
     try {
         const lic_code = req.header('lic_code');
@@ -492,6 +498,7 @@ exports.addVehicle = async (req, res, next) => {
             vehicle_name,
             vehicle_license,
             model_code = null,
+            vehicle_status = 1,
             battery_capacity_kwh,
             max_ac_charge_rate_kw = null,
             max_dc_charge_rate_kw = null,
@@ -559,11 +566,11 @@ exports.addVehicle = async (req, res, next) => {
                 // บันทึกตารางหลัก tbl_vehicle
                 const vScript = `
                     INSERT INTO tbl_vehicle (
-                        vehicle_code, vehicle_name, vehicle_license, vehicle_flag, model_code, ist_dt
-                    ) VALUES ($1, $2, $3, 1, $4, $5);
+                        vehicle_code, vehicle_name, vehicle_license, vehicle_flag, vehicle_status, model_code, ist_dt
+                    ) VALUES ($1, $2, $3, 1, $4, $5, $6);
                 `;
                 const resV = await pgConn.executeWithClient(client, vScript, [
-                    newVehicleCode, vehicle_name, vehicle_license || null, model_code, nowStr
+                    newVehicleCode, vehicle_name, vehicle_license || null, vehicle_status, model_code, nowStr
                 ]);
                 if (resV.code) throw new Error("ไม่สามารถบันทึกข้อมูลรถยนต์หลักได้: " + resV.message);
 =======
@@ -623,7 +630,7 @@ exports.addVehicle = async (req, res, next) => {
         return sendResponse(res, 'error', '-4', "เกิดข้อผิดพลาดภายในระบบ");
     }
 };
-// Set Vehicle & Spec
+
 exports.setVehicle = async (req, res, next) => {
     try {
         const lic_code = req.header('lic_code');
@@ -707,11 +714,22 @@ exports.setVehicle = async (req, res, next) => {
 
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 // Remove Vehicle & Spec
 =======
 >>>>>>> parent of 7fbf438 (Update Backend)
 =======
 >>>>>>> parent of 7fbf438 (Update Backend)
+=======
+        await xglobal.action_logs(lic_code, action[0].id, "แก้ไขรถยนต์และสเปค", JSON.stringify(req.body[0]), "success", action[0].value);
+        return sendResponse(res, 'success', '0', "แก้ไขรถยนต์และสเปคสำเร็จ");
+    } catch (err) {
+        console.error(err);
+        return sendResponse(res, 'error', '-4', "เกิดข้อผิดพลาดภายในระบบ");
+    }
+};
+
+>>>>>>> parent of 2056d7e (Update Backend)
 exports.removeVehicle = async (req, res, next) => {
 
     return (async () => {

@@ -32,8 +32,8 @@ var usersRouter = require('./routes/users/index');
 var authorityRouter = require('./routes/authority/index');
 var stationRouter = require('./routes/station/index');
 var chargerRouter = require('./routes/charger/index');
-var connectorRouter = require('./routes/connector/index');
 var vehicleRouter = require('./routes/vehicle/index');
+<<<<<<< HEAD
 =======
 >>>>>>> parent of 7fbf438 (Update Backend)
 =======
@@ -44,6 +44,10 @@ var itemRouter = require('./routes/item/index');
 var transporeonRouter = require('./routes/transporeon/index');
 var petrolRouter = require('./routes/petrol/index');
 var depotRouter = require('./routes/depot/index');
+=======
+var reservationRouter = require('./routes/reservation/index');
+var transactionLogRouter = require('./routes/transaction-log/index');
+>>>>>>> parent of 2056d7e (Update Backend)
 var utilityRouter = require('./routes/utility/index');
 var centerRouter = require('./routes/center/index');
 var jobRouter = require('./routes/job/index');
@@ -312,6 +316,7 @@ exports.xAuthorization = async (req, res) => {
     }
 }
 
+<<<<<<< HEAD
 //auth
 app.use('/api-tms-v2/auth', authRouter);
 //employee
@@ -456,6 +461,26 @@ app.use('/api-tms-v2/sales-org-config', salesOrgConfigRouter);
 // });
 =======
 >>>>>>> parent of 7fbf438 (Update Backend)
+=======
+// auth
+app.use('/api-evc-v1/auth', authRouter);
+// users
+app.use('/api-evc-v1/users', usersRouter);
+// authority
+app.use('/api-evc-v1/authority', authorityRouter);
+// station
+app.use('/api-evc-v1/station', stationRouter);
+// charger
+app.use('/api-evc-v1/charger', chargerRouter);
+// vehicle
+app.use('/api-evc-v1/vehicle', vehicleRouter);
+// reservation
+app.use('/api-evc-v1/reservation', reservationRouter);
+// transaction-log
+app.use('/api-evc-v1/transaction-log', transactionLogRouter);
+// utility
+app.use('/api-evc-v1/utility', utilityRouter);
+>>>>>>> parent of 2056d7e (Update Backend)
 
 // catch 404 and forward to error handler
 app.use(function (req, res, next) {

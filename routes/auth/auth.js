@@ -12,10 +12,12 @@ const dbPrefix = config.dbPrefix();
 exports.authUserInformation = async (req, res, next) => {
     try {
         const lic_code = req.header('lic_code');
-        const {
-            user_name,
+        const { 
+            user_name, 
             user_password,
-            action
+            emp_username, 
+            emp_userpassword,
+            action 
         } = req.body[0] || {};
 =======
 =======
@@ -53,9 +55,9 @@ exports.authEmployeeInformation = async (req, res, next) => {
 <<<<<<< HEAD
         if (!lic_code || !username || !password) {
             return sendResponse(
-                res,
-                'error',
-                '-1',
+                res, 
+                'error', 
+                '-1', 
                 'ไม่สามารถดึงข้อมูลได้, เนื่องจากข้อมูลพารามิเตอร์ไม่ถูกต้อง'
             );
         }
@@ -79,7 +81,7 @@ exports.authEmployeeInformation = async (req, res, next) => {
                 a.authority_code,
                 a.authority_name
             FROM tbl_users u
-            LEFT JOIN tbl_authority a ON u.user_authority = a.authority_code AND a.rm_dt IS NULL AND a.authority_flag = 1
+            LEFT JOIN tbl_authority a ON u.user_authority = a.authority_no AND a.rm_dt IS NULL AND a.authority_flag = 1
             WHERE u.user_name = $1 
               AND u.user_password = $2 
               AND u.user_flag = 1 
