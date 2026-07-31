@@ -20,6 +20,7 @@ var driverRouter = require('./routes/driver/index');
 var authRouter = require('./routes/auth/index');
 var officeRouter = require('./routes/office/index');
 var locationRouter = require('./routes/location/index');
+<<<<<<< HEAD
 var vehicleRouter = require('./routes/vehicle/index');
 <<<<<<< HEAD
 var reservationRouter = require('./routes/reservation/index');
@@ -34,6 +35,9 @@ var chargerRouter = require('./routes/charger/index');
 var connectorRouter = require('./routes/connector/index');
 var vehicleRouter = require('./routes/vehicle/index');
 =======
+>>>>>>> parent of 7fbf438 (Update Backend)
+=======
+var vehicleRouter = require('./routes/vehicle/index');
 >>>>>>> parent of 7fbf438 (Update Backend)
 var orderRouter = require('./routes/order/index');
 var itemRouter = require('./routes/item/index');
@@ -405,6 +409,7 @@ app.use('/api-tms-v2/sales-org-config', salesOrgConfigRouter);
 // }, {
 //     timezone: "Asia/Bangkok"
 // });
+<<<<<<< HEAD
 
 
 
@@ -449,6 +454,8 @@ app.use('/api-tms-v2/sales-org-config', salesOrgConfigRouter);
 // }, {
 //     timezone: "Asia/Bangkok"
 // });
+=======
+>>>>>>> parent of 7fbf438 (Update Backend)
 
 // catch 404 and forward to error handler
 app.use(function (req, res, next) {
@@ -467,13 +474,19 @@ app.use(function (err, req, res, next) {
 });
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
+=======
+>>>>>>> parent of 7fbf438 (Update Backend)
 // Background Scheduler สำหรับ Auto Order Mail
 autoOrderMailsScheduler.startAutoOrderMailLoop(); // Production รันทุกๆ 10 นาที
 // Background Scheduler สำหรับแจ้งเตือน Low Stock
 lowStockAlertScheduler.startLowStockLoop();
 // Background Scheduler สำหรับดึงข้อมูลออเดอร์จาก SAP
 orderScheduler.startOrderSapScheduler();
+<<<<<<< HEAD
+>>>>>>> parent of 7fbf438 (Update Backend)
+=======
 >>>>>>> parent of 7fbf438 (Update Backend)
 
 module.exports = app;

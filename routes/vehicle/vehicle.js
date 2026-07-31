@@ -7,6 +7,7 @@ const dbPrefix = config.dbPrefix();
 
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 // Get Brand
 exports.getBrand = async (req, res, next) => {
     try {
@@ -389,6 +390,9 @@ exports.removeType = async (req, res, next) => {
 =======
 //example https://stackoverflow.com/questions/6182315/how-can-i-do-base64-encoding-in-node-js
 >>>>>>> parent of 7fbf438 (Update Backend)
+=======
+//example https://stackoverflow.com/questions/6182315/how-can-i-do-base64-encoding-in-node-js
+>>>>>>> parent of 7fbf438 (Update Backend)
 exports.getVehicleInformation = async (req, res, next) => {
 
     var xresult = [];
@@ -432,6 +436,7 @@ exports.getVehicleInformation = async (req, res, next) => {
 
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
         if (result.data.length === 0) return sendResponse(res, 'success', '0', "ไม่พบข้อมูล", [], { page_total: 0, rows_total: 0 });
         const data = JSON.parse(JSON.stringify(result.data).replace(/\:null/gi, '\:""'));
 
@@ -442,12 +447,17 @@ exports.getVehicleInformation = async (req, res, next) => {
 =======
 =======
 >>>>>>> parent of 7fbf438 (Update Backend)
+=======
+>>>>>>> parent of 7fbf438 (Update Backend)
                 from tbl_vehicle 
                 left join tbl_vehicle_type on tbl_vehicle.veh_type_code = tbl_vehicle_type.veh_type_code
                 left join tbl_vehicle_group on tbl_vehicle.veh_group_code = tbl_vehicle_group.veh_group_code 
                 where tbl_vehicle.veh_code = '${veh_code}' and tbl_vehicle.veh_flag = '1'`;
 <<<<<<< HEAD
+<<<<<<< HEAD
 >>>>>>> parent of e952446 (first commit)
+=======
+>>>>>>> parent of 7fbf438 (Update Backend)
 =======
 >>>>>>> parent of 7fbf438 (Update Backend)
             }
@@ -473,6 +483,7 @@ exports.getVehicleInformation = async (req, res, next) => {
 
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 // Add Vehicle & Spec
 exports.addVehicle = async (req, res, next) => {
     try {
@@ -492,6 +503,11 @@ exports.addVehicle = async (req, res, next) => {
                 script += ` and tbl_vehicle.veh_group_code = '${veh_group_code}'`
             }
 >>>>>>> parent of e952446 (first commit)
+=======
+            if (veh_group_code.toString().toUpperCase() != 'ALL') {
+                script += ` and tbl_vehicle.veh_group_code = '${veh_group_code}'`
+            }
+>>>>>>> parent of 7fbf438 (Update Backend)
 =======
             if (veh_group_code.toString().toUpperCase() != 'ALL') {
                 script += ` and tbl_vehicle.veh_group_code = '${veh_group_code}'`
@@ -536,6 +552,7 @@ exports.addVehicle = async (req, res, next) => {
 
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
         const transactionResult = await pgConn.executeTransaction(
             dbPrefix + lic_code,
             async (client) => {
@@ -554,6 +571,11 @@ exports.addVehicle = async (req, res, next) => {
                         script += ` and tbl_vehicle.off_code = '${off_code}'`
                     }
 >>>>>>> parent of e952446 (first commit)
+=======
+                    if (off_code.toString().toUpperCase() != 'ALL') {
+                        script += ` and tbl_vehicle.off_code = '${off_code}'`
+                    }
+>>>>>>> parent of 7fbf438 (Update Backend)
 =======
                     if (off_code.toString().toUpperCase() != 'ALL') {
                         script += ` and tbl_vehicle.off_code = '${off_code}'`
@@ -591,6 +613,7 @@ exports.addVehicle = async (req, res, next) => {
                         response_time: moment().format('YYYY-MM-DD HH:mm:ss')
                     }]
 
+<<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
         await xglobal.action_logs(lic_code, action[0].id, "เพิ่มรถยนต์และสเปค", JSON.stringify(req.body[0]), "success", action[0].value);
@@ -649,6 +672,10 @@ exports.setVehicle = async (req, res, next) => {
                     res.status(200).send(response);
                     return;
 >>>>>>> parent of 7fbf438 (Update Backend)
+=======
+                    res.status(200).send(response);
+                    return;
+>>>>>>> parent of 7fbf438 (Update Backend)
                 }
             } else {
                 let response = [{
@@ -679,7 +706,10 @@ exports.setVehicle = async (req, res, next) => {
 }
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 // Remove Vehicle & Spec
+=======
+>>>>>>> parent of 7fbf438 (Update Backend)
 =======
 >>>>>>> parent of 7fbf438 (Update Backend)
 exports.removeVehicle = async (req, res, next) => {
