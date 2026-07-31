@@ -17,9 +17,11 @@ var usersRouter = require('./routes/users/index');
 var authorityRouter = require('./routes/authority/index');
 var stationRouter = require('./routes/station/index');
 var chargerRouter = require('./routes/charger/index');
+var connectorRouter = require('./routes/connector/index');
 var vehicleRouter = require('./routes/vehicle/index');
 var reservationRouter = require('./routes/reservation/index');
 var transactionLogRouter = require('./routes/transaction-log/index');
+var stationChargerRouter = require('./routes/station-charger-connector/index');
 var utilityRouter = require('./routes/utility/index');
 var app = express();
 var cors = require('cors');
@@ -281,12 +283,16 @@ app.use('/api-evc-v1/authority', authorityRouter);
 app.use('/api-evc-v1/station', stationRouter);
 // charger
 app.use('/api-evc-v1/charger', chargerRouter);
+// connector
+app.use('/api-evc-v1/connector', connectorRouter);
 // vehicle
 app.use('/api-evc-v1/vehicle', vehicleRouter);
 // reservation
 app.use('/api-evc-v1/reservation', reservationRouter);
 // transaction-log
 app.use('/api-evc-v1/transaction-log', transactionLogRouter);
+// Station Charger
+app.use('/api-evc-v1/station-charger', stationChargerRouter);
 // utility
 app.use('/api-evc-v1/utility', utilityRouter);
 

@@ -238,6 +238,32 @@ exports.setStation = async (req, res, next) => {
             );
         }
 
+        // Validate Station Name Th
+        const checkScript = `SELECT ev_station_code FROM tbl_ev_station WHERE (station_name_th = $1 OR station_name_en = $2) AND ev_station_code != $3 AND rm_dt IS NULL LIMIT 1;`;
+        const checkStation = await pgConn.getWithParams(
+            dbPrefix + lic_code,
+            checkScript,
+            [station_name_th, ev_station_code],
+            config.connectionString()
+        );
+
+        if (!checkStation.code && checkStation.data.length > 0) {
+            return sendResponse(res, 'error', '-1', `ชื่อภาษาไทยของสถานี '${station_name_th}' นี้มีอยู่ในระบบแล้ว`);
+        }
+
+        // Validate Station Name En
+        const checkStationEnScript = `SELECT ev_station_code FROM tbl_ev_station WHERE station_name_en = $1 AND ev_station_code != $2 AND rm_dt IS NULL LIMIT 1;`;
+        const checkStationEn = await pgConn.getWithParams(
+            dbPrefix + lic_code,
+            checkStationEnScript,
+            [station_name_en, ev_station_code],
+            config.connectionString()
+        );
+
+        if (!checkStationEn.code && checkStationEn.data.length > 0) {
+            return sendResponse(res, 'error', '-1', `ชื่อภาษาอังกฤษของสถานี '${station_name_en}' นี้มีอยู่ในระบบแล้ว`);
+        }
+
         const nowStr = moment().format("YYYY-MM-DD HH:mm:ss");
 
         let updateFields = [];

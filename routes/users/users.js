@@ -27,6 +27,8 @@ exports.getUsersInformation = async (req, res, next) => {
             );
         }
 
+
+
         const offset = page_index > 0 ? page_index - 1 : 0;
         const conditions = ["u.rm_dt IS NULL"];
 
@@ -51,28 +53,27 @@ exports.getUsersInformation = async (req, res, next) => {
             SELECT 
                 u.user_code,
                 u.user_name,
-                u.user_authority,
                 u.emp_code,
                 u.name,
                 u.lastname,
-                u.photo,
                 u.email,
                 u.mobile,
                 u.gender,
                 u.id_card,
+                u.photo,
                 u.default_lang,
                 u.user_flag,
                 u.ist_dt,
-                u.mdf_dt,
-                a.authority_code,
-                a.authority_name,
                 q.monthly_quota_kwh,
                 q.used_quota_kwh,
                 q.excess_rate_thb_kwh,
                 q.idle_fee_rate_thb_min,
-                TO_CHAR(q.quota_reset_date, 'YYYY-MM-DD') as quota_reset_date
+                TO_CHAR(q.quota_reset_date, 'YYYY-MM-DD') AS quota_reset_date,
+                a.authority_code,
+                a.authority_name,
+                a.permission_role
             FROM tbl_users u
-            LEFT JOIN tbl_authority a ON u.user_authority = a.authority_no AND a.rm_dt IS NULL
+            LEFT JOIN tbl_authority a ON u.user_authority = a.authority_code AND a.rm_dt IS NULL
             LEFT JOIN tbl_user_charging_quota q ON u.user_code = q.user_code
             ${whereClause}
             ORDER BY u.ist_dt DESC
@@ -180,11 +181,79 @@ exports.addUser = async (req, res, next) => {
                 `ข้อมูลพารามิเตอร์ไม่ถูกต้อง (ขาด: ${missing.join(", ")})`
             );
         }
+        const checkIdCard = `SELECT 1 FROM tbl_users WHERE id_card = '${id_card}' AND rm_dt IS NULL LIMIT 1`;
+        const resultCheckIdCard = await pgConn.get(
+            dbPrefix + lic_code,
+            checkIdCard,
+            config.connectionString()
+        );
+        if (resultCheckIdCard.code) {
+            return sendResponse(
+                res,
+                'error',
+                '-3',
+                "ไม่สามารถตรวจสอบข้อมูลได้, กรุณาติดต่อผู้ดูแลระบบ"
+            );
+        }
+        if (resultCheckIdCard.data.length > 0) {
+            return sendResponse(
+                res,
+                'error',
+                '-1',
+                'ไม่สามารถเพิ่มข้อมูลได้, เนื่องจากมีเลขบัตรประชาชนอยู่ในระบบแล้ว'
+            );
+        }
+
+        const checkEmail = `SELECT 1 FROM tbl_users WHERE email = '${email}' AND rm_dt IS NULL LIMIT 1`;
+        const resultCheckEmail = await pgConn.get(
+            dbPrefix + lic_code,
+            checkEmail,
+            config.connectionString()
+        );
+        if (resultCheckEmail.code) {
+            return sendResponse(
+                res,
+                'error',
+                '-3',
+                "ไม่สามารถตรวจสอบข้อมูลได้, กรุณาติดต่อผู้ดูแลระบบ"
+            );
+        }
+        if (resultCheckEmail.data.length > 0) {
+            return sendResponse(
+                res,
+                'error',
+                '-1',
+                'ไม่สามารถเพิ่มข้อมูลได้, เนื่องจากมีอีเมลอยู่ในระบบแล้ว'
+            );
+        }
+
+        const checkUsername = `SELECT 1 FROM tbl_users WHERE user_name = '${user_name}' AND rm_dt IS NULL LIMIT 1`;
+        const resultCheckUsername = await pgConn.get(
+            dbPrefix + lic_code,
+            checkUsername,
+            config.connectionString()
+        );
+        if (resultCheckUsername.code) {
+            return sendResponse(
+                res,
+                'error',
+                '-3',
+                "ไม่สามารถตรวจสอบข้อมูลได้, กรุณาติดต่อผู้ดูแลระบบ"
+            );
+        }
+        if (resultCheckUsername.data.length > 0) {
+            return sendResponse(
+                res,
+                'error',
+                '-1',
+                'ไม่สามารถเพิ่มข้อมูลได้, เนื่องจากมีชื่อผู้ใช้งานอยู่ในระบบแล้ว'
+            );
+        }
 
         const newUserCode = "usr-" + moment().format("YYYYMMDDHHmmss") + Math.floor(Math.random() * 100);
         const encodedPassword = xglobal.Base64.encode(user_password);
         const nowStr = moment().format("YYYY-MM-DD HH:mm:ss");
-        
+
         // กำหนดวันรีเซ็ตอัตโนมัติหากไม่ได้ส่งมา (เป็นวันแรกของเดือนถัดไป)
         const defaultResetDate = quota_reset_date || moment().add(1, 'month').startOf('month').format("YYYY-MM-DD");
 
@@ -208,7 +277,7 @@ exports.addUser = async (req, res, next) => {
                 `;
                 const userParams = [
                     newUserCode, user_name, encodedPassword, user_authority || null, emp_code || null,
-                    name, lastname || null, photo, email, mobile, gender, id_card, 
+                    name, lastname || null, photo, email, mobile, gender, id_card,
                     default_lang, nowStr
                 ];
                 const resUser = await pgConn.executeWithClient(client, userScript, userParams);
@@ -222,7 +291,7 @@ exports.addUser = async (req, res, next) => {
                     ) VALUES ($1, $2, 0.00, $3, $4, $5, $6);
                 `;
                 const quotaParams = [
-                    newUserCode, monthly_quota_kwh, excess_rate_thb_kwh, 
+                    newUserCode, monthly_quota_kwh, excess_rate_thb_kwh,
                     idle_fee_rate_thb_min, defaultResetDate, nowStr
                 ];
                 const resQuota = await pgConn.executeWithClient(client, quotaScript, quotaParams);
@@ -300,6 +369,53 @@ exports.setUser = async (req, res, next) => {
             );
         }
 
+        const checkIdCard = `SELECT 1 FROM tbl_users WHERE id_card = '${id_card}' AND rm_dt IS NULL LIMIT 1`;
+        const resultCheckIdCard = await pgConn.get(
+            dbPrefix + lic_code,
+            checkIdCard,
+            config.connectionString()
+        );
+        if (resultCheckIdCard.code) {
+            return sendResponse(
+                res,
+                'error',
+                '-3',
+                "ไม่สามารถตรวจสอบข้อมูลได้, กรุณาติดต่อผู้ดูแลระบบ"
+            );
+        }
+        if (resultCheckIdCard.data.length > 0) {
+            return sendResponse(
+                res,
+                'error',
+                '-1',
+                'ไม่สามารถเพิ่มข้อมูลได้, เนื่องจากมีเลขบัตรประชาชนอยู่ในระบบแล้ว'
+            );
+        }
+
+        const checkEmail = `SELECT 1 FROM tbl_users WHERE email = '${email}' AND rm_dt IS NULL LIMIT 1`;
+        const resultCheckEmail = await pgConn.get(
+            dbPrefix + lic_code,
+            checkEmail,
+            config.connectionString()
+        );
+        if (resultCheckEmail.code) {
+            return sendResponse(
+                res,
+                'error',
+                '-3',
+                "ไม่สามารถตรวจสอบข้อมูลได้, กรุณาติดต่อผู้ดูแลระบบ"
+            );
+        }
+        if (resultCheckEmail.data.length > 0) {
+            return sendResponse(
+                res,
+                'error',
+                '-1',
+                'ไม่สามารถเพิ่มข้อมูลได้, เนื่องจากมีอีเมลอยู่ในระบบแล้ว'
+            );
+        }
+
+
         const nowStr = moment().format("YYYY-MM-DD HH:mm:ss");
 
         const transactionResult = await pgConn.executeTransaction(
@@ -321,10 +437,10 @@ exports.setUser = async (req, res, next) => {
                 if (user_authority !== undefined) { userUpdateFields.push(`user_authority = $${paramIndex++}`); userParams.push(user_authority); }
                 if (emp_code !== undefined) { userUpdateFields.push(`emp_code = $${paramIndex++}`); userParams.push(emp_code); }
                 if (user_flag !== undefined) { userUpdateFields.push(`user_flag = $${paramIndex++}`); userParams.push(user_flag); }
-                
+
                 if (user_password && user_password.trim() !== "") {
                     const encodedPassword = xglobal.Base64.encode(user_password);
-                    userUpdateFields.push(`user_password = $${paramIndex++}`); 
+                    userUpdateFields.push(`user_password = $${paramIndex++}`);
                     userParams.push(encodedPassword);
                 }
 

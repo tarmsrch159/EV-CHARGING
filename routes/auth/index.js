@@ -3,6 +3,6 @@ const router = express.Router();
 const auth = require('./auth');
 
 router.post('/information', auth.authUserInformation);
-router.post('/reset/information', auth.resetUserPassword);
+router.patch('/reset/information', auth.resetUserPassword);
 
 module.exports = router;

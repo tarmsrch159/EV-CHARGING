@@ -139,6 +139,7 @@ exports.addAuthority = async (req, res, next) => {
         const newAuthCode = "auth-" + moment().format("YYYYMMDDHHmmss") + Math.floor(Math.random() * 100);
         const nowStr = moment().format("YYYY-MM-DD HH:mm:ss");
 
+        // Validate Authority Name
         const checkScript = `SELECT authority_code FROM tbl_authority WHERE authority_name = $1 AND rm_dt IS NULL LIMIT 1;`;
         const checkAuth = await pgConn.getWithParams(
             dbPrefix + lic_code,
@@ -212,6 +213,18 @@ exports.setAuthority = async (req, res, next) => {
             );
         }
 
+        // Validate Authority Name
+        const checkScript = `SELECT authority_code FROM tbl_authority WHERE authority_name = $1 AND rm_dt IS NULL LIMIT 1;`;
+        const checkAuth = await pgConn.getWithParams(
+            dbPrefix + lic_code,
+            checkScript,
+            [authority_name],
+            config.connectionString()
+        );
+
+        if (!checkAuth.code && checkAuth.data.length > 0) {
+            return sendResponse(res, 'error', '-1', `สิทธิ์ '${authority_name}' นี้มีอยู่ในระบบแล้ว`);
+        }
         const nowStr = moment().format("YYYY-MM-DD HH:mm:ss");
 
         const script = `
