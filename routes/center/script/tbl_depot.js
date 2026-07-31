@@ -1,0 +1,33 @@
+const config = require('../../../configuration/connection');
+const pgConn = require('../../../library/pgConnection');
+const moment = require('moment');
+const xglobal = new require('../../../middleware/global');
+
+exports.execute = async (databse) => {
+
+    let script = `CREATE TABLE IF NOT EXISTS public.tbl_depot (
+	dpo_code character varying(50) NOT NULL,
+	dpo_number character varying(50) NOT NULL,
+	dpo_desc character varying(200),
+	dpo_short_desc character varying(100),
+	dpo_address character varying(255),
+	dpo_zip_code character varying(50) NOT NULL,
+	dpo_country_code character varying(50) NOT NULL,
+	dpo_loading_minute integer,
+	dpo_expenses_per_km double precision,
+	dpo_area double precision,
+	dpo_lat double precision,
+	dpo_lon double precision,
+	dpo_flag character varying(2) NOT NULL,
+	ist_dt timestamp without time zone NOT NULL,
+	mdf_dt timestamp without time zone,
+	rm_dt timestamp without time zone,
+	off_code character varying(50) NOT NULL,
+	dpo_group_code character varying(50) NOT NULL,
+	dpo_city character varying(200) DEFAULT NULL::character varying,
+	PRIMARY KEY(dpo_code)
+	);`;
+
+    let standardTemporary = await pgConn.execute(databse, script, config.connectionString());
+    return !standardTemporary.code;
+}

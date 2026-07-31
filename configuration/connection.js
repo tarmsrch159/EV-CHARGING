@@ -17,7 +17,7 @@ const connectionStringOnSit = {
   password: process.env.DB_PASSWORD_SIT || "reP@ssw0rd778900",
   host: process.env.DB_HOST_SIT || "203.150.210.25",
   port: parseInt(process.env.DB_PORT_SIT || "5432", 10),
-  database: process.env.DB_DATABASE_SIT || "evc_01"
+  database: process.env.DB_DATABASE_SIT || "tms_aos01"
 }
 
 exports.connectionString = (dbdatabase) => {
@@ -27,7 +27,7 @@ exports.connectionString = (dbdatabase) => {
       password: process.env.DB_PASSWORD || "reP@ssw0rd778900",
       host: process.env.DB_HOST,
       port: parseInt(process.env.DB_PORT || "5432", 10),
-      database: dbdatabase || process.env.DB_DATABASE || "evc_01"
+      database: dbdatabase || process.env.DB_DATABASE || "tms_aos01"
     };
   }
 
@@ -50,5 +50,5 @@ exports.authMobile = () => {
 }
 
 exports.dbPrefix = () => {
-  return process.env.DB_PREFIX || ``;
+  return process.env.DB_PREFIX || `tms_`;
 }
