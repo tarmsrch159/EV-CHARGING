@@ -18,7 +18,6 @@ var departmentRouter = require('./routes/department/index');
 var positionRouter = require('./routes/position/index');
 var driverRouter = require('./routes/driver/index');
 var authRouter = require('./routes/auth/index');
-<<<<<<< HEAD
 var usersRouter = require('./routes/users/index');
 var authorityRouter = require('./routes/authority/index');
 var stationRouter = require('./routes/station/index');
@@ -28,16 +27,19 @@ var vehicleRouter = require('./routes/vehicle/index');
 var reservationRouter = require('./routes/reservation/index');
 var transactionLogRouter = require('./routes/transaction-log/index');
 var stationChargerRouter = require('./routes/station-charger-connector/index');
-=======
 var officeRouter = require('./routes/office/index');
 var locationRouter = require('./routes/location/index');
+var usersRouter = require('./routes/users/index');
+var authorityRouter = require('./routes/authority/index');
+var stationRouter = require('./routes/station/index');
+var chargerRouter = require('./routes/charger/index');
+var connectorRouter = require('./routes/connector/index');
 var vehicleRouter = require('./routes/vehicle/index');
 var orderRouter = require('./routes/order/index');
 var itemRouter = require('./routes/item/index');
 var transporeonRouter = require('./routes/transporeon/index');
 var petrolRouter = require('./routes/petrol/index');
 var depotRouter = require('./routes/depot/index');
->>>>>>> parent of e952446 (first commit)
 var utilityRouter = require('./routes/utility/index');
 var centerRouter = require('./routes/center/index');
 var jobRouter = require('./routes/job/index');
@@ -306,7 +308,6 @@ exports.xAuthorization = async (req, res) => {
     }
 }
 
-<<<<<<< HEAD
 // auth
 app.use('/api-evc-v1/auth', authRouter);
 // users
@@ -329,61 +330,7 @@ app.use('/api-evc-v1/transaction-log', transactionLogRouter);
 app.use('/api-evc-v1/station-charger', stationChargerRouter);
 // utility
 app.use('/api-evc-v1/utility', utilityRouter);
-=======
-//auth
-app.use('/api-tms-v2/auth', authRouter);
-//employee
-app.use('/api-tms-v2/employee', employeeRouter);
-//division
-app.use('/api-tms-v2/division', divisionRouter);
-//department
-app.use('/api-tms-v2/department', departmentRouter);
-//position
-app.use('/api-tms-v2/position', positionRouter);
-//driver
-app.use('/api-tms-v2/driver', driverRouter);
-//office
-app.use('/api-tms-v2/office', officeRouter);
-//location
-app.use('/api-tms-v2/location', locationRouter);
-//vehicle
-app.use('/api-tms-v2/vehicle', vehicleRouter);
-//order
-app.use('/api-tms-v2/order', orderRouter);
-//item
-app.use('/api-tms-v2/item', itemRouter);
-//transporeon
-app.use('/api-tms-v2/transporeon', transporeonRouter);
-//Petrol
-app.use('/api-tms-v2/petrol', petrolRouter);
-//Depot
-app.use('/api-tms-v2/depot', depotRouter);
-//Utility
-app.use('/api-tms-v2/utility', utilityRouter);
-//Center
-app.use('/api-tms-v2/center', centerRouter);
-//Job
-app.use('/api-tms-v2/job', jobRouter);
-//Tracking
-app.use('/api-tms-v2/tracking', trackingRouter);
-//Report
-app.use('/api-tms-v2/report', reportRouter);
-//MasterTime
-app.use('/api-tms-v2/master-time', masterTimeRouter);
-//Reason
-app.use('/api-tms-v2/reason', reasonRouter);
-//Runout Config
-app.use('/api-tms-v2/runout-config', runoutConfigRouter);
-//SAP Alert Config
-app.use('/api-tms-v2/sap-alert-config', sapAlertConfigRouter);
-//Auto Order Mails
-app.use('/api-tms-v2/auto-order-mails', autoOrderMailsRouter);
-//Low Stock Alert
-app.use('/api-tms-v2/low-stock-alert', lowStockAlertRouter);
-//Manual Stock
-app.use('/api-tms-v2/manual-stock', manualStockRouter);
-//Sales Org Config
-app.use('/api-tms-v2/sales-org-config', salesOrgConfigRouter);
+
 
 
 // ตั้งเวลาทำงานทุก 1 ชั่วโมง
@@ -427,7 +374,6 @@ app.use('/api-tms-v2/sales-org-config', salesOrgConfigRouter);
 // }, {
 //     timezone: "Asia/Bangkok"
 // });
->>>>>>> parent of e952446 (first commit)
 
 // catch 404 and forward to error handler
 app.use(function (req, res, next) {
@@ -445,11 +391,5 @@ app.use(function (err, req, res, next) {
     res.render('error');
 });
 
-// Background Scheduler สำหรับ Auto Order Mail
-autoOrderMailsScheduler.startAutoOrderMailLoop(); // Production รันทุกๆ 10 นาที
-// Background Scheduler สำหรับแจ้งเตือน Low Stock
-lowStockAlertScheduler.startLowStockLoop();
-// Background Scheduler สำหรับดึงข้อมูลออเดอร์จาก SAP
-orderScheduler.startOrderSapScheduler();
 
 module.exports = app;
